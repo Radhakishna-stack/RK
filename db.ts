@@ -125,9 +125,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
 };
 
-const runGAS = (funcName: string, ...args: any[]): Promise<any> => {
-  return new Promise((resolve, reject) => {
-    if (isGAS) {
+const GAS_URL = import.meta.env.VITE_GAS_URL || '';
+
+const runGAS = async (funcName: string, ...args: any[]): Promise<any> => {
+  // If running inside Google Apps Script (as a web app)
+  if (isGAS) {
+    return new Promise((resolve, reject) => {
       (window as any).google.script.run
         .withSuccessHandler((data: any) => {
           if (Array.isArray(data)) {
@@ -137,10 +140,32 @@ const runGAS = (funcName: string, ...args: any[]): Promise<any> => {
           }
         })
         .withFailureHandler(reject)[funcName](...args);
-    } else {
-      resolve(null);
+    });
+  }
+
+  // If running locally but a remote GAS URL is provided
+  if (GAS_URL) {
+    try {
+      const response = await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors', // Apps Script web apps require no-cors or redirect handling
+        body: JSON.stringify({
+          action: funcName,
+          args: args
+        })
+      });
+      // Note: 'no-cors' mode results in an opaque response, we can't read the result easily.
+      // For a real API, a better way is required, but this is a starting point.
+      // Alternatively, we use JSONP or a proxy.
+      console.log(`Sent ${funcName} to remote GAS`);
+      return null;
+    } catch (e) {
+      console.error("Remote GAS Error", e);
+      return null;
     }
-  });
+  }
+
+  return null;
 };
 
 export const dbService = {
@@ -171,7 +196,7 @@ export const dbService = {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Generate 3 professional and high-converting social media ad suggestions for a bike service center named "${businessName}".`,
-      config: { 
+      config: {
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.ARRAY,

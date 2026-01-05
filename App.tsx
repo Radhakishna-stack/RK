@@ -57,21 +57,23 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 overflow-hidden text-slate-900">
       {/* Top Header - Mobile UX */}
-      <header className="bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between sticky top-0 z-40 no-print">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Settings className="w-5 h-5 text-white" />
+      <header className="bg-white border-b border-slate-100 sticky top-0 z-40 no-print">
+        <div className="max-w-screen-xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Settings className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-lg font-bold tracking-tight uppercase">SRK BIKE SERVICE</h1>
           </div>
-          <h1 className="text-lg font-bold tracking-tight uppercase">SRK BIKE SERVICE</h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <button className="relative text-slate-400 hover:text-blue-600 transition-colors">
-            <Bell className="w-6 h-6" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-          </button>
-          <button onClick={() => setActiveTab('settings')} className="text-slate-400 hover:text-blue-600 transition-colors">
-            <Settings className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-4">
+            <button className="relative text-slate-400 hover:text-blue-600 transition-colors">
+              <Bell className="w-6 h-6" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+            </button>
+            <button onClick={() => setActiveTab('settings')} className="text-slate-400 hover:text-blue-600 transition-colors">
+              <Settings className="w-6 h-6" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -83,16 +85,18 @@ const App: React.FC = () => {
       </main>
 
       {/* Bottom Navigation - Mobile UX */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around py-2 px-2 z-50 no-print safe-area-bottom shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
-        <BottomNavItem icon={<Home className="w-6 h-6" />} label="HOME" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
-        <BottomNavItem icon={<LayoutDashboard className="w-6 h-6" />} label="REPORTS" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-        <BottomNavItem icon={<Package className="w-6 h-6" />} label="ITEMS" active={activeTab === 'items'} onClick={() => setActiveTab('items')} />
-        <BottomNavItem icon={<MenuIcon className="w-6 h-6" />} label="MENU" active={activeTab === 'menu'} onClick={() => setActiveTab('menu')} />
-        <div className="flex flex-col items-center gap-1 min-w-[64px] group opacity-70">
-           <div className="p-1 bg-amber-100 rounded-lg text-amber-600">
-             <Sparkles className="w-5 h-5" />
-           </div>
-           <span className="text-[10px] font-bold">PREMIUM</span>
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-50 no-print safe-area-bottom shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
+        <div className="max-w-screen-md mx-auto flex items-center justify-around py-2 px-2">
+          <BottomNavItem icon={<Home className="w-6 h-6" />} label="HOME" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+          <BottomNavItem icon={<LayoutDashboard className="w-6 h-6" />} label="REPORTS" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+          <BottomNavItem icon={<Package className="w-6 h-6" />} label="ITEMS" active={activeTab === 'items'} onClick={() => setActiveTab('items')} />
+          <BottomNavItem icon={<MenuIcon className="w-6 h-6" />} label="MENU" active={activeTab === 'menu'} onClick={() => setActiveTab('menu')} />
+          <div className="flex flex-col items-center gap-1 min-w-[64px] group opacity-70">
+             <div className="p-1 bg-amber-100 rounded-lg text-amber-600">
+               <Sparkles className="w-5 h-5" />
+             </div>
+             <span className="text-[10px] font-bold">PREMIUM</span>
+          </div>
         </div>
       </nav>
     </div>

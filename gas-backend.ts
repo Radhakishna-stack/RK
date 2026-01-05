@@ -8,6 +8,7 @@
 declare var SpreadsheetApp: any;
 declare var HtmlService: any;
 declare var PropertiesService: any;
+declare var ContentService: any;
 
 // 1. RUN THIS ONCE to setup your spreadsheet
 function initProject() {
@@ -42,10 +43,61 @@ function initProject() {
 }
 
 function doGet(e) {
+  if (e.parameter.action) {
+    // Basic API support via GET (for simple queries)
+    const result = handleApiRequest(e.parameter.action, e.parameter.args ? JSON.parse(e.parameter.args) : []);
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+  }
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('BikeService Pro')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function doPost(e) {
+  try {
+    const postData = JSON.parse(e.postData.contents);
+    const action = postData.action;
+    const args = postData.args || [];
+
+    const result = handleApiRequest(action, args);
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ error: err.message })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function handleApiRequest(action, args) {
+  const functions = {
+    'getSettings': getSettings,
+    'updateSettings': updateSettings,
+    'getCustomers': getCustomers,
+    'createCustomer': createCustomer,
+    'deleteCustomer': deleteCustomer,
+    'getComplaints': getComplaints,
+    'createComplaint': createComplaint,
+    'deleteComplaint': deleteComplaint,
+    'updateComplaintStatus': updateComplaintStatus,
+    'getInvoices': getInvoices,
+    'generateInvoice': generateInvoice,
+    'deleteInvoice': deleteInvoice,
+    'getInventory': getInventory,
+    'addInventoryItem': addInventoryItem,
+    'deleteInventoryItem': deleteInventoryItem,
+    'updateStock': updateStock,
+    'getExpenses': getExpenses,
+    'addExpense': addExpense,
+    'deleteExpense': deleteExpense,
+    'getReminders': getReminders,
+    'createReminder': createReminder,
+    'deleteReminder': deleteReminder,
+    'getDashboardStats': getDashboardStats
+  };
+
+  if (functions[action]) {
+    return functions[action](...(Array.isArray(args) ? args : [args]));
+  }
+  throw new Error("Action not found: " + action);
 }
 
 // Mapping from Sheet Headers to Frontend Type Keys
@@ -62,10 +114,10 @@ function getSheetData(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(name);
   if (!sheet) return [];
-  
+
   const values = sheet.getDataRange().getValues();
   if (values.length <= 1) return []; // Only headers or empty
-  
+
   const headers = values.shift();
   return values.map(row => {
     const obj = {};
@@ -74,7 +126,7 @@ function getSheetData(name) {
       let val = row[i];
       if (key === 'photoUrls' && typeof val === 'string') val = val ? val.split(',') : [];
       if (key === 'items' && typeof val === 'string') {
-        try { val = JSON.parse(val || '[]'); } catch(e) { val = []; }
+        try { val = JSON.parse(val || '[]'); } catch (e) { val = []; }
       }
       obj[key] = val;
     });
@@ -153,14 +205,14 @@ function generateInvoice(data) {
   const invSheet = ss.getSheetByName('Invoices');
   const txnSheet = ss.getSheetByName('Transactions');
   const custSheet = ss.getSheetByName('Customers');
-  
+
   const id = 'INV-' + Date.now();
   const now = new Date();
-  
+
   const itemsJson = JSON.stringify(data.items || []);
   // id, complaintId, bike, customer, details, items, estCost, finalAmount, status, mode, date, taxAmount, subTotal
   invSheet.appendRow([id, data.complaintId, data.bikeNumber, data.customerName, data.details, itemsJson, data.estimatedCost, data.finalAmount, data.paymentStatus, data.paymentMode, now, data.taxAmount || 0, data.subTotal || 0]);
-  
+
   if (data.paymentStatus === 'Paid') {
     txnSheet.appendRow(['TXN-' + Date.now(), id, data.finalAmount, data.paymentMode, now]);
     const custRow = findRowById(custSheet, data.bikeNumber, 3);
@@ -220,27 +272,27 @@ function getDashboardStats() {
   const customers = Math.max(0, ss.getSheetByName('Customers').getLastRow() - 1);
   const complaints = Math.max(0, ss.getSheetByName('Complaints').getLastRow() - 1);
   const invoicesCount = Math.max(0, ss.getSheetByName('Invoices').getLastRow() - 1);
-  
+
   const txns = ss.getSheetByName('Transactions').getDataRange().getValues();
   let received = 0;
-  for(let i=1; i<txns.length; i++) received += Number(txns[i][2]);
-  
+  for (let i = 1; i < txns.length; i++) received += Number(txns[i][2]);
+
   const exps = ss.getSheetByName('Expenses').getDataRange().getValues();
   let spent = 0;
   let cashExpenses = 0;
-  for(let i=1; i<exps.length; i++) {
+  for (let i = 1; i < exps.length; i++) {
     const amt = Number(exps[i][2]);
     spent += amt;
     if (exps[i][5] === 'Cash') cashExpenses += amt;
   }
-  
+
   const invs = ss.getSheetByName('Invoices').getDataRange().getValues();
   let pending = 0;
   let cashInvoices = 0;
-  for(let i=1; i<invs.length; i++) {
+  for (let i = 1; i < invs.length; i++) {
     const finalAmt = Number(invs[i][7]);
-    if(invs[i][8] === 'Unpaid') pending += finalAmt;
-    if(invs[i][8] === 'Paid' && invs[i][9] === 'Cash') cashInvoices += finalAmt;
+    if (invs[i][8] === 'Unpaid') pending += finalAmt;
+    if (invs[i][8] === 'Paid' && invs[i][9] === 'Cash') cashInvoices += finalAmt;
   }
 
   const cashInHand = Math.max(0, cashInvoices - cashExpenses);
