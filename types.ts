@@ -1,15 +1,16 @@
 
-
 export interface Customer {
   id: string;
   name: string;
   phone: string;
   bikeNumber: string;
   city: string;
+  email?: string;
+  address?: string;
   gstin?: string;
   loyaltyPoints: number;
   createdAt: string;
-  location?: { lat: number; lng: number };
+  location?: { lat: number; lng: number; address: string };
 }
 
 export enum ComplaintStatus {
@@ -31,11 +32,59 @@ export interface Complaint {
   createdAt: string;
 }
 
+export enum PickupStatus {
+  SCHEDULED = 'Scheduled',
+  ON_THE_WAY = 'On the Way',
+  PICKED_UP = 'Picked Up',
+  AT_CENTER = 'At Center',
+  DELIVERING = 'Delivering',
+  DELIVERED = 'Delivered',
+  CANCELLED = 'Cancelled'
+}
+
+export interface PickupSlot {
+  id: string;
+  date: string;
+  timeRange: string; // "9-11", "11-1", "2-4", "4-6"
+  capacity: number;
+  bookedCount: number;
+}
+
+export interface PickupBooking {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  bikeNumber: string;
+  slotId: string;
+  date: string;
+  timeRange: string;
+  status: PickupStatus;
+  staffId?: string;
+  staffName?: string;
+  location: {
+    lat: number;
+    lng: number;
+    address: string;
+  };
+  createdAt: string;
+}
+
+export interface StaffLocation {
+  staffId: string;
+  bookingId: string | 'IDLE';
+  lat: number;
+  lng: number;
+  lastUpdated: string;
+  staffName: string;
+}
+
 export interface InvoiceItem {
   id: string;
   description: string;
   amount: number;
   gstRate?: number;
+  inventoryItemId?: string;
 }
 
 export interface Invoice {
@@ -56,7 +105,7 @@ export interface Invoice {
 
 export interface Transaction {
   id: string;
-  entityId: string; // Invoice or Expense ID
+  entityId: string;
   type: 'IN' | 'OUT';
   amount: number;
   paymentMode: 'Cash' | 'UPI' | 'Card' | 'Cheque';
@@ -64,12 +113,21 @@ export interface Transaction {
   description: string;
 }
 
+export interface StockTransaction {
+  id: string;
+  itemId: string;
+  type: 'IN' | 'OUT';
+  quantity: number;
+  date: string;
+  note: string;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
   category: string;
   stock: number;
-  unitPrice: number; // Sale Price
+  unitPrice: number;
   purchasePrice: number;
   itemCode: string;
   gstRate?: number;
@@ -84,6 +142,17 @@ export interface Expense {
   date: string;
   notes: string;
   paymentMode: 'Cash' | 'UPI' | 'Card' | 'Cheque';
+}
+
+export interface Salesman {
+  id: string;
+  name: string;
+  phone: string;
+  target: number;
+  salesCount: number;
+  totalSalesValue: number;
+  joinDate: string;
+  status?: 'Available' | 'On Task' | 'Offline';
 }
 
 export interface ServiceReminder {
@@ -135,27 +204,20 @@ export interface AppSettings {
     auditTrail: boolean;
   };
   transaction: {
-    // Header
     showInvoiceNumber: boolean;
     cashSaleDefault: boolean;
     billingName: boolean;
     poDetails: boolean;
     addTime: boolean;
-    
-    // Items
     inclusiveTax: boolean;
     showPurchasePrice: boolean;
     freeItemQuantity: boolean;
-    countChangeLabel: string; // Used for "Count" label
+    countChangeLabel: string;
     countChange: boolean;
     barcodeScanning: boolean;
-
-    // Taxes & Totals
     txnWiseTax: boolean;
     txnWiseDiscount: boolean;
     roundOffTransaction: boolean;
-
-    // More Features
     shareTransactionAs: string;
     passcodeEditDelete: boolean;
     discountDuringPayment: boolean;
@@ -166,7 +228,6 @@ export interface AppSettings {
     additionalFields: boolean;
     transportationDetails: boolean;
     additionalCharges: boolean;
-
     prefixes: {
       firmName: string;
       sale: string;
@@ -180,11 +241,37 @@ export interface AppSettings {
   print: {
     printerType: 'Regular' | 'Thermal';
     theme: string;
+    textSize: 'Small' | 'Medium' | 'Large';
+    pageSize: string;
+    orientation: 'Portrait' | 'Landscape';
+    showUnsavedWarning: boolean;
     showCompanyName: boolean;
+    companyNameSize: 'Small' | 'Medium' | 'Large';
     showLogo: boolean;
     showAddress: boolean;
     showEmail: boolean;
-    paperSize: string;
+    showPhoneNumber: boolean;
+    showGstin: boolean;
+    printBillOfSupply: boolean;
+    extraSpacesTop: number;
+    printOriginalDuplicate: boolean;
+    minRowsInTable: number;
+    totalItemQuantity: boolean;
+    amountWithDecimal: boolean;
+    receivedAmount: boolean;
+    balanceAmount: boolean;
+    printCurrentBalance: boolean;
+    taxDetails: boolean;
+    amountGrouping: boolean;
+    amountInWordsFormat: string;
+    showYouSaved: boolean;
+    printDescription: boolean;
+    printReceivedBy: boolean;
+    printDeliveredBy: boolean;
+    printSignatureText: boolean;
+    customSignatureText: string;
+    printPaymentMode: boolean;
+    printAcknowledgement: boolean;
   };
   gst: {
     enabled: boolean;
@@ -201,6 +288,28 @@ export interface AppSettings {
     sendToParty: boolean;
     copyToSelf: boolean;
     template: string;
+    transactionMessaging: {
+      sendToParty: boolean;
+      smsCopyToSelf: boolean;
+      txnUpdateSms: boolean;
+      showPartyBalance: boolean;
+      showWebInvoiceLink: boolean;
+      autoShareVyapar: boolean;
+      autoMsgTypes: {
+        sale: boolean;
+        purchase: boolean;
+        saleReturn: boolean;
+        purchaseReturn: boolean;
+        estimate: boolean;
+        proforma: boolean;
+        paymentIn: boolean;
+        paymentOut: boolean;
+        saleOrder: boolean;
+        purchaseOrder: boolean;
+        deliveryChallan: boolean;
+        cancelledInvoice: boolean;
+      };
+    };
   };
   party: {
     gstin: boolean;
@@ -221,8 +330,11 @@ export interface AppSettings {
   reminders: {
     enabled: boolean;
     autoSchedule: boolean;
+    manualDateSelection: boolean;
     defaultInterval: string;
     reminderTemplate: string;
+    reminderDaysBefore: number;
+    remindersPerDay: number;
   };
   accounting: {
     enabled: boolean;

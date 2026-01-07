@@ -10,7 +10,7 @@ const PartyStatementPage: React.FC<PartyStatementPageProps> = ({ onNavigate }) =
   return (
     <div className="flex flex-col h-screen bg-[#F0F8FF] overflow-hidden">
       {/* Header */}
-      <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm z-20 relative">
+      <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm z-20 relative no-print">
          <div className="flex items-center gap-3">
             <button onClick={() => onNavigate('home')} className="text-slate-700 p-1 -ml-1">
                <ArrowLeft className="w-6 h-6" />
@@ -24,17 +24,23 @@ const PartyStatementPage: React.FC<PartyStatementPageProps> = ({ onNavigate }) =
                   <div className="w-1 h-1 bg-white rounded-full"></div>
                </div>
             </button>
-            <button className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
+            <button 
+              onClick={() => window.print()}
+              className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center text-white text-[10px] font-bold shadow-md active:scale-95 transition-all"
+            >
                Pdf
             </button>
-            <button className="w-8 h-8 bg-green-600 rounded-md flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
+            <button 
+              onClick={() => window.print()}
+              className="w-8 h-8 bg-green-600 rounded-md flex items-center justify-center text-white text-[10px] font-bold shadow-md active:scale-95 transition-all"
+            >
                xls
             </button>
          </div>
       </div>
       
       {/* Date Filter */}
-      <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-slate-100 z-10">
+      <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-slate-100 z-10 no-print">
          <div className="flex items-center gap-1 text-slate-600 font-medium text-sm cursor-pointer">
             <span>This Month</span>
             <ChevronDown className="w-4 h-4 text-blue-500" />
@@ -49,7 +55,7 @@ const PartyStatementPage: React.FC<PartyStatementPageProps> = ({ onNavigate }) =
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white px-4 py-3 border-t border-slate-100 shadow-sm space-y-3 z-10">
+      <div className="bg-white px-4 py-3 border-t border-slate-100 shadow-sm space-y-3 z-10 no-print">
          <div className="flex justify-between items-center">
             <span className="text-sm text-slate-600">Filters Applied:</span>
             <button className="flex items-center gap-1 border border-blue-200 text-blue-600 px-4 py-1 rounded-full text-xs font-bold bg-white shadow-sm">
@@ -67,7 +73,7 @@ const PartyStatementPage: React.FC<PartyStatementPageProps> = ({ onNavigate }) =
       <div className="flex-1 bg-gradient-to-b from-blue-100/50 to-blue-50 p-4 relative">
          
          {/* Select Party Dropdown */}
-         <div className="bg-white rounded-lg p-3 flex justify-between items-center shadow-sm cursor-pointer border border-blue-100 hover:border-blue-300 transition-colors mb-12">
+         <div className="bg-white rounded-lg p-3 flex justify-between items-center shadow-sm cursor-pointer border border-blue-100 hover:border-blue-300 transition-colors mb-12 no-print">
             <span className="text-slate-400 text-sm font-medium">Select Party</span>
             <ChevronDown className="w-5 h-5 text-blue-500" />
          </div>
@@ -86,9 +92,17 @@ const PartyStatementPage: React.FC<PartyStatementPageProps> = ({ onNavigate }) =
                    <div className="mt-auto self-end w-4 h-1.5 bg-blue-500 rounded-full"></div>
                 </div>
             </div>
-            <p className="text-center text-slate-500 text-sm max-w-[240px] leading-relaxed">
-               To see the statement in full detail, please select a party.
+            <p className="text-center text-slate-500 text-sm max-w-[240px] font-black uppercase tracking-tighter leading-relaxed">
+               Party Statement View
             </p>
+            <div className="mt-8 no-print">
+               <button 
+                 onClick={() => window.print()}
+                 className="px-8 py-4 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-red-500/20 active:scale-95 transition-all"
+               >
+                 <Download className="w-5 h-5" /> Save Statement as PDF
+               </button>
+            </div>
          </div>
       </div>
     </div>

@@ -3,9 +3,10 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { 
   LayoutDashboard, Users, ClipboardList, Receipt, Package, 
-  CreditCard, Settings, Wifi, WifiOff, Bell, Home, Menu as MenuIcon, Sparkles, Plus
+  CreditCard, Settings, Wifi, WifiOff, Bell, Home, Menu as MenuIcon, Sparkles, Plus, BarChart3, MessageCircle
 } from 'lucide-react';
 import DashboardPage from './pages/Dashboard';
+import DashboardV2 from './pages/DashboardV2';
 import CustomersPage from './pages/Customers';
 import ComplaintsPage from './pages/Complaints';
 import BillingPage from './pages/Billing';
@@ -19,85 +20,100 @@ import PartyStatementPage from './pages/PartyStatement';
 import AdsManagerPage from './pages/AdsManager';
 import MenuPage from './pages/Menu';
 import UtilitiesPage from './pages/Utilities';
+import BusinessHoroscope from './pages/BusinessHoroscope';
+import MarketingTools from './pages/MarketingTools';
+import ConnectPage from './pages/Connect';
+import SalesmanTrackingPage from './pages/SalesmanTracking';
+import MarketExplorerPage from './pages/MarketExplorer';
 import { dbService } from './db';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
+  const [initialSearchQuery, setInitialSearchQuery] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'preview'>('preview');
 
   useEffect(() => {
     setConnectionStatus(dbService.getConnectionStatus());
   }, []);
 
+  const navigateToMarketExplorer = (query: string = '') => {
+    setInitialSearchQuery(query);
+    setActiveTab('market_explorer');
+  };
+
   const renderContent = () => {
     if (activeTab.startsWith('settings')) {
       const section = activeTab.split('/')[1] || 'general';
-      return <SettingsPage initialSection={section} />;
+      return <SettingsPage initialSection={section} onNavigate={setActiveTab} />;
     }
 
     switch (activeTab) {
       case 'home': return <DashboardPage onNavigate={setActiveTab} />;
-      case 'dashboard': return <ReportsPage />;
+      case 'dashboard': return <DashboardV2 onNavigate={setActiveTab} />;
+      case 'items': return <InventoryPage onNavigate={(tab) => {
+        if (tab === 'market_explorer') navigateToMarketExplorer();
+        else setActiveTab(tab);
+      }} />;
+      case 'menu': return <MenuPage onNavigate={setActiveTab} />;
+      case 'connect': return <ConnectPage />;
+      
+      // Growth Features
+      case 'horoscope': return <BusinessHoroscope onNavigate={setActiveTab} />;
+      case 'marketing_tools': return <MarketingTools onNavigate={setActiveTab} />;
+      case 'ads': return <AdsManagerPage />;
+      case 'market_explorer': return <MarketExplorerPage onNavigate={setActiveTab} initialQuery={initialSearchQuery} />;
+      
+      // Secondary/Nested Pages
       case 'sale_report': return <SaleReportPage onNavigate={setActiveTab} />;
       case 'party_statement': return <PartyStatementPage onNavigate={setActiveTab} />;
-      case 'items': return <InventoryPage onNavigate={setActiveTab} />;
       case 'billing': return <BillingPage />;
       case 'customers': return <CustomersPage />;
       case 'complaints': return <ComplaintsPage />;
       case 'expenses': return <ExpensesPage />;
       case 'reminders': return <RemindersPage />;
-      // case 'settings' is handled by if block above
-      case 'ads': return <AdsManagerPage />;
-      case 'menu': return <MenuPage onNavigate={setActiveTab} />;
-      case 'utilities': return <UtilitiesPage />;
+      case 'utilities': return <UtilitiesPage onNavigate={setActiveTab} />;
+      case 'salesmen': return <SalesmanTrackingPage onNavigate={setActiveTab} />;
       default: return <DashboardPage onNavigate={setActiveTab} />;
     }
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 overflow-hidden text-slate-900">
-      {/* Top Header - Mobile UX */}
-      <header className="bg-white border-b border-slate-100 sticky top-0 z-40 no-print">
-        <div className="max-w-screen-xl mx-auto px-4 py-3 flex items-center justify-between">
+      {/* Top Header */}
+      {activeTab !== 'dashboard' && activeTab !== 'horoscope' && activeTab !== 'market_explorer' && (
+        <header className="bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between sticky top-0 z-40 no-print">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Settings className="w-5 h-5 text-white" />
+              <BarChart3 className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-lg font-bold tracking-tight uppercase">SRK BIKE SERVICE</h1>
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative text-slate-400 hover:text-blue-600 transition-colors">
-              <Bell className="w-6 h-6" />
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+            <button onClick={() => setActiveTab('connect')} className="relative text-slate-400 hover:text-emerald-600 transition-colors">
+              <MessageCircle className="w-6 h-6" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white"></span>
             </button>
             <button onClick={() => setActiveTab('settings')} className="text-slate-400 hover:text-blue-600 transition-colors">
               <Settings className="w-6 h-6" />
             </button>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto pb-24 relative">
-        <div className="max-w-screen-xl mx-auto px-4 pt-4">
+      <main className={`flex-1 overflow-y-auto relative ${activeTab === 'dashboard' || activeTab === 'market_explorer' ? 'pb-28' : 'pb-24'}`}>
+        <div className={`max-w-screen-xl mx-auto ${activeTab === 'dashboard' || activeTab === 'horoscope' || activeTab === 'market_explorer' ? 'px-0 pt-0' : 'px-4 pt-4'}`}>
           {renderContent()}
         </div>
       </main>
 
       {/* Bottom Navigation - Mobile UX */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-50 no-print safe-area-bottom shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
-        <div className="max-w-screen-md mx-auto flex items-center justify-around py-2 px-2">
-          <BottomNavItem icon={<Home className="w-6 h-6" />} label="HOME" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
-          <BottomNavItem icon={<LayoutDashboard className="w-6 h-6" />} label="REPORTS" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-          <BottomNavItem icon={<Package className="w-6 h-6" />} label="ITEMS" active={activeTab === 'items'} onClick={() => setActiveTab('items')} />
-          <BottomNavItem icon={<MenuIcon className="w-6 h-6" />} label="MENU" active={activeTab === 'menu'} onClick={() => setActiveTab('menu')} />
-          <div className="flex flex-col items-center gap-1 min-w-[64px] group opacity-70">
-             <div className="p-1 bg-amber-100 rounded-lg text-amber-600">
-               <Sparkles className="w-5 h-5" />
-             </div>
-             <span className="text-[10px] font-bold">PREMIUM</span>
-          </div>
-        </div>
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around py-2 px-2 z-50 no-print safe-area-bottom shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
+        <BottomNavItem icon={<Home className="w-6 h-6" />} label="HOME" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+        <BottomNavItem icon={<BarChart3 className="w-6 h-6" />} label="INSIGHTS" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+        <BottomNavItem icon={<MessageCircle className="w-6 h-6" />} label="CONNECT" active={activeTab === 'connect'} onClick={() => setActiveTab('connect')} />
+        <BottomNavItem icon={<Package className="w-6 h-6" />} label="ITEMS" active={activeTab === 'items'} onClick={() => setActiveTab('items')} />
+        <BottomNavItem icon={<MenuIcon className="w-6 h-6" />} label="MORE" active={activeTab === 'menu'} onClick={() => setActiveTab('menu')} />
       </nav>
     </div>
   );

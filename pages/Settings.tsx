@@ -1,24 +1,25 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { 
   Globe, Receipt, Printer, Landmark, MessageSquare, Users, Package, 
   Bell, Calculator, Check, Loader2, ChevronRight, Plus, Trash2, Lock,
   Monitor, Smartphone, Settings as SettingsIcon, ShieldCheck, CreditCard, Sparkles,
-  Eye, X, Scissors, Barcode, Info, Edit2, Crown, Search, ArrowLeft
+  Eye, X, Scissors, Barcode, Info, Edit2, Crown, Search, ArrowLeft, Minus,
+  Truck, Hash, Percent, FileText, AlertCircle, RefreshCw, Menu as MenuIcon,
+  MessageSquareMore, Download, BarChart3, Briefcase
 } from 'lucide-react';
 import { dbService } from '../db';
 import { AppSettings } from '../types';
 
 interface SettingsPageProps {
   initialSection?: string;
+  onNavigate?: (tab: string) => void;
 }
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'general' }) => {
+const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'general', onNavigate }) => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [activeSection, setActiveSection] = useState(initialSection);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const [previewTheme, setPreviewTheme] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     dbService.getSettings().then(setSettings);
@@ -32,10 +33,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'general' 
     };
     setSettings(newSettings);
     dbService.updateSettings(newSettings);
-    
-    // Optional: show quick feedback, though switch is usually enough
-    // setMessage({ type: 'success', text: 'Saved' });
-    // setTimeout(() => setMessage(null), 1000);
   };
 
   const renderSection = () => {
@@ -46,325 +43,384 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'general' 
     );
 
     switch (activeSection) {
+      case 'reports':
+        return (
+          <div className="animate-in fade-in duration-300">
+             <div className="flex items-center gap-4 p-4 bg-white border-b border-slate-100 sticky top-0 z-10 md:hidden">
+               <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-700"><MenuIcon className="w-6 h-6" /></button>
+               <h2 className="text-lg font-bold text-slate-800">Reports</h2>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto pb-32">
+              <ReportCategory title="Transaction">
+                <ReportItem label="Sale Report" onClick={() => onNavigate?.('sale_report')} />
+                <ReportItem label="Purchase Report" onClick={() => {}} />
+                <ReportItem label="Day Book" onClick={() => {}} />
+                <ReportItem label="Profit & Loss" onClick={() => {}} />
+                <ReportItem label="All Transactions Report" onClick={() => {}} />
+                <ReportItem label="Cashflow" onClick={() => {}} />
+                <ReportItem label="Balance Sheet" isPremium onClick={() => {}} />
+              </ReportCategory>
+
+              <ReportCategory title="Party Reports">
+                <ReportItem label="Party Statement" onClick={() => onNavigate?.('party_statement')} />
+                <ReportItem label="Party Wise Profit & Loss" isPremium onClick={() => {}} />
+                <ReportItem label="All Parties Report" onClick={() => {}} noBorder />
+              </ReportCategory>
+
+              <ReportCategory title="Item/Stock Reports">
+                <ReportItem label="Stock Summary Report" onClick={() => onNavigate?.('items')} />
+                <ReportItem label="Item wise Profit & Loss" onClick={() => {}} />
+                <ReportItem label="Stock Detail Report" onClick={() => {}} noBorder />
+              </ReportCategory>
+
+              <ReportCategory title="GST Reports">
+                <ReportItem label="GSTR-1" onClick={() => {}} noBorder />
+              </ReportCategory>
+            </div>
+          </div>
+        );
+
       case 'general':
         return (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <SettingsGroup title="Security & Locale">
+          <div className="space-y-6 animate-in fade-in duration-300 p-4 md:p-8">
+            <SettingsGroup title="Core System Settings">
               <ToggleRow 
-                label="Enable Passcode" 
-                desc="Require a PIN to access management modules" 
+                label="Passcode Protection" 
+                desc="Protect your business data with a secure PIN" 
                 checked={settings.general.passcodeEnabled} 
                 onChange={(v) => handleUpdate('general', { passcodeEnabled: v })} 
               />
               {settings.general.passcodeEnabled && (
-                <div className="pl-14 flex items-center gap-3">
-                  <Lock className="w-4 h-4 text-slate-400" />
+                <div className="pl-4 pb-4">
                   <input 
                     type="password" 
-                    placeholder="Set PIN (4-6 digits)"
-                    className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-40 font-mono"
+                    placeholder="Enter 4-digit PIN"
+                    className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full max-w-xs font-mono"
                     value={settings.general.passcode}
                     onChange={(e) => handleUpdate('general', { passcode: e.target.value })}
                   />
                 </div>
               )}
-              <InputRow label="Business Currency" value={settings.general.currency} onChange={(v) => handleUpdate('general', { currency: v })} />
-              <InputRow label="Decimal Places" type="number" min={0} max={4} value={settings.general.decimalPlaces.toString()} onChange={(v) => handleUpdate('general', { decimalPlaces: parseInt(v) || 0 })} />
-            </SettingsGroup>
-
-            <SettingsGroup title="Inventory Control">
-              <ToggleRow label="Stop Sale on Negative Stock" desc="Prevent billing if stock is unavailable" checked={settings.general.stopNegativeStock} onChange={(v) => handleUpdate('general', { stopNegativeStock: v })} />
-              <ToggleRow label="Block New Items/Parties" desc="Restrict creation during transaction" checked={settings.general.blockNewItems} onChange={(v) => handleUpdate('general', { blockNewItems: v })} />
+              <ToggleRow 
+                label="Stop Negative Stock" 
+                desc="Prevent billing if item quantity is zero" 
+                checked={settings.general.stopNegativeStock} 
+                onChange={(v) => handleUpdate('general', { stopNegativeStock: v })} 
+              />
+              <ToggleRow 
+                label="Audit Trail" 
+                desc="Record all transaction edits and deletions" 
+                checked={settings.general.auditTrail} 
+                onChange={(v) => handleUpdate('general', { auditTrail: v })} 
+              />
+              <InputRow label="Base Currency Symbol" value={settings.general.currency} onChange={(v) => handleUpdate('general', { currency: v })} />
             </SettingsGroup>
           </div>
         );
 
       case 'transaction':
         return (
-          <div className="flex flex-col bg-slate-50 min-h-screen pb-20 -mx-4 md:mx-0 animate-in fade-in duration-300">
-            {/* Mobile-like Header for Transaction Page */}
-            <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-100 sticky top-0 z-20">
-              <div className="flex items-center gap-4">
-                 <button onClick={() => window.history.back()} className="text-slate-600"><ArrowLeft className="w-6 h-6" /></button>
-                 <h2 className="text-lg font-bold text-slate-800">Transaction</h2>
+          <div className="space-y-6 animate-in fade-in duration-300 p-4 md:p-8">
+            <SettingsGroup title="Billing & Invoicing Rules">
+              <ToggleRow label="Show Invoice Number" checked={settings.transaction.showInvoiceNumber} onChange={(v) => handleUpdate('transaction', { showInvoiceNumber: v })} />
+              <ToggleRow label="Inclusive Tax Pricing" desc="Prices entered include GST" checked={settings.transaction.inclusiveTax} onChange={(v) => handleUpdate('transaction', { inclusiveTax: v })} />
+              <ToggleRow label="Round off Total" desc="Automatically round off to nearest Rupee" checked={settings.transaction.roundOffTransaction} onChange={(v) => handleUpdate('transaction', { roundOffTransaction: v })} />
+              <ToggleRow label="Show Profit on Dashboard" checked={settings.transaction.showProfit} onChange={(v) => handleUpdate('transaction', { showProfit: v })} />
+            </SettingsGroup>
+            
+            <SettingsGroup title="Document Prefixes">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputRow label="Firm Name" value={settings.transaction.prefixes.firmName} onChange={(v) => handleUpdate('transaction', { prefixes: { ...settings.transaction.prefixes, firmName: v } })} />
+                <InputRow label="Invoice Prefix" value={settings.transaction.prefixes.sale} onChange={(v) => handleUpdate('transaction', { prefixes: { ...settings.transaction.prefixes, sale: v } })} />
+                <InputRow label="Estimate Prefix" value={settings.transaction.prefixes.estimate} onChange={(v) => handleUpdate('transaction', { prefixes: { ...settings.transaction.prefixes, estimate: v } })} />
+                <InputRow label="Payment In Prefix" value={settings.transaction.prefixes.paymentIn} onChange={(v) => handleUpdate('transaction', { prefixes: { ...settings.transaction.prefixes, paymentIn: v } })} />
               </div>
-              <Search className="w-6 h-6 text-slate-600" />
+            </SettingsGroup>
+          </div>
+        );
+
+      case 'transaction_message':
+        const msgSett = settings.messages.transactionMessaging;
+        const updateMsg = (update: any) => {
+          handleUpdate('messages', {
+            ...settings.messages,
+            transactionMessaging: { ...msgSett, ...update }
+          });
+        };
+        const updateAuto = (key: string, val: boolean) => {
+          updateMsg({
+            autoMsgTypes: { ...msgSett.autoMsgTypes, [key]: val }
+          });
+        };
+
+        return (
+          <div className="animate-in fade-in duration-300">
+             <div className="flex items-center gap-4 p-4 bg-white border-b border-slate-100 sticky top-0 z-10">
+               <button onClick={() => setActiveSection('general')} className="text-slate-700"><ArrowLeft className="w-6 h-6" /></button>
+               <h2 className="text-lg font-bold text-slate-800">Transaction Message</h2>
+            </div>
+            
+            <div className="bg-white divide-y divide-slate-50">
+               <ToggleRow label="Send to party" checked={msgSett.sendToParty} onChange={(v) => updateMsg({sendToParty: v})} />
+               <ToggleRow label="Send SMS Copy to Self" checked={msgSett.smsCopyToSelf} onChange={(v) => updateMsg({smsCopyToSelf: v})} isPremium />
+               <ToggleRow label="Send Transaction Update SMS" checked={msgSett.txnUpdateSms} onChange={(v) => updateMsg({txnUpdateSms: v})} isPremium showRedDot />
+               <ToggleRow label="Show Party's Current Balance" checked={msgSett.showPartyBalance} onChange={(v) => updateMsg({showPartyBalance: v})} />
+               <ToggleRow label="Show web invoice link" checked={msgSett.showWebInvoiceLink} onChange={(v) => updateMsg({showWebInvoiceLink: v})} />
+               <ToggleRow label="Automatically Share Invoices on Vyapar Network" checked={msgSett.autoShareVyapar} onChange={(v) => updateMsg({autoShareVyapar: v})} />
             </div>
 
-            {/* Transaction Header Section */}
-            <div className="mt-4">
-              <SectionHeader title="Transaction Header" />
-              <div className="bg-white border-y border-slate-100">
-                <TransactionToggle label="Invoice/Bill Number" checked={settings.transaction.showInvoiceNumber} onChange={(v) => handleUpdate('transaction', { showInvoiceNumber: v })} info />
-                <TransactionToggle label="Cash Sale by default" checked={settings.transaction.cashSaleDefault} onChange={(v) => handleUpdate('transaction', { cashSaleDefault: v })} info />
-                <TransactionToggle label="Billing name of Parties" checked={settings.transaction.billingName} onChange={(v) => handleUpdate('transaction', { billingName: v })} info />
-                <TransactionToggle label="PO Details(of customer)" checked={settings.transaction.poDetails} onChange={(v) => handleUpdate('transaction', { poDetails: v })} info />
-                <TransactionToggle label="Add Time On Transactions" checked={settings.transaction.addTime} onChange={(v) => handleUpdate('transaction', { addTime: v })} info />
-              </div>
+            <div className="bg-slate-50 px-6 py-4 border-y border-slate-100">
+               <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Select transactions for automatic messaging</h3>
             </div>
 
-            {/* Items Table Section */}
-            <div className="mt-4">
-              <SectionHeader title="Items Table" />
-              <div className="bg-white border-y border-slate-100">
-                <TransactionToggle label="Allow Inclusive/Exclusive tax on Rate(Price/unit)" checked={settings.transaction.inclusiveTax} onChange={(v) => handleUpdate('transaction', { inclusiveTax: v })} info />
-                <TransactionToggle label="Display Purchase Price" checked={settings.transaction.showPurchasePrice} onChange={(v) => handleUpdate('transaction', { showPurchasePrice: v })} info />
-                <TransactionToggle label="Free Item quantity" checked={settings.transaction.freeItemQuantity} onChange={(v) => handleUpdate('transaction', { freeItemQuantity: v })} info />
-                <TransactionToggle label="Count" checked={settings.transaction.countChange} onChange={(v) => handleUpdate('transaction', { countChange: v })} info icon={<Edit2 className="w-4 h-4 text-slate-400" />} />
-                <TransactionToggle label="Barcode scanning for items" checked={settings.transaction.barcodeScanning} onChange={(v) => handleUpdate('transaction', { barcodeScanning: v })} info />
-              </div>
+            <div className="bg-white divide-y divide-slate-50">
+               <ToggleRow label="Sale" checked={msgSett.autoMsgTypes.sale} onChange={(v) => updateAuto('sale', v)} />
+               <ToggleRow label="Purchase" checked={msgSett.autoMsgTypes.purchase} onChange={(v) => updateAuto('purchase', v)} />
+               <ToggleRow label="Sale Return" checked={msgSett.autoMsgTypes.saleReturn} onChange={(v) => updateAuto('saleReturn', v)} />
+               <ToggleRow label="Purchase Return" checked={msgSett.autoMsgTypes.purchaseReturn} onChange={(v) => updateAuto('purchaseReturn', v)} />
+               <ToggleRow label="Estimate" checked={msgSett.autoMsgTypes.estimate} onChange={(v) => updateAuto('estimate', v)} />
+               <ToggleRow label="Proforma Invoice" checked={msgSett.autoMsgTypes.proforma} onChange={(v) => updateAuto('proforma', v)} />
+               <ToggleRow label="Payment-In" checked={msgSett.autoMsgTypes.paymentIn} onChange={(v) => updateAuto('paymentIn', v)} />
+               <ToggleRow label="Payment-Out" checked={msgSett.autoMsgTypes.paymentOut} onChange={(v) => updateAuto('paymentOut', v)} />
+               <ToggleRow label="Sale Order" checked={msgSett.autoMsgTypes.saleOrder} onChange={(v) => updateAuto('saleOrder', v)} />
+               <ToggleRow label="Purchase Order" checked={msgSett.autoMsgTypes.purchaseOrder} onChange={(v) => updateAuto('purchaseOrder', v)} />
+               <ToggleRow label="Delivery Challan" checked={msgSett.autoMsgTypes.deliveryChallan} onChange={(v) => updateAuto('deliveryChallan', v)} />
+               <ToggleRow label="Cancelled Invoice" checked={msgSett.autoMsgTypes.cancelledInvoice} onChange={(v) => updateAuto('cancelledInvoice', v)} noBorder />
+            </div>
+          </div>
+        );
+
+      case 'gst':
+        return (
+          <div className="space-y-6 animate-in fade-in duration-300 p-4 md:p-8">
+            <SettingsGroup title="GST Compliance">
+              <ToggleRow label="Enable GST Features" checked={settings.gst.enabled} onChange={(v) => handleUpdate('gst', { enabled: v })} />
+              <ToggleRow label="Show HSN Code on Print" checked={settings.gst.showHsn} onChange={(v) => handleUpdate('gst', { showHsn: v })} />
+              <ToggleRow label="Reverse Charge (RCM)" checked={settings.gst.rcm} onChange={(v) => handleUpdate('gst', { rcm: v })} />
+              <ToggleRow label="State of Supply" checked={settings.gst.stateOfSupply} onChange={(v) => handleUpdate('gst', { stateOfSupply: v })} />
+            </SettingsGroup>
+          </div>
+        );
+
+      case 'print':
+        return (
+          <div className="space-y-1 animate-in fade-in duration-300">
+            <div className="flex items-center gap-4 p-4 bg-white border-b border-slate-100 sticky top-0 z-10 no-print">
+               <button onClick={() => setActiveSection('general')} className="text-slate-700"><ArrowLeft className="w-6 h-6" /></button>
+               <h2 className="text-lg font-bold text-slate-800">Invoice Print</h2>
             </div>
 
-            {/* Taxes, Discount & Total Section */}
-            <div className="mt-4">
-              <SectionHeader title="Taxes, Discount & Total" />
-              <div className="bg-white border-y border-slate-100">
-                <TransactionToggle label="Transaction wise Tax" checked={settings.transaction.txnWiseTax} onChange={(v) => handleUpdate('transaction', { txnWiseTax: v })} info />
-                <TransactionToggle label="Transaction wise Discount" checked={settings.transaction.txnWiseDiscount} onChange={(v) => handleUpdate('transaction', { txnWiseDiscount: v })} info />
-                <div className="flex items-center justify-between p-4 border-b border-slate-100 last:border-0">
+            <div className="p-4 space-y-4 pb-32">
+              <SettingsGroup title="Themes">
+                <div className="flex items-center justify-between py-2 cursor-pointer group" onClick={() => {}}>
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800 text-sm">Round Off Transaction amount</span>
-                    <Info className="w-4 h-4 text-slate-300 fill-slate-100" />
+                    <span className="text-sm font-medium text-slate-700">Change Theme and Colors</span>
+                    <Info className="w-4 h-4 text-slate-300" />
                   </div>
+                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                </div>
+              </SettingsGroup>
+
+              <SettingsGroup title="Printer Settings">
+                <SelectRow label="Print text size" value={settings.print.textSize} options={['Small', 'Medium', 'Large']} onChange={(v) => handleUpdate('print', { textSize: v })} />
+                <SelectRow label="Page size" value={settings.print.pageSize} options={['A4 (210 x 297 mm)', 'A5', 'Thermal 2"', 'Thermal 3"']} onChange={(v) => handleUpdate('print', { pageSize: v })} />
+                <SelectRow label="Orientation" value={settings.print.orientation} options={['Portrait', 'Landscape']} onChange={(v) => handleUpdate('print', { orientation: v })} />
+              </SettingsGroup>
+
+              <SettingsGroup title="Company Info / Header" showEditIcon>
+                <ToggleRow label="Show warning for unsaved changes" checked={settings.print.showUnsavedWarning} onChange={(v) => handleUpdate('print', { showUnsavedWarning: v })} />
+                <ToggleRow label="Print Company Name" checked={settings.print.showCompanyName} onChange={(v) => handleUpdate('print', { showCompanyName: v })} />
+                <SelectRow label="Company Name Text Size" value={settings.print.companyNameSize} options={['Small', 'Medium', 'Large']} onChange={(v) => handleUpdate('print', { companyNameSize: v })} />
+                <ToggleRow label="Company Logo" checked={settings.print.showLogo} onChange={(v) => handleUpdate('print', { showLogo: v })} />
+                <ToggleRow label="Address" checked={settings.print.showAddress} onChange={(v) => handleUpdate('print', { showAddress: v })} />
+                <ToggleRow label="Email" checked={settings.print.showEmail} onChange={(v) => handleUpdate('print', { showEmail: v })} />
+                <ToggleRow label="Phone number" checked={settings.print.showPhoneNumber} onChange={(v) => handleUpdate('print', { showPhoneNumber: v })} />
+                <ToggleRow label="GSTIN on Sale" checked={settings.print.showGstin} onChange={(v) => handleUpdate('print', { showGstin: v })} />
+                <ToggleRow label="Print Bill of Supply for non tax invoices" checked={settings.print.printBillOfSupply} onChange={(v) => handleUpdate('print', { printBillOfSupply: v })} />
+                <StepperRow label="Extra spaces on top of PDF" value={settings.print.extraSpacesTop} onChange={(v) => handleUpdate('print', { extraSpacesTop: v })} />
+                <ToggleRow label="Print Original/Duplicate" checked={settings.print.printOriginalDuplicate} onChange={(v) => handleUpdate('print', { printOriginalDuplicate: v })} />
+              </SettingsGroup>
+
+              <SettingsGroup title="Totals & Taxes">
+                <StepperRow label="Min. No. of rows in Item Table" value={settings.print.minRowsInTable} onChange={(v) => handleUpdate('print', { minRowsInTable: v })} />
+                <ToggleRow label="Total Item Quantity" checked={settings.print.totalItemQuantity} onChange={(v) => handleUpdate('print', { totalItemQuantity: v })} />
+                <ToggleRow label="Amount with Decimal (eg 0.00)" checked={settings.print.amountWithDecimal} onChange={(v) => handleUpdate('print', { amountWithDecimal: v })} />
+                <ToggleRow label="Received amount" checked={settings.print.receivedAmount} onChange={(v) => handleUpdate('print', { receivedAmount: v })} />
+                <ToggleRow label="Balance amount" checked={settings.print.balanceAmount} onChange={(v) => handleUpdate('print', { balanceAmount: v })} />
+                <ToggleRow label="Print Current Balance of Party" checked={settings.print.printCurrentBalance} onChange={(v) => handleUpdate('print', { printCurrentBalance: v })} />
+                <ToggleRow label="Tax details" checked={settings.print.taxDetails} onChange={(v) => handleUpdate('print', { taxDetails: v })} />
+                <ToggleRow label="Amount Grouping" checked={settings.print.amountGrouping} onChange={(v) => handleUpdate('print', { amountGrouping: v })} />
+                <SelectRow label="Amount in words format" value={settings.print.amountInWordsFormat} options={['Indian (e.g. 1,00,000)', 'International (e.g. 100,000)']} onChange={(v) => handleUpdate('print', { amountInWordsFormat: v })} />
+                <ToggleRow label="You Saved" checked={settings.print.showYouSaved} onChange={(v) => handleUpdate('print', { showYouSaved: v })} />
+              </SettingsGroup>
+
+              <SettingsGroup title="Footer">
+                <ToggleRow label="Print description" checked={settings.print.printDescription} onChange={(v) => handleUpdate('print', { printDescription: v })} />
+                <ToggleRow label="Print Received by details" checked={settings.print.printReceivedBy} onChange={(v) => handleUpdate('print', { printReceivedBy: v })} />
+                <ToggleRow label="Print Delivered by details" checked={settings.print.printDeliveredBy} onChange={(v) => handleUpdate('print', { printDeliveredBy: v })} />
+                <ToggleRow label="Print Signature Text" checked={settings.print.printSignatureText} onChange={(v) => handleUpdate('print', { printSignatureText: v })} />
+                <div className="flex items-center justify-between py-2 cursor-pointer group" onClick={() => {}}>
                   <div className="flex items-center gap-2">
-                    <TransactionSwitch checked={settings.transaction.roundOffTransaction} onChange={(v) => handleUpdate('transaction', { roundOffTransaction: v })} />
+                    <span className="text-sm font-medium text-slate-700">Set Custom Signature Text</span>
+                    <Info className="w-4 h-4 text-slate-300" />
                   </div>
+                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
                 </div>
-                {settings.transaction.roundOffTransaction && (
-                   <div className="p-4 bg-slate-50 flex items-center justify-between gap-2 border-b border-slate-100">
-                      <select className="bg-white border border-slate-200 text-xs font-bold rounded p-2 flex-1"><option>Nearest</option></select>
-                      <span className="text-xs text-slate-500 font-bold">To</span>
-                      <select className="bg-white border border-slate-200 text-xs font-bold rounded p-2 flex-1"><option>1</option></select>
-                   </div>
-                )}
+                <ToggleRow label="Payment Mode" checked={settings.print.printPaymentMode} onChange={(v) => handleUpdate('print', { printPaymentMode: v })} />
+                <ToggleRow label="Print Acknowledgement" checked={settings.print.printAcknowledgement} onChange={(v) => handleUpdate('print', { printAcknowledgement: v })} />
+              </SettingsGroup>
+
+              <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 no-print">
+                 <button 
+                   onClick={() => window.print()}
+                   className="w-full bg-red-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-2xl shadow-red-500/20 hover:bg-red-700 transition-all flex items-center justify-center gap-3 active:scale-95"
+                 >
+                   <Download className="w-5 h-5" /> Save Preview as PDF
+                 </button>
               </div>
             </div>
-
-            {/* More Transaction Features */}
-            <div className="mt-4">
-              <SectionHeader title="More Transaction Features" />
-              <div className="bg-white border-y border-slate-100">
-                 <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                       <span className="font-semibold text-slate-800 text-sm">Share Transaction as</span>
-                       <Info className="w-4 h-4 text-slate-300 fill-slate-100" />
-                    </div>
-                    <span className="text-xs text-slate-500 font-medium flex items-center gap-1">Ask me Everytime <ChevronRight className="w-4 h-4" /></span>
-                 </div>
-                 <TransactionToggle label="Passcode for edit/delete" checked={settings.transaction.passcodeEditDelete} onChange={(v) => handleUpdate('transaction', { passcodeEditDelete: v })} info />
-                 <TransactionToggle label="Discount during Payment" checked={settings.transaction.discountDuringPayment} onChange={(v) => handleUpdate('transaction', { discountDuringPayment: v })} info />
-                 <TransactionToggle label="Link Payments to Invoices" checked={settings.transaction.linkPaymentsToInvoices} onChange={(v) => handleUpdate('transaction', { linkPaymentsToInvoices: v })} info />
-                 <ChevronRow label="Due Dates and Payment terms" info />
-                 <TransactionToggle label="Enable Invoice Preview" checked={settings.transaction.enableInvoicePreview} onChange={(v) => handleUpdate('transaction', { enableInvoicePreview: v })} info />
-                 <ChevronRow label="Additional Fields" info />
-                 <ChevronRow label="Transportation Details" info />
-                 <ChevronRow label="Additional Charges" info redDot />
-                 <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                       <span className="font-semibold text-slate-800 text-sm">Show Profit while making Sale Invoice</span>
-                       <Info className="w-4 h-4 text-slate-300 fill-slate-100" />
-                       <Crown className="w-4 h-4 text-purple-400 fill-purple-100" />
-                    </div>
-                    <TransactionSwitch checked={settings.transaction.showProfit} onChange={(v) => handleUpdate('transaction', { showProfit: v })} />
-                 </div>
-              </div>
-            </div>
-
-            {/* GST Section */}
-            <div className="mt-4">
-              <SectionHeader title="GST" />
-              <div className="bg-white border-y border-slate-100">
-                <TransactionToggle label="Reverse Charge" checked={settings.gst.reverseCharge} onChange={(v) => handleUpdate('gst', { reverseCharge: v })} info />
-                <TransactionToggle label="State of Supply" checked={settings.gst.stateOfSupply} onChange={(v) => handleUpdate('gst', { stateOfSupply: v })} info />
-                <TransactionToggle label="E-Way Bill No." checked={settings.gst.ewayBill} onChange={(v) => handleUpdate('gst', { ewayBill: v })} info />
-              </div>
-            </div>
-
-            {/* Transaction Prefixes */}
-            <div className="mt-4">
-              <SectionHeader title="Transaction Prefixes" />
-              <div className="bg-white border-y border-slate-100 p-4 space-y-4">
-                <PrefixInput label="Firm" value={settings.transaction.prefixes.firmName} onChange={(v) => handleUpdate('transaction', { prefixes: {...settings.transaction.prefixes, firmName: v} })} />
-                <div className="grid grid-cols-2 gap-4">
-                   <PrefixInput label="Sale invoices" value={settings.transaction.prefixes.sale} onChange={(v) => handleUpdate('transaction', { prefixes: {...settings.transaction.prefixes, sale: v} })} />
-                   <PrefixInput label="Credit Note" value={settings.transaction.prefixes.creditNote} onChange={(v) => handleUpdate('transaction', { prefixes: {...settings.transaction.prefixes, creditNote: v} })} />
-                   <PrefixInput label="Sale Order" value={settings.transaction.prefixes.saleOrder} onChange={(v) => handleUpdate('transaction', { prefixes: {...settings.transaction.prefixes, saleOrder: v} })} />
-                   <PrefixInput label="Purchase Order" value={settings.transaction.prefixes.purchaseOrder} onChange={(v) => handleUpdate('transaction', { prefixes: {...settings.transaction.prefixes, purchaseOrder: v} })} />
-                   <PrefixInput label="Estimate" value={settings.transaction.prefixes.estimate} onChange={(v) => handleUpdate('transaction', { prefixes: {...settings.transaction.prefixes, estimate: v} })} />
-                   <PrefixInput label="Payment-In" value={settings.transaction.prefixes.paymentIn} onChange={(v) => handleUpdate('transaction', { prefixes: {...settings.transaction.prefixes, paymentIn: v} })} />
-                </div>
-              </div>
-            </div>
-
           </div>
         );
 
       case 'party':
         return (
-          <div className="flex flex-col bg-slate-50 min-h-screen pb-20 -mx-4 md:mx-0 animate-in fade-in duration-300">
-             {/* Header */}
-             <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-slate-100 sticky top-0 z-20">
-              <div className="flex items-center gap-4">
-                 <button onClick={() => window.history.back()} className="text-slate-600"><ArrowLeft className="w-6 h-6" /></button>
-                 <h2 className="text-lg font-bold text-slate-800">Party</h2>
-              </div>
-              <Search className="w-6 h-6 text-slate-600" />
-            </div>
-
-            {/* Content */}
-            <div className="mt-2 bg-white border-y border-slate-100">
-               <TransactionToggle 
-                 label="GSTIN Number" 
-                 checked={settings.party.gstin} 
-                 onChange={(v) => handleUpdate('party', { gstin: v })} 
-                 info 
-               />
-               <TransactionToggle 
-                 label="Party Grouping" 
-                 checked={settings.party.grouping} 
-                 onChange={(v) => handleUpdate('party', { grouping: v })} 
-                 info 
-               />
-               <ChevronRow label="Party Additional Fields" info />
-               <TransactionToggle 
-                 label="Party Shipping Address" 
-                 checked={settings.party.shippingAddress} 
-                 onChange={(v) => handleUpdate('party', { shippingAddress: v })} 
-                 info 
-               />
-               <div className="flex items-center justify-between p-4 border-b border-slate-100 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800 text-sm">Loyalty Points</span>
-                    <Info className="w-4 h-4 text-slate-300 fill-slate-100" />
-                    <Crown className="w-4 h-4 text-purple-500 fill-purple-100" />
-                  </div>
-                  <TransactionSwitch 
-                    checked={settings.party.loyaltyPoints} 
-                    onChange={(v) => handleUpdate('party', { loyaltyPoints: v })} 
-                  />
-               </div>
-            </div>
+          <div className="space-y-6 animate-in fade-in duration-300 p-4 md:p-8">
+            <SettingsGroup title="Customer & Vendor Settings">
+              <ToggleRow label="Loyalty Points Tracking" checked={settings.party.loyaltyPoints} onChange={(v) => handleUpdate('party', { loyaltyPoints: v })} />
+              <ToggleRow label="Shipping Address" checked={settings.party.shippingAddress} onChange={(v) => handleUpdate('party', { shippingAddress: v })} />
+              <ToggleRow label="Payment Reminders" checked={settings.party.paymentReminders} onChange={(v) => handleUpdate('party', { paymentReminders: v })} />
+              <StepperRow label="Reminder Offset (Days)" value={settings.party.reminderOffset} onChange={(v) => handleUpdate('party', { reminderOffset: v })} />
+            </SettingsGroup>
           </div>
         );
 
-      case 'print':
-        // Existing print logic...
-        const isThermal = settings.print.printerType === 'Thermal';
-        const themes = isThermal 
-          ? ['Thermal 2-inch', 'Thermal 3-inch', 'POS Minimal', 'Eco Bill'] 
-          : ['GST Theme 1', 'Modern Pro', 'Classic Clean', 'Inventory View'];
-
+      case 'item':
         return (
-          <div className="space-y-6 animate-in fade-in duration-300">
-             <div className="bg-white px-4 py-3 flex items-center gap-4 border-b border-slate-100 sticky top-0 z-20 md:hidden">
-               <button onClick={() => window.history.back()} className="text-slate-600"><ArrowLeft className="w-6 h-6" /></button>
-               <h2 className="text-lg font-bold text-slate-800">Print Settings</h2>
-             </div>
-            <SettingsGroup title="Printer Selection">
-              <div className="flex gap-4 p-2 bg-slate-100 rounded-2xl w-full md:w-max">
-                <PrinterTab 
-                  active={!isThermal} 
-                  label="Regular A4/A5" 
-                  icon={<Monitor className="w-5 h-5" />} 
-                  onClick={() => handleUpdate('print', { printerType: 'Regular', theme: 'GST Theme 1', paperSize: 'A4' })} 
-                />
-                <PrinterTab 
-                  active={isThermal} 
-                  label="Thermal POS" 
-                  icon={<Smartphone className="w-5 h-5" />} 
-                  onClick={() => handleUpdate('print', { printerType: 'Thermal', theme: 'Thermal 2-inch', paperSize: 'Thermal 2-inch' })} 
-                />
-              </div>
+          <div className="space-y-6 animate-in fade-in duration-300 p-4 md:p-8">
+            <SettingsGroup title="Inventory Behavior">
+              <ToggleRow label="Maintain Inventory" desc="Track stock levels for all products" checked={settings.item.stockMaintenance} onChange={(v) => handleUpdate('item', { stockMaintenance: v })} />
+              <ToggleRow label="Serial Number Tracking" checked={settings.item.serialTracking} onChange={(v) => handleUpdate('item', { serialTracking: v })} />
+              <ToggleRow label="Batch & Expiry Date" checked={settings.item.batchTracking} onChange={(v) => handleUpdate('item', { batchTracking: v })} />
+              <ToggleRow label="Show MRP Column" checked={settings.item.mrpColumn} onChange={(v) => handleUpdate('item', { mrpColumn: v })} />
             </SettingsGroup>
-
-            <SettingsGroup title={`${settings.print.printerType} Theme Selection`}>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {themes.map((theme) => (
-                  <div key={theme} className="relative group">
-                    <button 
-                      onClick={() => handleUpdate('print', { theme })}
-                      className={`w-full p-4 rounded-2xl border-2 transition-all text-left ${settings.print.theme === theme ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 hover:border-slate-200 bg-slate-50'}`}
-                    >
-                      <div className={`w-full aspect-[3/4] rounded-lg mb-3 flex items-center justify-center transition-colors relative ${settings.print.theme === theme ? 'bg-blue-100' : 'bg-slate-200'}`}>
-                         {isThermal ? <Barcode className={`w-10 h-10 ${settings.print.theme === theme ? 'text-blue-600' : 'text-slate-400'}`} /> : <Receipt className={`w-10 h-10 ${settings.print.theme === theme ? 'text-blue-600' : 'text-slate-400'}`} />}
-                         {settings.print.theme === theme && <div className="absolute top-2 right-2 bg-blue-600 text-white rounded-full p-1"><Check className="w-3 h-3 stroke-[4px]" /></div>}
-                      </div>
-                      <p className="text-xs font-bold text-slate-700 truncate">{theme}</p>
-                    </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setPreviewTheme(theme); }}
-                      className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 bg-white/90 backdrop-blur shadow-sm p-2 rounded-xl text-blue-600 hover:bg-blue-600 hover:text-white transition-all transform translate-y-2 group-hover:translate-y-0"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </SettingsGroup>
-            {/* ... rest of print settings */}
           </div>
         );
-      
-      // ... keep other cases but wrap them with similar structure if needed, or leave as is. 
-      // For brevity, I'll return the existing structure for 'general' and other tabs as they weren't requested to change deeply.
+
+      case 'messages':
+        return (
+          <div className="space-y-6 animate-in fade-in duration-300 p-4 md:p-8">
+            <SettingsGroup title="Communication Channels">
+              <SelectRow label="Preferred Channel" value={settings.messages.channel} options={['WhatsApp', 'SMS']} onChange={(v) => handleUpdate('messages', { channel: v })} />
+              <ToggleRow label="Send copy to self" checked={settings.messages.copyToSelf} onChange={(v) => handleUpdate('messages', { copyToSelf: v })} />
+            </SettingsGroup>
+
+            <SettingsGroup title="WhatsApp Template">
+              <p className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest ml-1">Edit Template</p>
+              <textarea 
+                rows={4} 
+                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                value={settings.messages.template}
+                onChange={(e) => handleUpdate('messages', { template: e.target.value })}
+              />
+              <div className="mt-2 flex flex-wrap gap-2">
+                 <TagLabel text="{{CustomerName}}" />
+                 <TagLabel text="{{InvoiceAmount}}" />
+                 <TagLabel text="{{BikeNumber}}" />
+              </div>
+            </SettingsGroup>
+          </div>
+        );
+
+      case 'reminders':
+        return (
+          <div className="space-y-6 animate-in fade-in duration-300 p-4 md:p-8">
+            <SettingsGroup title="Service Reminders Configuration">
+              <ToggleRow label="Enable Service Reminders" checked={settings.reminders.enabled} onChange={(v) => handleUpdate('reminders', { enabled: v })} />
+              <ToggleRow label="Auto-Schedule on Bill" desc="Automatically calculate next service date after billing" checked={settings.reminders.autoSchedule} onChange={(v) => handleUpdate('reminders', { autoSchedule: v })} />
+              <ToggleRow label="Allow Manual Date Selection" desc="Choose specific dates during billing" checked={settings.reminders.manualDateSelection} onChange={(v) => handleUpdate('reminders', { manualDateSelection: v })} />
+              <SelectRow label="Default Interval" value={settings.reminders.defaultInterval} options={['15 Days', '1 Month', '3 Months', '6 Months']} onChange={(v) => handleUpdate('reminders', { defaultInterval: v })} />
+            </SettingsGroup>
+
+            <SettingsGroup title="Reminder Timing">
+              <StepperRow label="Send reminder days before" value={settings.reminders.reminderDaysBefore} onChange={(v) => handleUpdate('reminders', { reminderDaysBefore: v })} />
+              <StepperRow label="Messages per day" value={settings.reminders.remindersPerDay} onChange={(v) => handleUpdate('reminders', { remindersPerDay: v })} />
+            </SettingsGroup>
+
+            <SettingsGroup title="Reminder Message Template">
+              <p className="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest ml-1">Edit Template</p>
+              <textarea 
+                rows={4} 
+                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                placeholder="Write your reminder message here..."
+                value={settings.reminders.reminderTemplate}
+                onChange={(e) => handleUpdate('reminders', { reminderTemplate: e.target.value })}
+              />
+              <div className="mt-2 flex flex-wrap gap-2">
+                 <TagLabel text="{{CustomerName}}" />
+                 <TagLabel text="{{BikeNumber}}" />
+                 <TagLabel text="{{ReminderDate}}" />
+                 <TagLabel text="{{ServiceType}}" />
+              </div>
+            </SettingsGroup>
+          </div>
+        );
+
       default:
         return (
-           <div className="space-y-6 animate-in fade-in duration-300">
-               {/* Just a placeholder to ensure non-transaction tabs still render somewhat correctly if this was a full rewrite */}
-               <SettingsGroup title="Configuration">
-                   <p className="text-slate-500 text-sm">Use the sidebar to navigate settings.</p>
-               </SettingsGroup>
-           </div>
+          <div className="p-8 text-center text-slate-400 font-bold uppercase tracking-widest">
+            Module under construction
+          </div>
         );
     }
   };
 
-  // If in transaction or party mode (mobile view style), we render full width without sidebar
-  if (activeSection === 'transaction' || activeSection === 'party') {
-     return (
-        <div className="max-w-md mx-auto bg-slate-50 min-h-screen">
-           {renderSection()}
-        </div>
-     );
-  }
-
   return (
-    <div className="flex h-full animate-in fade-in duration-500 overflow-hidden -m-8">
-      {/* Settings Navigation */}
-      <aside className="w-80 border-r border-slate-200 bg-white flex flex-col hidden md:flex">
-        <div className="p-8 border-b border-slate-50">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
-            <SettingsIcon className="w-6 h-6 text-slate-400" /> Settings
+    <div className="flex h-screen animate-in fade-in duration-500 overflow-hidden -m-4 md:-m-8">
+      {/* Mobile Toggle */}
+      <div className="md:hidden fixed top-3 left-3 z-[60] no-print">
+         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="bg-white p-2 rounded-lg shadow-sm border border-slate-200">
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
+         </button>
+      </div>
+
+      {/* Settings Navigation Sidebar */}
+      <aside className={`w-full md:w-80 border-r border-slate-100 bg-white flex flex-col absolute inset-0 z-50 md:relative md:translate-x-0 transition-transform no-print ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+          <h2 className="text-xl font-black tracking-tight text-slate-900 flex items-center gap-3">
+            <SettingsIcon className="w-5 h-5 text-blue-600" /> SETUP
           </h2>
-          <p className="text-sm text-slate-500 mt-1">Configure your workspace</p>
+          <button className="md:hidden" onClick={() => setIsMobileMenuOpen(false)}><X className="w-5 h-5" /></button>
         </div>
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-          <SettingsNavLink id="general" icon={<Globe />} label="General" active={activeSection === 'general'} onClick={setActiveSection} />
-          <SettingsNavLink id="transaction" icon={<Receipt />} label="Transactions" active={activeSection === 'transaction'} onClick={setActiveSection} />
-          <SettingsNavLink id="party" icon={<Users />} label="Party" active={activeSection === 'party'} onClick={setActiveSection} />
-          <SettingsNavLink id="print" icon={<Printer />} label="Print Settings" active={activeSection === 'print'} onClick={setActiveSection} />
-          {/* ... other nav links */}
+          <SettingsNavLink id="reports" icon={<BarChart3 />} label="Reports" active={activeSection === 'reports'} onClick={(id) => { setActiveSection(id); setIsMobileMenuOpen(false); }} />
+          <SettingsNavLink id="utilities" icon={<Briefcase />} label="Utilities Hub" active={activeSection === 'utilities'} onClick={() => { onNavigate?.('utilities'); setIsMobileMenuOpen(false); }} />
+          <SettingsNavLink id="general" icon={<Globe />} label="General" active={activeSection === 'general'} onClick={(id) => { setActiveSection(id); setIsMobileMenuOpen(false); }} />
+          <SettingsNavLink id="transaction" icon={<FileText />} label="Transaction" active={activeSection === 'transaction'} onClick={(id) => { setActiveSection(id); setIsMobileMenuOpen(false); }} />
+          <SettingsNavLink id="transaction_message" icon={<MessageSquareMore />} label="Transaction Message" active={activeSection === 'transaction_message'} onClick={(id) => { setActiveSection(id); setIsMobileMenuOpen(false); }} />
+          <SettingsNavLink id="gst" icon={<Percent />} label="GST Settings" active={activeSection === 'gst'} onClick={(id) => { setActiveSection(id); setIsMobileMenuOpen(false); }} />
+          <SettingsNavLink id="print" icon={<Printer />} label="Print Design" active={activeSection === 'print'} onClick={(id) => { setActiveSection(id); setIsMobileMenuOpen(false); }} />
+          <SettingsNavLink id="party" icon={<Users />} label="Party Settings" active={activeSection === 'party'} onClick={(id) => { setActiveSection(id); setIsMobileMenuOpen(false); }} />
+          <SettingsNavLink id="item" icon={<Package />} label="Item Settings" active={activeSection === 'item'} onClick={(id) => { setActiveSection(id); setIsMobileMenuOpen(false); }} />
+          <SettingsNavLink id="messages" icon={<MessageSquare />} label="Messages" active={activeSection === 'messages'} onClick={(id) => { setActiveSection(id); setIsMobileMenuOpen(false); }} />
+          <SettingsNavLink id="reminders" icon={<Bell />} label="Reminders" active={activeSection === 'reminders'} onClick={(id) => { setActiveSection(id); setIsMobileMenuOpen(false); }} />
         </nav>
+        <div className="p-8 bg-slate-50 border-t border-slate-100">
+           <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase text-slate-400">Security</p>
+                <p className="text-xs font-bold text-slate-700">AES-256 Cloud Sync</p>
+              </div>
+           </div>
+        </div>
       </aside>
 
-      {/* Settings Content Area */}
-      <main className="flex-1 bg-slate-50 overflow-y-auto p-4 md:p-12">
-        <div className="max-w-4xl mx-auto pb-24 relative">
-          {message && (
-            <div className={`fixed top-8 right-8 z-50 px-6 py-3 rounded-2xl shadow-2xl animate-in slide-in-from-top-4 flex items-center gap-3 font-bold text-white ${message.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`}>
-              <Check className="w-5 h-5" /> {message.text}
-            </div>
-          )}
-          
-          <div className="mb-10 hidden md:block">
-            <h3 className="text-3xl font-black text-slate-900 capitalize tracking-tighter">
-              {activeSection.replace('-', ' ')}
-            </h3>
-            <p className="text-slate-500 font-medium">Customize how the {activeSection} module behaves</p>
-          </div>
-
-          {renderSection()}
-        </div>
+      {/* Main Content */}
+      <main className="flex-1 bg-white md:bg-slate-50 overflow-y-auto w-full pt-16 md:pt-0">
+        {renderSection()}
       </main>
     </div>
   );
@@ -372,125 +428,145 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'general' 
 
 // --- Sub Components ---
 
-const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-  <div className="bg-blue-50/50 px-4 py-3 border-t border-slate-100 mt-2 first:mt-0">
-    <h4 className="text-sm font-bold text-blue-900">{title}</h4>
-  </div>
-);
-
-const TransactionToggle: React.FC<{ label: string, checked: boolean, onChange: (v: boolean) => void, info?: boolean, icon?: React.ReactNode }> = ({ label, checked, onChange, info, icon }) => (
-  <div className="flex items-center justify-between p-4 border-b border-slate-100 last:border-0">
-    <div className="flex items-center gap-2">
-      <span className="font-semibold text-slate-800 text-sm">{label}</span>
-      {info && <Info className="w-4 h-4 text-slate-300 fill-slate-100" />}
-      {icon}
+const SettingsGroup: React.FC<{ title: string, children: React.ReactNode, showEditIcon?: boolean }> = ({ title, children, showEditIcon }) => (
+  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-4">
+    <div className="px-6 py-3 border-b border-slate-50 bg-[#F9FBFF] flex items-center justify-between">
+      <h4 className="text-sm font-bold text-slate-600">{title}</h4>
+      {showEditIcon && <Edit2 className="w-4 h-4 text-slate-400 cursor-pointer" />}
     </div>
-    <div className="flex items-center gap-2">
-       <TransactionSwitch checked={checked} onChange={onChange} />
-    </div>
-  </div>
-);
-
-const TransactionSwitch: React.FC<{ checked: boolean, onChange: (v: boolean) => void }> = ({ checked, onChange }) => (
-  <button 
-    onClick={() => onChange(!checked)}
-    className={`w-10 h-5 rounded-full relative transition-colors ${checked ? 'bg-blue-600' : 'bg-slate-300'}`}
-  >
-    <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${checked ? 'left-5.5' : 'left-0.5'}`}></div>
-  </button>
-);
-
-const ChevronRow: React.FC<{ label: string, info?: boolean, redDot?: boolean }> = ({ label, info, redDot }) => (
-  <div className="flex items-center justify-between p-4 border-b border-slate-100 last:border-0 cursor-pointer active:bg-slate-50">
-     <div className="flex items-center gap-2">
-        <span className="font-semibold text-slate-800 text-sm">{label}</span>
-        {info && <Info className="w-4 h-4 text-slate-300 fill-slate-100" />}
-        {redDot && <div className="w-2 h-2 rounded-full bg-red-500"></div>}
-     </div>
-     <ChevronRight className="w-5 h-5 text-slate-400" />
-  </div>
-);
-
-const PrefixInput: React.FC<{ label: string, value: string, onChange: (v: string) => void }> = ({ label, value, onChange }) => (
-   <div className="relative border border-slate-300 rounded-lg bg-white group hover:border-blue-400 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600">
-      <label className="absolute -top-2 left-2 bg-white px-1 text-[10px] font-bold text-slate-500 group-focus-within:text-blue-600">{label}</label>
-      <input 
-         type="text" 
-         className="w-full p-3 bg-transparent outline-none text-sm font-semibold text-slate-900"
-         value={value}
-         onChange={e => onChange(e.target.value)}
-      />
-      <ChevronDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-   </div>
-);
-
-const ChevronDownIcon = (props: any) => (
-   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m6 9 6 6 6-6"/></svg>
-);
-
-// Re-using existing components for Sidebar mode
-const SettingsNavLink: React.FC<{ id: string, icon: React.ReactNode, label: string, active: boolean, onClick: (id: string) => void }> = ({ id, icon, label, active, onClick }) => (
-  <button
-    onClick={() => onClick(id)}
-    className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all group ${
-      active ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-    }`}
-  >
-    <div className="flex items-center gap-3">
-      <span className={active ? 'text-white' : 'text-slate-400 group-hover:text-blue-600'}>{icon}</span>
-      <span className="font-bold text-sm">{label}</span>
-    </div>
-    <ChevronRight className={`w-4 h-4 transition-transform ${active ? 'opacity-100 rotate-90' : 'opacity-0'}`} />
-  </button>
-);
-
-const SettingsGroup: React.FC<{ title: string, children: React.ReactNode }> = ({ title, children }) => (
-  <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-    <div className="px-8 py-4 border-b border-slate-50 bg-slate-50/50">
-      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{title}</h4>
-    </div>
-    <div className="p-8 space-y-6">
+    <div className="p-4 divide-y divide-slate-50">
       {children}
     </div>
   </div>
 );
 
-const ToggleRow: React.FC<{ label: string, desc?: string, checked: boolean, onChange: (v: boolean) => void }> = ({ label, desc, checked, onChange }) => (
-  <div className="flex items-start justify-between">
-    <div className="flex-1 pr-8">
-      <p className="font-bold text-slate-800">{label}</p>
-      {desc && <p className="text-xs text-slate-400 mt-0.5">{desc}</p>}
+const SettingsNavLink: React.FC<{ id: string, icon: React.ReactNode, label: string, active: boolean, onClick: (id: string) => void }> = ({ id, icon, label, active, onClick }) => (
+  <button
+    onClick={() => onClick(id)}
+    className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${
+      active ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:bg-slate-50'
+    }`}
+  >
+    <div className="flex items-center gap-3">
+      {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-5 h-5 stroke-[2]' })}
+      <span className="font-bold text-sm tracking-tight">{label}</span>
     </div>
-    <button
+    {active && <ChevronRight className="w-4 h-4" />}
+  </button>
+);
+
+const ToggleRow: React.FC<{ 
+  label: string, 
+  desc?: string, 
+  checked: boolean, 
+  onChange: (v: boolean) => void,
+  isPremium?: boolean,
+  showRedDot?: boolean,
+  noBorder?: boolean
+}> = ({ label, desc, checked, onChange, isPremium, showRedDot, noBorder }) => (
+  <div className={`flex items-center justify-between py-5 px-6 bg-white ${noBorder ? '' : 'border-b border-slate-50'}`}>
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2">
+        <label className="font-medium text-slate-700 text-sm">{label}</label>
+        {isPremium && (
+          <div className="bg-blue-100 p-1 rounded-md">
+            <Crown className="w-3 h-3 text-blue-600" />
+          </div>
+        )}
+        {showRedDot && <div className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+      </div>
+      {desc && <p className="text-[10px] text-slate-400 font-medium">{desc}</p>}
+    </div>
+    <button 
       onClick={() => onChange(!checked)}
-      className={`w-12 h-6 rounded-full transition-all relative ${checked ? 'bg-blue-600' : 'bg-slate-200'}`}
+      className={`w-12 h-6 rounded-full relative transition-all duration-300 shadow-inner ${checked ? 'bg-blue-600' : 'bg-[#E9E9EA]'}`}
     >
-      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${checked ? 'left-7' : 'left-1'}`} />
+      <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 shadow-md transition-all duration-300 ${checked ? 'left-6.5' : 'left-0.5'}`} />
     </button>
   </div>
 );
 
-const InputRow: React.FC<{ label: string, value: string, onChange: (v: string) => void, type?: string, min?: number, max?: number }> = ({ label, value, onChange, type = "text", min, max }) => (
-  <div className="flex items-center justify-between">
-    <label className="font-bold text-slate-700 text-sm">{label}</label>
+const SelectRow: React.FC<{ label: string, value: string, options: string[], onChange: (v: any) => void }> = ({ label, value, options, onChange }) => (
+  <div className="flex items-center justify-between py-3 px-6">
+    <div className="flex items-center gap-2">
+      <label className="font-medium text-slate-700 text-sm">{label}</label>
+      <Info className="w-4 h-4 text-slate-300" />
+    </div>
+    <div className="flex items-center gap-1 group cursor-pointer" onClick={() => {}}>
+       <select 
+         className="bg-transparent text-xs font-medium text-slate-400 outline-none appearance-none cursor-pointer pr-4 text-right"
+         value={value}
+         onChange={(e) => onChange(e.target.value)}
+       >
+         {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+       </select>
+       <ChevronDownIcon className="w-3.5 h-3.5 text-slate-300 -ml-3 pointer-events-none" />
+    </div>
+  </div>
+);
+
+const StepperRow: React.FC<{ label: string, value: number, onChange: (v: number) => void }> = ({ label, value, onChange }) => (
+  <div className="flex items-center justify-between py-3 px-6">
+    <div className="flex items-center gap-2">
+      <label className="font-medium text-slate-700 text-sm">{label}</label>
+      <Info className="w-4 h-4 text-slate-300" />
+    </div>
+    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-1.5 py-1 scale-90">
+       <button onClick={() => onChange(Math.max(0, value - 1))} className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400"><Minus className="w-3.5 h-3.5" /></button>
+       <span className="font-bold text-xs text-slate-500 w-6 text-center">{value.toString().padStart(2, '0')}</span>
+       <button onClick={() => onChange(value + 1)} className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400"><Plus className="w-3.5 h-3.5" /></button>
+    </div>
+  </div>
+);
+
+const InputRow: React.FC<{ label: string, value: string, onChange: (v: string) => void }> = ({ label, value, onChange }) => (
+  <div className="flex flex-col gap-2 py-3 px-6">
+    <label className="font-black text-[10px] text-slate-400 uppercase tracking-widest ml-1">{label}</label>
     <input
-      type={type}
-      min={min}
-      max={max}
-      className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none w-48 text-right"
+      type="text"
+      className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none w-full"
       value={value}
       onChange={(e) => onChange(e.target.value)}
     />
   </div>
 );
 
-const PrinterTab: React.FC<{ active: boolean, label: string, icon: React.ReactNode, onClick: () => void }> = ({ active, label, icon, onClick }) => (
+const ReportCategory: React.FC<{ title: string, children: React.ReactNode }> = ({ title, children }) => (
+  <div className="mb-2">
+    <h3 className="px-5 py-3 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] bg-slate-50/50 border-y border-slate-100">
+      {title}
+    </h3>
+    <div className="bg-white">
+      {children}
+    </div>
+  </div>
+);
+
+const ReportItem: React.FC<{ label: string, isPremium?: boolean, onClick: () => void, noBorder?: boolean }> = ({ label, isPremium, onClick, noBorder }) => (
   <button 
     onClick={onClick}
-    className={`flex items-center gap-3 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${active ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+    className={`w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50 active:bg-slate-100 transition-all text-left ${!noBorder ? 'border-b border-slate-50' : ''}`}
   >
-    {icon} {label}
+    <div className="flex items-center gap-3">
+      <span className="text-sm font-bold text-slate-700 tracking-tight">{label}</span>
+      {isPremium && (
+        <div className="bg-purple-100 p-1 rounded-md">
+           <Crown className="w-3 h-3 text-purple-600 fill-purple-600" />
+        </div>
+      )}
+    </div>
+    <ChevronRight className="w-4 h-4 text-slate-300" />
   </button>
+);
+
+const TagLabel: React.FC<{ text: string }> = ({ text }) => (
+  <span className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-black border border-blue-100">{text}</span>
+);
+
+const ChevronDownIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  </svg>
 );
 
 export default SettingsPage;

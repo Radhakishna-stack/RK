@@ -1,6 +1,5 @@
 
-
-import { Customer, Complaint, Invoice, Transaction, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings } from './types';
+import { Customer, Complaint, Invoice, Transaction, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, PickupBooking, PickupSlot, StaffLocation, PickupStatus } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
 
 const isGAS = typeof window !== 'undefined' && (window as any).google?.script?.run;
@@ -13,7 +12,13 @@ const LS_KEYS = {
   EXPENSES: 'bp_expenses',
   TRANSACTIONS: 'bp_transactions',
   REMINDERS: 'bp_reminders',
-  SETTINGS: 'bp_settings'
+  SETTINGS: 'bp_settings',
+  STOCK_TRANSACTIONS: 'bp_stock_txns',
+  SALESMEN: 'bp_salesmen',
+  PICKUP_BOOKINGS: 'bp_pickup_bookings',
+  LIVE_TRACKING: 'bp_live_tracking',
+  WA_DEVICE_STATUS: 'bp_wa_status',
+  PICKUP_SLOTS: 'bp_pickup_slots'
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -72,11 +77,37 @@ const DEFAULT_SETTINGS: AppSettings = {
   print: {
     printerType: 'Regular',
     theme: 'GST Theme 1',
+    textSize: 'Medium',
+    pageSize: 'A4 (210 x 297 mm)',
+    orientation: 'Portrait',
+    showUnsavedWarning: true,
     showCompanyName: true,
+    companyNameSize: 'Large',
     showLogo: true,
     showAddress: true,
     showEmail: true,
-    paperSize: 'A4',
+    showPhoneNumber: true,
+    showGstin: false,
+    printBillOfSupply: false,
+    extraSpacesTop: 0,
+    printOriginalDuplicate: false,
+    minRowsInTable: 0,
+    totalItemQuantity: true,
+    amountWithDecimal: true,
+    receivedAmount: true,
+    balanceAmount: true,
+    printCurrentBalance: false,
+    taxDetails: false,
+    amountGrouping: true,
+    amountInWordsFormat: 'Indian (e.g. 1,00,000)',
+    showYouSaved: false,
+    printDescription: true,
+    printReceivedBy: true,
+    printDeliveredBy: false,
+    printSignatureText: false,
+    customSignatureText: '',
+    printPaymentMode: false,
+    printAcknowledgement: false,
   },
   gst: {
     enabled: true,
@@ -92,7 +123,29 @@ const DEFAULT_SETTINGS: AppSettings = {
     channel: 'WhatsApp',
     sendToParty: true,
     copyToSelf: false,
-    template: 'Hi {{CustomerName}}, your bill of {{InvoiceAmount}} for bike {{BikeNumber}} is ready. Balance: {{Balance}}.',
+    template: 'Hi {{CustomerName}}, your bill of {{InvoiceAmount}} for bike {{BikeNumber}} is ready at Moto Gear SRK. Ride safe!',
+    transactionMessaging: {
+      sendToParty: true,
+      smsCopyToSelf: false,
+      txnUpdateSms: false,
+      showPartyBalance: false,
+      showWebInvoiceLink: false,
+      autoShareVyapar: false,
+      autoMsgTypes: {
+        sale: true,
+        purchase: false,
+        saleReturn: false,
+        purchaseReturn: false,
+        estimate: false,
+        proforma: false,
+        paymentIn: false,
+        paymentOut: false,
+        saleOrder: true,
+        purchaseOrder: false,
+        deliveryChallan: false,
+        cancelledInvoice: false
+      }
+    }
   },
   party: {
     gstin: true,
@@ -116,8 +169,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   reminders: {
     enabled: true,
     autoSchedule: true,
+    manualDateSelection: true,
     defaultInterval: '3 Months',
     reminderTemplate: 'Hello {{CustomerName}}, your bike {{BikeNumber}} is due for service. Visit Moto Gear SRK today!',
+    reminderDaysBefore: 3,
+    remindersPerDay: 1,
   },
   accounting: {
     enabled: false,
@@ -125,12 +181,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
 };
 
-const GAS_URL = import.meta.env.VITE_GAS_URL || '';
-
-const runGAS = async (funcName: string, ...args: any[]): Promise<any> => {
-  // If running inside Google Apps Script (as a web app)
-  if (isGAS) {
-    return new Promise((resolve, reject) => {
+const runGAS = (funcName: string, ...args: any[]): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    if (isGAS) {
       (window as any).google.script.run
         .withSuccessHandler((data: any) => {
           if (Array.isArray(data)) {
@@ -140,38 +193,15 @@ const runGAS = async (funcName: string, ...args: any[]): Promise<any> => {
           }
         })
         .withFailureHandler(reject)[funcName](...args);
-    });
-  }
-
-  // If running locally but a remote GAS URL is provided
-  if (GAS_URL) {
-    try {
-      const response = await fetch(GAS_URL, {
-        method: 'POST',
-        mode: 'no-cors', // Apps Script web apps require no-cors or redirect handling
-        body: JSON.stringify({
-          action: funcName,
-          args: args
-        })
-      });
-      // Note: 'no-cors' mode results in an opaque response, we can't read the result easily.
-      // For a real API, a better way is required, but this is a starting point.
-      // Alternatively, we use JSONP or a proxy.
-      console.log(`Sent ${funcName} to remote GAS`);
-      return null;
-    } catch (e) {
-      console.error("Remote GAS Error", e);
-      return null;
+    } else {
+      resolve(null);
     }
-  }
-
-  return null;
+  });
 };
 
 export const dbService = {
   getConnectionStatus: () => isGAS ? 'connected' : 'preview',
 
-  // Settings
   getSettings: async (): Promise<AppSettings> => {
     const gasData = await runGAS('getSettings');
     if (gasData) return gasData;
@@ -183,178 +213,310 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.SETTINGS, JSON.stringify(settings));
   },
 
-  // WhatsApp
   sendWhatsApp: (phone: string, message: string) => {
     const formattedPhone = phone.replace(/\D/g, '');
     const url = `https://wa.me/${formattedPhone.length === 10 ? '91' + formattedPhone : formattedPhone}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   },
 
-  // AI Ads Manager
+  getWADeviceStatus: () => {
+    const status = localStorage.getItem(LS_KEYS.WA_DEVICE_STATUS);
+    return status ? JSON.parse(status) : { connected: false, lastSeen: null, deviceName: 'Unknown' };
+  },
+  setWADeviceStatus: (status: any) => {
+    localStorage.setItem(LS_KEYS.WA_DEVICE_STATUS, JSON.stringify(status));
+  },
+
+  parseLocationFromLink: (text: string) => {
+    // Regex for long format, query format, and mobile short link redirect formats
+    const longRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const queryRegex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const shortRegex = /maps\.app\.goo\.gl\/([a-zA-Z0-9]+)/;
+    
+    const longMatch = text.match(longRegex);
+    if (longMatch) return { lat: parseFloat(longMatch[1]), lng: parseFloat(longMatch[2]) };
+    
+    const queryMatch = text.match(queryRegex);
+    if (queryMatch) return { lat: parseFloat(queryMatch[1]), lng: parseFloat(queryMatch[2]) };
+    
+    return null;
+  },
+
+  updateCustomerLocation: async (customerId: string, location: { lat: number; lng: number; address: string }): Promise<void> => {
+    const customers = await dbService.getCustomers();
+    const updated = customers.map(c => c.id === customerId ? { ...c, location } : c);
+    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(updated));
+  },
+
+  // --- SLOT MANAGEMENT ---
+  getSlotsByDate: async (date: string): Promise<PickupSlot[]> => {
+    const local = localStorage.getItem(LS_KEYS.PICKUP_SLOTS);
+    const all: PickupSlot[] = local ? JSON.parse(local) : [];
+    return all.filter(s => s.date === date);
+  },
+
+  initSlotsForDate: async (date: string, capacity: number): Promise<PickupSlot[]> => {
+    const local = localStorage.getItem(LS_KEYS.PICKUP_SLOTS);
+    let all: PickupSlot[] = local ? JSON.parse(local) : [];
+    all = all.filter(s => s.date !== date);
+    const timeRanges = ["9-11", "11-1", "2-4", "4-6"];
+    const newSlots = timeRanges.map(range => ({
+      id: `SLOT-${date}-${range}`,
+      date,
+      timeRange: range,
+      capacity,
+      bookedCount: 0
+    }));
+    all.push(...newSlots);
+    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(all));
+    return newSlots;
+  },
+
+  updateSlotBookingCount: async (slotId: string, delta: number): Promise<void> => {
+    const local = localStorage.getItem(LS_KEYS.PICKUP_SLOTS);
+    if (!local) return;
+    const all: PickupSlot[] = JSON.parse(local);
+    const updated = all.map(s => s.id === slotId ? { ...s, bookedCount: Math.max(0, s.bookedCount + delta) } : s);
+    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(updated));
+  },
+
+  // --- PICKUP BOOKINGS ---
+  getPickupBookings: async (): Promise<PickupBooking[]> => {
+    const local = localStorage.getItem(LS_KEYS.PICKUP_BOOKINGS);
+    return local ? JSON.parse(local) : [];
+  },
+
+  addPickupBooking: async (data: Partial<PickupBooking>): Promise<PickupBooking> => {
+    const current = await dbService.getPickupBookings();
+    const newBooking: PickupBooking = {
+      id: 'PCK-' + Date.now(),
+      customerId: data.customerId || '',
+      customerName: data.customerName || '',
+      customerPhone: data.customerPhone || '',
+      bikeNumber: data.bikeNumber || '',
+      slotId: data.slotId || '',
+      date: data.date || new Date().toISOString().split('T')[0],
+      timeRange: data.timeRange || '',
+      status: PickupStatus.SCHEDULED,
+      location: data.location || { lat: 0, lng: 0, address: '' },
+      createdAt: new Date().toISOString()
+    };
+
+    if (newBooking.slotId) {
+      await dbService.updateSlotBookingCount(newBooking.slotId, 1);
+    }
+
+    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify([...current, newBooking]));
+    const msg = `Hi ${newBooking.customerName}, your pickup for ${newBooking.bikeNumber} is scheduled for ${newBooking.date} during the ${newBooking.timeRange} slot. We will notify you when our staff is on the way!`;
+    dbService.sendWhatsApp(newBooking.customerPhone, msg);
+    return newBooking;
+  },
+
+  updatePickupStatus: async (id: string, status: PickupStatus, staffId?: string, staffName?: string): Promise<void> => {
+    const bookings = await dbService.getPickupBookings();
+    const updated = bookings.map(b => {
+      if (b.id === id) {
+        const up = { ...b, status, staffId: staffId || b.staffId, staffName: staffName || b.staffName };
+        if (status === PickupStatus.SCHEDULED && staffId && staffName) {
+           const mapsLink = `https://www.google.com/maps?q=${b.location.lat},${b.location.lng}`;
+           const msg = `New Pickup Assigned!\nCustomer: ${b.customerName}\nBike: ${b.bikeNumber}\nAddress: ${b.location.address}\nLocation: ${mapsLink}`;
+           dbService.sendWhatsApp('9123456789', msg);
+        }
+        return up;
+      }
+      return b;
+    });
+    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify(updated));
+  },
+
+  getLiveStaffTracking: async (bookingId: string): Promise<StaffLocation | null> => {
+    const all = JSON.parse(localStorage.getItem(LS_KEYS.LIVE_TRACKING) || '{}');
+    return all[bookingId] || null;
+  },
+
+  getAllStaffLocations: async (): Promise<StaffLocation[]> => {
+    const all = JSON.parse(localStorage.getItem(LS_KEYS.LIVE_TRACKING) || '{}');
+    return Object.values(all);
+  },
+
+  updateStaffLocation: async (data: StaffLocation): Promise<void> => {
+    const all = JSON.parse(localStorage.getItem(LS_KEYS.LIVE_TRACKING) || '{}');
+    const key = data.bookingId === 'IDLE' ? `IDLE_${data.staffId}` : data.bookingId;
+    all[key] = { ...data, lastUpdated: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.LIVE_TRACKING, JSON.stringify(all));
+  },
+
   getAdSuggestions: async (businessName: string): Promise<AdSuggestion[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Generate 3 professional and high-converting social media ad suggestions for a bike service center named "${businessName}".`,
+      contents: `Generate 3 social media ads for "${businessName}".`,
+      config: { responseMimeType: 'application/json' }
+    });
+    return JSON.parse(response.text || '[]');
+  },
+
+  getBusinessHoroscope: async (businessName: string): Promise<string> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Business advice for "${businessName}". 50 words.`,
+    });
+    return response.text || "Perfect day for growth!";
+  },
+
+  generateMarketingContent: async (topic: string): Promise<{ caption: string, tags: string }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Instagram caption for: "${topic}".`,
+      config: { responseMimeType: 'application/json' }
+    });
+    return JSON.parse(response.text || '{"caption":"","tags":""}');
+  },
+
+  searchLocalMarket: async (query: string, lat: number, lng: number): Promise<{ text: string, grounding: any[] }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `What are the best ${query} nearby? Provide a summary and details about the specific locations found.`,
       config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              platform: { type: Type.STRING, description: 'Platform (e.g., Instagram/Facebook)' },
-              headline: { type: Type.STRING },
-              copy: { type: Type.STRING },
-              targetAudience: { type: Type.STRING },
-              estimatedPerformance: { type: Type.STRING, description: 'Brief reasoning for the ad effectiveness' }
-            },
-            required: ['platform', 'headline', 'copy', 'targetAudience', 'estimatedPerformance']
+        tools: [{ googleMaps: {} }],
+        toolConfig: {
+          retrievalConfig: {
+            latLng: {
+              latitude: lat,
+              longitude: lng
+            }
           }
         }
-      }
+      },
     });
-    try {
-      return JSON.parse(response.text || '[]');
-    } catch (e) {
-      console.error("AI Parse Error", e);
-      return [];
-    }
+    return { 
+      text: response.text || "No details found.", 
+      grounding: response.candidates?.[0]?.groundingMetadata?.groundingChunks || [] 
+    };
   },
 
-  // Reminders
-  getReminders: async (): Promise<ServiceReminder[]> => {
-    const gasData = await runGAS('getReminders');
-    if (gasData) return gasData;
-    return JSON.parse(localStorage.getItem(LS_KEYS.REMINDERS) || '[]');
-  },
-  addReminder: async (reminder: Omit<ServiceReminder, 'id' | 'status'>): Promise<ServiceReminder> => {
-    const gasResult = await runGAS('createReminder', reminder);
-    if (gasResult) return gasResult;
-    const reminders = await dbService.getReminders();
-    const newRem: ServiceReminder = { ...reminder, id: 'L-REM-' + Date.now(), status: 'Pending' };
-    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify([...reminders, newRem]));
-    return newRem;
-  },
-  deleteReminder: async (id: string): Promise<void> => {
-    await runGAS('deleteReminder', id);
-    const items = await dbService.getReminders();
-    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify(items.filter(i => i.id !== id)));
-  },
-
-  // Core Data methods
   getCustomers: async (): Promise<Customer[]> => {
-    const gasData = await runGAS('getCustomers');
-    if (gasData) return gasData;
-    return JSON.parse(localStorage.getItem(LS_KEYS.CUSTOMERS) || '[]');
+    const local = localStorage.getItem(LS_KEYS.CUSTOMERS);
+    return local ? JSON.parse(local) : [];
   },
-  addCustomer: async (customer: Omit<Customer, 'id' | 'loyaltyPoints' | 'createdAt'>): Promise<Customer> => {
-    const gasResult = await runGAS('createCustomer', customer);
-    if (gasResult) return gasResult;
+  addCustomer: async (data: any): Promise<Customer> => {
     const customers = await dbService.getCustomers();
-    const newCustomer: Customer = { ...customer, id: 'L-CUST-' + Date.now(), loyaltyPoints: 0, createdAt: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify([...customers, newCustomer]));
-    return newCustomer;
+    const newCust = { ...data, id: 'CUST-' + Date.now(), loyaltyPoints: 0, createdAt: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify([...customers, newCust]));
+    return newCust;
   },
   deleteCustomer: async (id: string): Promise<void> => {
-    await runGAS('deleteCustomer', id);
-    const items = await dbService.getCustomers();
-    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(items.filter(i => i.id !== id)));
+    const customers = await dbService.getCustomers();
+    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(customers.filter(c => c.id !== id)));
+  },
+
+  getSalesmen: async (): Promise<Salesman[]> => {
+    const local = localStorage.getItem(LS_KEYS.SALESMEN);
+    return local ? JSON.parse(local) : [];
+  },
+  addSalesman: async (data: any): Promise<Salesman> => {
+    const salesmen = await dbService.getSalesmen();
+    const newSalesman: Salesman = { ...data, id: 'SM-' + Date.now(), salesCount: 0, totalSalesValue: 0, joinDate: new Date().toISOString(), status: 'Available' };
+    localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify([...salesmen, newSalesman]));
+    return newSalesman;
+  },
+  deleteSalesman: async (id: string): Promise<void> => {
+    const salesmen = await dbService.getSalesmen();
+    localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify(salesmen.filter(s => s.id !== id)));
   },
 
   getComplaints: async (): Promise<Complaint[]> => {
-    const gasData = await runGAS('getComplaints');
-    if (gasData) return gasData;
-    return JSON.parse(localStorage.getItem(LS_KEYS.COMPLAINTS) || '[]');
+    const local = localStorage.getItem(LS_KEYS.COMPLAINTS);
+    return local ? JSON.parse(local) : [];
   },
-  addComplaint: async (complaint: Omit<Complaint, 'id' | 'createdAt' | 'status'>): Promise<Complaint> => {
-    const gasResult = await runGAS('createComplaint', complaint);
-    if (gasResult) return gasResult;
+  addComplaint: async (data: any): Promise<Complaint> => {
     const complaints = await dbService.getComplaints();
-    const newComp: Complaint = { ...complaint, id: 'L-CMP-' + Date.now(), status: ComplaintStatus.PENDING, createdAt: new Date().toISOString() };
+    const newComp = { ...data, id: 'CMP-' + Date.now(), status: ComplaintStatus.PENDING, createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify([...complaints, newComp]));
     return newComp;
   },
-  deleteComplaint: async (id: string): Promise<void> => {
-    await runGAS('deleteComplaint', id);
-    const items = await dbService.getComplaints();
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(items.filter(i => i.id !== id)));
-  },
   updateComplaintStatus: async (id: string, status: ComplaintStatus): Promise<void> => {
-    const gasResult = await runGAS('updateComplaintStatus', id, status);
-    if (gasResult !== null) return;
     const complaints = await dbService.getComplaints();
-    const updated = complaints.map(c => c.id === id ? { ...c, status } : c);
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(updated));
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(complaints.map(c => c.id === id ? { ...c, status } : c)));
+  },
+  deleteComplaint: async (id: string): Promise<void> => {
+    const complaints = await dbService.getComplaints();
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(complaints.filter(c => c.id !== id)));
   },
 
   getInvoices: async (): Promise<Invoice[]> => {
-    const gasData = await runGAS('getInvoices');
-    if (gasData) return gasData;
-    return JSON.parse(localStorage.getItem(LS_KEYS.INVOICES) || '[]');
+    const local = localStorage.getItem(LS_KEYS.INVOICES);
+    return local ? JSON.parse(local) : [];
   },
-  generateInvoice: async (invoiceData: Omit<Invoice, 'id' | 'date'>): Promise<Invoice> => {
-    const gasResult = await runGAS('generateInvoice', invoiceData);
-    if (gasResult) return gasResult;
+  generateInvoice: async (data: any): Promise<Invoice> => {
     const invoices = await dbService.getInvoices();
-    const newInv: Invoice = { ...invoiceData, id: 'L-INV-' + Date.now(), date: new Date().toISOString() };
+    const newInv = { ...data, id: 'INV-' + Date.now(), date: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([...invoices, newInv]));
     return newInv;
   },
   deleteInvoice: async (id: string): Promise<void> => {
-    await runGAS('deleteInvoice', id);
-    const items = await dbService.getInvoices();
-    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify(items.filter(i => i.id !== id)));
+    const invoices = await dbService.getInvoices();
+    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify(invoices.filter(i => i.id !== id)));
   },
 
   getInventory: async (): Promise<InventoryItem[]> => {
-    const gasData = await runGAS('getInventory');
-    if (gasData) return gasData;
-    return JSON.parse(localStorage.getItem(LS_KEYS.INVENTORY) || '[]');
+    const local = localStorage.getItem(LS_KEYS.INVENTORY);
+    return local ? JSON.parse(local) : [];
   },
-  addInventoryItem: async (item: Omit<InventoryItem, 'id' | 'lastUpdated'>): Promise<InventoryItem> => {
-    const gasResult = await runGAS('addInventoryItem', item);
-    if (gasResult) return gasResult;
+  addInventoryItem: async (data: any): Promise<InventoryItem> => {
     const inventory = await dbService.getInventory();
-    const newItem: InventoryItem = { ...item, id: 'L-SKU-' + Date.now(), lastUpdated: new Date().toISOString() };
+    const newItem = { ...data, id: 'SKU-' + Date.now(), lastUpdated: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify([...inventory, newItem]));
     return newItem;
   },
-  deleteInventoryItem: async (id: string): Promise<void> => {
-    await runGAS('deleteInventoryItem', id);
-    const items = await dbService.getInventory();
-    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(items.filter(i => i.id !== id)));
-  },
-  updateStock: async (id: string, delta: number) => {
-    const gasResult = await runGAS('updateStock', id, delta);
-    if (gasResult !== null) return;
+  updateStock: async (id: string, delta: number, note: string = 'Manual Adjustment'): Promise<void> => {
     const inventory = await dbService.getInventory();
-    const updated = inventory.map(i => i.id === id ? { ...i, stock: i.stock + delta, lastUpdated: new Date().toISOString() } : i);
-    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(updated));
+    const updatedInventory = inventory.map(i => i.id === id ? { ...i, stock: i.stock + delta, lastUpdated: new Date().toISOString() } : i);
+    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(updatedInventory));
+  },
+  getStockTransactions: async (itemId: string): Promise<StockTransaction[]> => {
+    const allTxns = JSON.parse(localStorage.getItem(LS_KEYS.STOCK_TRANSACTIONS) || '[]');
+    return allTxns.filter((t: StockTransaction) => t.itemId === itemId).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  },
+  deleteInventoryItem: async (id: string): Promise<void> => {
+    const inventory = await dbService.getInventory();
+    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(inventory.filter(i => i.id !== id)));
   },
 
   getExpenses: async (): Promise<Expense[]> => {
-    const gasData = await runGAS('getExpenses');
-    if (gasData) return gasData;
-    return JSON.parse(localStorage.getItem(LS_KEYS.EXPENSES) || '[]');
+    const local = localStorage.getItem(LS_KEYS.EXPENSES);
+    return local ? JSON.parse(local) : [];
   },
-  addExpense: async (expense: Omit<Expense, 'id' | 'date'>): Promise<Expense> => {
-    const gasResult = await runGAS('addExpense', expense);
-    if (gasResult) return gasResult;
+  addExpense: async (data: any): Promise<Expense> => {
     const expenses = await dbService.getExpenses();
-    const newExp: Expense = { ...expense, id: 'L-EXP-' + Date.now(), date: new Date().toISOString() };
+    const newExp = { ...data, id: 'EXP-' + Date.now(), date: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify([...expenses, newExp]));
     return newExp;
   },
   deleteExpense: async (id: string): Promise<void> => {
-    await runGAS('deleteExpense', id);
-    const items = await dbService.getExpenses();
-    localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(items.filter(i => i.id !== id)));
+    const expenses = await dbService.getExpenses();
+    localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(expenses.filter(e => e.id !== id)));
+  },
+
+  getReminders: async (): Promise<ServiceReminder[]> => {
+    const local = localStorage.getItem(LS_KEYS.REMINDERS);
+    return local ? JSON.parse(local) : [];
+  },
+  addReminder: async (data: any): Promise<ServiceReminder> => {
+    const reminders = await dbService.getReminders();
+    const newRem = { ...data, id: 'REM-' + Date.now(), status: 'Pending' };
+    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify([...reminders, newRem]));
+    return newRem;
+  },
+  deleteReminder: async (id: string): Promise<void> => {
+    const reminders = await dbService.getReminders();
+    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify(reminders.filter(r => r.id !== id)));
   },
 
   getDashboardStats: async (): Promise<DashboardStats> => {
-    const gasData = await runGAS('getDashboardStats');
-    if (gasData) return gasData;
     const customers = await dbService.getCustomers();
     const complaints = await dbService.getComplaints();
     const invoices = await dbService.getInvoices();
@@ -362,8 +524,6 @@ export const dbService = {
     const received = invoices.filter(i => i.paymentStatus === 'Paid').reduce((sum, i) => sum + i.finalAmount, 0);
     const pending = invoices.filter(i => i.paymentStatus === 'Unpaid').reduce((sum, i) => sum + i.finalAmount, 0);
     const spent = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const cash = invoices.filter(i => i.paymentMode === 'Cash' && i.paymentStatus === 'Paid').reduce((sum, i) => sum + i.finalAmount, 0) - expenses.filter(e => e.paymentMode === 'Cash').reduce((sum, e) => sum + e.amount, 0);
-    const bank = received - cash;
     return {
       totalCustomers: customers.length,
       totalComplaints: complaints.length,
@@ -372,8 +532,8 @@ export const dbService = {
       totalPending: pending,
       totalExpenses: spent,
       netProfit: received - spent,
-      cashInHand: Math.max(0, cash),
-      bankBalance: Math.max(0, bank)
+      cashInHand: received - spent,
+      bankBalance: 0
     };
   }
 };

@@ -8,13 +8,12 @@
 declare var SpreadsheetApp: any;
 declare var HtmlService: any;
 declare var PropertiesService: any;
-declare var ContentService: any;
 
 // 1. RUN THIS ONCE to setup your spreadsheet
 function initProject() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheets = {
-    'Customers': ['Customer_ID', 'Customer_Name', 'Phone_Number', 'Bike_Number', 'City', 'Loyalty_Points', 'Created_At', 'GSTIN'],
+    'Customers': ['Customer_ID', 'Customer_Name', 'Phone_Number', 'Bike_Number', 'City', 'Loyalty_Points', 'Created_At', 'GSTIN', 'Email', 'Address'],
     'Complaints': ['Complaint_ID', 'Bike_Number', 'Customer_Name', 'Phone_Number', 'Complaint_List', 'Complaint_Photos_URL', 'Estimated_Cost', 'Status', 'Created_Date'],
     'Invoices': ['Invoice_ID', 'Complaint_ID', 'Bike_Number', 'Customer_Name', 'Complaint_Details', 'Items_JSON', 'Estimated_Cost', 'Final_Amount', 'Payment_Status', 'Payment_Mode', 'Invoice_Date', 'Tax_Amount', 'Sub_Total'],
     'Transactions': ['Transaction_ID', 'Invoice_ID', 'Amount', 'Payment_Mode', 'Date'],
@@ -33,8 +32,6 @@ function initProject() {
       // Update headers if missing
       const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       if (existingHeaders.length < sheets[name].length) {
-        // Append missing headers
-        // Note: Simple append for now, migration of data columns is manual if order changes
         sheet.getRange(1, 1, 1, sheets[name].length).setValues([sheets[name]]);
       }
     }
@@ -43,66 +40,15 @@ function initProject() {
 }
 
 function doGet(e) {
-  if (e.parameter.action) {
-    // Basic API support via GET (for simple queries)
-    const result = handleApiRequest(e.parameter.action, e.parameter.args ? JSON.parse(e.parameter.args) : []);
-    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-  }
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('BikeService Pro')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-function doPost(e) {
-  try {
-    const postData = JSON.parse(e.postData.contents);
-    const action = postData.action;
-    const args = postData.args || [];
-
-    const result = handleApiRequest(action, args);
-    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ error: err.message })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-function handleApiRequest(action, args) {
-  const functions = {
-    'getSettings': getSettings,
-    'updateSettings': updateSettings,
-    'getCustomers': getCustomers,
-    'createCustomer': createCustomer,
-    'deleteCustomer': deleteCustomer,
-    'getComplaints': getComplaints,
-    'createComplaint': createComplaint,
-    'deleteComplaint': deleteComplaint,
-    'updateComplaintStatus': updateComplaintStatus,
-    'getInvoices': getInvoices,
-    'generateInvoice': generateInvoice,
-    'deleteInvoice': deleteInvoice,
-    'getInventory': getInventory,
-    'addInventoryItem': addInventoryItem,
-    'deleteInventoryItem': deleteInventoryItem,
-    'updateStock': updateStock,
-    'getExpenses': getExpenses,
-    'addExpense': addExpense,
-    'deleteExpense': deleteExpense,
-    'getReminders': getReminders,
-    'createReminder': createReminder,
-    'deleteReminder': deleteReminder,
-    'getDashboardStats': getDashboardStats
-  };
-
-  if (functions[action]) {
-    return functions[action](...(Array.isArray(args) ? args : [args]));
-  }
-  throw new Error("Action not found: " + action);
-}
-
 // Mapping from Sheet Headers to Frontend Type Keys
 const MAPPINGS = {
-  'Customer_ID': 'id', 'Customer_Name': 'name', 'Phone_Number': 'phone', 'Bike_Number': 'bikeNumber', 'City': 'city', 'Loyalty_Points': 'loyaltyPoints', 'Created_At': 'createdAt', 'GSTIN': 'gstin',
+  'Customer_ID': 'id', 'Customer_Name': 'name', 'Phone_Number': 'phone', 'Bike_Number': 'bikeNumber', 'City': 'city', 'Loyalty_Points': 'loyaltyPoints', 'Created_At': 'createdAt', 'GSTIN': 'gstin', 'Email': 'email', 'Address': 'address',
   'Complaint_ID': 'id', 'Complaint_List': 'details', 'Complaint_Photos_URL': 'photoUrls', 'Created_Date': 'createdAt',
   'Invoice_ID': 'id', 'Invoice_Date': 'date', 'Payment_Status': 'paymentStatus', 'Payment_Mode': 'paymentMode', 'Final_Amount': 'finalAmount', 'Estimated_Cost': 'estimatedCost', 'Items_JSON': 'items', 'Tax_Amount': 'taxAmount', 'Sub_Total': 'subTotal',
   'Item_ID': 'id', 'Item_Name': 'name', 'Quantity_In_Stock': 'stock', 'Unit_Price': 'unitPrice', 'Purchase_Price': 'purchasePrice', 'Item_Code': 'itemCode', 'Last_Updated': 'lastUpdated', 'GST_Rate': 'gstRate', 'HSN_Code': 'hsn',
@@ -114,10 +60,10 @@ function getSheetData(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(name);
   if (!sheet) return [];
-
+  
   const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) return []; // Only headers or empty
-
+  if (values.length <= 1) return []; 
+  
   const headers = values.shift();
   return values.map(row => {
     const obj = {};
@@ -126,7 +72,7 @@ function getSheetData(name) {
       let val = row[i];
       if (key === 'photoUrls' && typeof val === 'string') val = val ? val.split(',') : [];
       if (key === 'items' && typeof val === 'string') {
-        try { val = JSON.parse(val || '[]'); } catch (e) { val = []; }
+        try { val = JSON.parse(val || '[]'); } catch(e) { val = []; }
       }
       obj[key] = val;
     });
@@ -137,7 +83,7 @@ function getSheetData(name) {
 function findRowById(sheet, id, colIndex = 0) {
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
-    if (data[i][colIndex].toString() === id.toString()) return i + 1;
+    if (data[i][colIndex].toString().toLowerCase() === id.toString().toLowerCase()) return i + 1;
   }
   return null;
 }
@@ -175,8 +121,7 @@ function createCustomer(data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Customers');
   const id = 'CUST-' + Date.now();
   const now = new Date();
-  // id, name, phone, bikeNumber, city, loyaltyPoints, createdAt, gstin
-  sheet.appendRow([id, data.name, data.phone, data.bikeNumber, data.city, 0, now, data.gstin || '']);
+  sheet.appendRow([id, data.name, data.phone, data.bikeNumber, data.city, 0, now, data.gstin || '', data.email || '', data.address || '']);
   return { ...data, id, loyaltyPoints: 0, createdAt: now.toISOString() };
 }
 
@@ -205,19 +150,37 @@ function generateInvoice(data) {
   const invSheet = ss.getSheetByName('Invoices');
   const txnSheet = ss.getSheetByName('Transactions');
   const custSheet = ss.getSheetByName('Customers');
-
+  const inventorySheet = ss.getSheetByName('Inventory');
+  
   const id = 'INV-' + Date.now();
   const now = new Date();
-
+  
   const itemsJson = JSON.stringify(data.items || []);
-  // id, complaintId, bike, customer, details, items, estCost, finalAmount, status, mode, date, taxAmount, subTotal
   invSheet.appendRow([id, data.complaintId, data.bikeNumber, data.customerName, data.details, itemsJson, data.estimatedCost, data.finalAmount, data.paymentStatus, data.paymentMode, now, data.taxAmount || 0, data.subTotal || 0]);
+  
+  // Deduct Inventory Stock
+  if (data.items && Array.isArray(data.items)) {
+    data.items.forEach(item => {
+      // Try finding by name or code
+      const invData = inventorySheet.getDataRange().getValues();
+      for (let i = 1; i < invData.length; i++) {
+        if (invData[i][1].toString().toLowerCase() === item.description.toString().toLowerCase()) {
+          const currentQty = Number(invData[i][3]);
+          inventorySheet.getRange(i + 1, 4).setValue(currentQty - 1); // Deduct 1 per item row, or improve logic for qty
+          inventorySheet.getRange(i + 1, 8).setValue(now);
+          break;
+        }
+      }
+    });
+  }
 
   if (data.paymentStatus === 'Paid') {
     txnSheet.appendRow(['TXN-' + Date.now(), id, data.finalAmount, data.paymentMode, now]);
-    const custRow = findRowById(custSheet, data.bikeNumber, 3);
+    let custRow = findRowById(custSheet, data.bikeNumber, 3);
+    if (!custRow) custRow = findRowById(custSheet, data.customerPhone, 2);
+    
     if (custRow) {
-      const currentPoints = custSheet.getRange(custRow, 6).getValue();
+      const currentPoints = Number(custSheet.getRange(custRow, 6).getValue()) || 0;
       const earned = Math.floor(data.finalAmount / 100);
       custSheet.getRange(custRow, 6).setValue(currentPoints + earned);
     }
@@ -232,7 +195,6 @@ function addInventoryItem(data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Inventory');
   const id = 'SKU-' + Date.now();
   const now = new Date();
-  // id, name, category, stock, unitPrice, purchasePrice, itemCode, lastUpdated, gstRate, hsn
   sheet.appendRow([id, data.name, data.category, data.stock, data.unitPrice, data.purchasePrice, data.itemCode, now, data.gstRate || 0, data.hsn || '']);
   return { ...data, id, lastUpdated: now.toISOString() };
 }
@@ -272,27 +234,27 @@ function getDashboardStats() {
   const customers = Math.max(0, ss.getSheetByName('Customers').getLastRow() - 1);
   const complaints = Math.max(0, ss.getSheetByName('Complaints').getLastRow() - 1);
   const invoicesCount = Math.max(0, ss.getSheetByName('Invoices').getLastRow() - 1);
-
+  
   const txns = ss.getSheetByName('Transactions').getDataRange().getValues();
   let received = 0;
-  for (let i = 1; i < txns.length; i++) received += Number(txns[i][2]);
-
+  for(let i=1; i<txns.length; i++) received += Number(txns[i][2]);
+  
   const exps = ss.getSheetByName('Expenses').getDataRange().getValues();
   let spent = 0;
   let cashExpenses = 0;
-  for (let i = 1; i < exps.length; i++) {
+  for(let i=1; i<exps.length; i++) {
     const amt = Number(exps[i][2]);
     spent += amt;
     if (exps[i][5] === 'Cash') cashExpenses += amt;
   }
-
+  
   const invs = ss.getSheetByName('Invoices').getDataRange().getValues();
   let pending = 0;
   let cashInvoices = 0;
-  for (let i = 1; i < invs.length; i++) {
+  for(let i=1; i<invs.length; i++) {
     const finalAmt = Number(invs[i][7]);
-    if (invs[i][8] === 'Unpaid') pending += finalAmt;
-    if (invs[i][8] === 'Paid' && invs[i][9] === 'Cash') cashInvoices += finalAmt;
+    if(invs[i][8] === 'Unpaid') pending += finalAmt;
+    if(invs[i][8] === 'Paid' && invs[i][9] === 'Cash') cashInvoices += finalAmt;
   }
 
   const cashInHand = Math.max(0, cashInvoices - cashExpenses);
