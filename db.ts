@@ -228,7 +228,6 @@ export const dbService = {
   },
 
   parseLocationFromLink: (text: string) => {
-    // Regex for long format, query format, and mobile short link redirect formats
     const longRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
     const queryRegex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
     const shortRegex = /maps\.app\.goo\.gl\/([a-zA-Z0-9]+)/;
@@ -248,7 +247,6 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(updated));
   },
 
-  // --- SLOT MANAGEMENT ---
   getSlotsByDate: async (date: string): Promise<PickupSlot[]> => {
     const local = localStorage.getItem(LS_KEYS.PICKUP_SLOTS);
     const all: PickupSlot[] = local ? JSON.parse(local) : [];
@@ -280,7 +278,6 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(updated));
   },
 
-  // --- PICKUP BOOKINGS ---
   getPickupBookings: async (): Promise<PickupBooking[]> => {
     const local = localStorage.getItem(LS_KEYS.PICKUP_BOOKINGS);
     return local ? JSON.parse(local) : [];
@@ -350,8 +347,24 @@ export const dbService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Generate 3 social media ads for "${businessName}".`,
-      config: { responseMimeType: 'application/json' }
+      contents: `Generate 3 professional social media ad suggestions for a bike service center named "${businessName}".`,
+      config: { 
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              platform: { type: Type.STRING },
+              headline: { type: Type.STRING },
+              copy: { type: Type.STRING },
+              targetAudience: { type: Type.STRING },
+              estimatedPerformance: { type: Type.STRING }
+            },
+            required: ["platform", "headline", "copy", "targetAudience", "estimatedPerformance"]
+          }
+        }
+      }
     });
     return JSON.parse(response.text || '[]');
   },
@@ -360,7 +373,7 @@ export const dbService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Business advice for "${businessName}". 50 words.`,
+      contents: `Give a short, motivational, mechanic-themed business insight for a bike center named "${businessName}". Max 40 words.`,
     });
     return response.text || "Perfect day for growth!";
   },
@@ -369,8 +382,18 @@ export const dbService = {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Instagram caption for: "${topic}".`,
-      config: { responseMimeType: 'application/json' }
+      contents: `Write an engaging Instagram caption and hashtags for this bike service promotion: "${topic}".`,
+      config: { 
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            caption: { type: Type.STRING },
+            tags: { type: Type.STRING }
+          },
+          required: ["caption", "tags"]
+        }
+      }
     });
     return JSON.parse(response.text || '{"caption":"","tags":""}');
   },
@@ -378,8 +401,8 @@ export const dbService = {
   searchLocalMarket: async (query: string, lat: number, lng: number): Promise<{ text: string, grounding: any[] }> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `What are the best ${query} nearby? Provide a summary and details about the specific locations found.`,
+      model: "gemini-2.5-flash-preview-12-2024", // Using 2.5 series as required for Maps Grounding
+      contents: `Explore "${query}" in the local market area around Pune. Focus on businesses that can supply or support a bike service center.`,
       config: {
         tools: [{ googleMaps: {} }],
         toolConfig: {
@@ -441,6 +464,12 @@ export const dbService = {
   updateComplaintStatus: async (id: string, status: ComplaintStatus): Promise<void> => {
     const complaints = await dbService.getComplaints();
     localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(complaints.map(c => c.id === id ? { ...c, status } : c)));
+  },
+  assignComplaintMechanic: async (id: string, mechanicId: string, mechanicName: string): Promise<void> => {
+    const complaints = await dbService.getComplaints();
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(complaints.map(c => 
+      c.id === id ? { ...c, mechanicId, mechanicName, status: ComplaintStatus.IN_PROGRESS } : c
+    )));
   },
   deleteComplaint: async (id: string): Promise<void> => {
     const complaints = await dbService.getComplaints();

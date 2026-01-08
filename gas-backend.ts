@@ -1,4 +1,3 @@
-
 /**
  * BIKE SERVICE PRO - BACKEND CONTROLLER
  * Paste this into Code.gs in your Google Apps Script Editor.
@@ -14,8 +13,8 @@ function initProject() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheets = {
     'Customers': ['Customer_ID', 'Customer_Name', 'Phone_Number', 'Bike_Number', 'City', 'Loyalty_Points', 'Created_At', 'GSTIN', 'Email', 'Address'],
-    'Complaints': ['Complaint_ID', 'Bike_Number', 'Customer_Name', 'Phone_Number', 'Complaint_List', 'Complaint_Photos_URL', 'Estimated_Cost', 'Status', 'Created_Date'],
-    'Invoices': ['Invoice_ID', 'Complaint_ID', 'Bike_Number', 'Customer_Name', 'Complaint_Details', 'Items_JSON', 'Estimated_Cost', 'Final_Amount', 'Payment_Status', 'Payment_Mode', 'Invoice_Date', 'Tax_Amount', 'Sub_Total'],
+    'Complaints': ['Complaint_ID', 'Bike_Number', 'Customer_Name', 'Phone_Number', 'Complaint_List', 'Complaint_Photos_URL', 'Estimated_Cost', 'Status', 'Created_Date', 'Odometer_Reading'],
+    'Invoices': ['Invoice_ID', 'Complaint_ID', 'Bike_Number', 'Customer_Name', 'Complaint_Details', 'Items_JSON', 'Estimated_Cost', 'Final_Amount', 'Payment_Status', 'Payment_Mode', 'Invoice_Date', 'Tax_Amount', 'Sub_Total', 'Odometer_Reading'],
     'Transactions': ['Transaction_ID', 'Invoice_ID', 'Amount', 'Payment_Mode', 'Date'],
     'Inventory': ['Item_ID', 'Item_Name', 'Category', 'Quantity_In_Stock', 'Unit_Price', 'Purchase_Price', 'Item_Code', 'Last_Updated', 'GST_Rate', 'HSN_Code'],
     'Expenses': ['Expense_ID', 'Expense_Title', 'Amount', 'Date', 'Notes', 'Payment_Mode'],
@@ -49,7 +48,7 @@ function doGet(e) {
 // Mapping from Sheet Headers to Frontend Type Keys
 const MAPPINGS = {
   'Customer_ID': 'id', 'Customer_Name': 'name', 'Phone_Number': 'phone', 'Bike_Number': 'bikeNumber', 'City': 'city', 'Loyalty_Points': 'loyaltyPoints', 'Created_At': 'createdAt', 'GSTIN': 'gstin', 'Email': 'email', 'Address': 'address',
-  'Complaint_ID': 'id', 'Complaint_List': 'details', 'Complaint_Photos_URL': 'photoUrls', 'Created_Date': 'createdAt',
+  'Complaint_ID': 'id', 'Complaint_List': 'details', 'Complaint_Photos_URL': 'photoUrls', 'Created_Date': 'createdAt', 'Odometer_Reading': 'odometerReading',
   'Invoice_ID': 'id', 'Invoice_Date': 'date', 'Payment_Status': 'paymentStatus', 'Payment_Mode': 'paymentMode', 'Final_Amount': 'finalAmount', 'Estimated_Cost': 'estimatedCost', 'Items_JSON': 'items', 'Tax_Amount': 'taxAmount', 'Sub_Total': 'subTotal',
   'Item_ID': 'id', 'Item_Name': 'name', 'Quantity_In_Stock': 'stock', 'Unit_Price': 'unitPrice', 'Purchase_Price': 'purchasePrice', 'Item_Code': 'itemCode', 'Last_Updated': 'lastUpdated', 'GST_Rate': 'gstRate', 'HSN_Code': 'hsn',
   'Expense_ID': 'id', 'Expense_Title': 'title',
@@ -132,7 +131,7 @@ function createComplaint(data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Complaints');
   const id = 'CMP-' + Date.now();
   const now = new Date();
-  sheet.appendRow([id, data.bikeNumber, data.customerName, data.customerPhone, data.details, (data.photoUrls || []).join(','), data.estimatedCost, 'Pending', now]);
+  sheet.appendRow([id, data.bikeNumber, data.customerName, data.customerPhone, data.details, (data.photoUrls || []).join(','), data.estimatedCost, 'Pending', now, data.odometerReading || '']);
   return { ...data, id, status: 'Pending', createdAt: now.toISOString() };
 }
 
@@ -156,7 +155,7 @@ function generateInvoice(data) {
   const now = new Date();
   
   const itemsJson = JSON.stringify(data.items || []);
-  invSheet.appendRow([id, data.complaintId, data.bikeNumber, data.customerName, data.details, itemsJson, data.estimatedCost, data.finalAmount, data.paymentStatus, data.paymentMode, now, data.taxAmount || 0, data.subTotal || 0]);
+  invSheet.appendRow([id, data.complaintId, data.bikeNumber, data.customerName, data.details, itemsJson, data.estimatedCost, data.finalAmount, data.paymentStatus, data.paymentMode, now, data.taxAmount || 0, data.subTotal || 0, data.odometerReading || '']);
   
   // Deduct Inventory Stock
   if (data.items && Array.isArray(data.items)) {

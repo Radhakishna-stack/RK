@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   MessageCircle, QrCode, Smartphone, Map as MapIcon, Link2, Loader2, Calendar, 
@@ -71,18 +70,19 @@ const ConnectPage: React.FC = () => {
     loadData();
     const interval = setInterval(async () => {
         const bookingsData = await dbService.getPickupBookings();
-        const activeOnes = bookingsData.filter(b => b.status === PickupStatus.ON_THE_WAY);
-        for (const b of activeOnes) {
-            const loc = await dbService.getLiveStaffTracking(b.id);
+        // Fixed shadowing of 'b' variable to prevent potential inference issues
+        const activeOnes = bookingsData.filter(item => item.status === PickupStatus.ON_THE_WAY);
+        for (const activeBooking of activeOnes) {
+            const loc = await dbService.getLiveStaffTracking(activeBooking.id);
             if (loc) {
-                setLiveLocations(prev => ({ ...prev, [b.id]: loc }));
+                setLiveLocations(prev => ({ ...prev, [activeBooking.id]: loc }));
             }
         }
         setBookings(bookingsData);
     }, 5000);
     return () => {
         clearInterval(interval);
-        Object.values(simulationTimers.current).forEach(t => clearInterval(t));
+        Object.values(simulationTimers.current).forEach((t: any) => clearInterval(t));
     };
   }, []);
 
@@ -172,20 +172,31 @@ const ConnectPage: React.FC = () => {
     loadData();
   };
 
+  // Fixed potential unknown type errors and shadowing by explicitly casting bookings and using local variables for coordination data.
   const updateStatus = async (id: string, status: PickupStatus, staffId?: string, staffName?: string) => {
     await dbService.updatePickupStatus(id, status, staffId, staffName);
     if (status === PickupStatus.ON_THE_WAY) {
-        const booking = bookings.find(b => b.id === id);
-        if (booking) {
-            const lastLoc = liveLocations[`IDLE_${booking.staffId}`] || { lat: booking.location.lat - 0.01, lng: booking.location.lng - 0.01 };
-            let currentLat = lastLoc.lat;
-            let currentLng = lastLoc.lng;
+        const found = bookings.find(item => item.id === id);
+        if (found) {
+            // Fix: Explicitly cast targetBooking to any then to PickupBooking to satisfy compiler inference
+            const targetBooking = found as PickupBooking;
+            const staffKey = `IDLE_${targetBooking.staffId || 'SYS'}`;
+            const targetLoc = targetBooking.location;
+            
+            // Fix: Ensure lastLoc has properties lat and lng by using a partial check or explicit typing
+            const cachedLoc = liveLocations[staffKey];
+            const lastLoc = cachedLoc ? { lat: cachedLoc.lat, lng: cachedLoc.lng } : { lat: targetLoc.lat - 0.01, lng: targetLoc.lng - 0.01 };
+            let currentLat: number = lastLoc.lat;
+            let currentLng: number = lastLoc.lng;
+            
             const timer = setInterval(() => {
-                currentLat += (booking.location.lat - currentLat) * 0.15;
-                currentLng += (booking.location.lng - currentLng) * 0.15;
+                const destLat = targetLoc.lat;
+                const destLng = targetLoc.lng;
+                currentLat += (destLat - currentLat) * 0.15;
+                currentLng += (destLng - currentLng) * 0.15;
                 dbService.updateStaffLocation({
-                    staffId: booking.staffId || 'SYS',
-                    staffName: booking.staffName || 'Staff',
+                    staffId: targetBooking.staffId || 'SYS',
+                    staffName: targetBooking.staffName || 'Staff',
                     bookingId: id,
                     lat: currentLat,
                     lng: currentLng,
@@ -199,14 +210,11 @@ const ConnectPage: React.FC = () => {
             clearInterval(simulationTimers.current[id]);
             delete simulationTimers.current[id];
         }
-        const booking = bookings.find(b => b.id === id);
-        if (booking) {
-            setLiveLocations(prev => {
-                const n = { ...prev };
-                delete n[id];
-                return n;
-            });
-        }
+        setLiveLocations(prev => {
+            const n = { ...prev };
+            delete n[id];
+            return n;
+        });
     }
     loadData();
   };

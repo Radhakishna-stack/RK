@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Loader2, Camera, Trash2, X, Image as ImageIcon, Search, ChevronRight, Bike, User, Clock, CheckCircle2, Phone, Upload, Filter, FlipHorizontal } from 'lucide-react';
+import { Plus, Loader2, Camera, Trash2, X, Image as ImageIcon, Search, ChevronRight, Bike, User, Clock, CheckCircle2, Phone, Upload, Filter, FlipHorizontal, Gauge } from 'lucide-react';
 import { dbService } from '../db';
 import { Complaint, ComplaintStatus, Customer } from '../types';
 
@@ -17,6 +16,7 @@ const ComplaintsPage: React.FC = () => {
   const [nameInput, setNameInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
   const [complaintDetails, setComplaintDetails] = useState('');
+  const [odometerInput, setOdometerInput] = useState('');
   const [estCost, setEstCost] = useState('');
   const [images, setImages] = useState<string[]>([]);
   
@@ -135,7 +135,8 @@ const ComplaintsPage: React.FC = () => {
         customerPhone: phoneInput,
         details: complaintDetails,
         photoUrls: images,
-        estimatedCost: parseFloat(estCost) || 0
+        estimatedCost: parseFloat(estCost) || 0,
+        odometerReading: odometerInput
       });
       
       setComplaints([newComplaint, ...complaints]);
@@ -162,6 +163,7 @@ const ComplaintsPage: React.FC = () => {
     setNameInput('');
     setPhoneInput('');
     setComplaintDetails('');
+    setOdometerInput('');
     setEstCost('');
     setImages([]);
   };
@@ -260,7 +262,15 @@ const ComplaintsPage: React.FC = () => {
                         {c.status}
                       </span>
                     </div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                    <div className="flex items-center gap-3">
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</p>
+                       {c.odometerReading && (
+                         <div className="flex items-center gap-1">
+                            <div className="w-1 h-1 rounded-full bg-slate-300" />
+                            <p className="text-[9px] font-black text-slate-400 uppercase">{c.odometerReading} KM</p>
+                         </div>
+                       )}
+                    </div>
                   </div>
                   <button 
                     onClick={() => handleDelete(c.id)}
@@ -406,11 +416,41 @@ const ComplaintsPage: React.FC = () => {
                      </div>
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Odometer Reading (KM)</label>
+                        <div className="relative">
+                           <Gauge className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500" />
+                           <input 
+                             type="number"
+                             placeholder="Mileage"
+                             className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-black text-sm text-slate-900"
+                             value={odometerInput}
+                             onChange={e => setOdometerInput(e.target.value)}
+                           />
+                        </div>
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Budget Estimate (₹)</label>
+                        <div className="relative">
+                          <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-black">₹</div>
+                          <input 
+                            required 
+                            type="number" 
+                            placeholder="0.00" 
+                            className="w-full p-4 pl-10 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-black text-lg text-slate-900" 
+                            value={estCost} 
+                            onChange={e => setEstCost(e.target.value)} 
+                          />
+                        </div>
+                     </div>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Service Details</label>
                     <textarea 
                       required 
-                      rows={4}
+                      rows={3}
                       placeholder="DESCRIBE ISSUES REPORTED BY THE CUSTOMER..." 
                       className="w-full p-5 bg-slate-50 border border-slate-200 rounded-3xl focus:ring-4 focus:ring-blue-500/10 outline-none resize-none font-bold text-sm text-slate-700 placeholder:text-slate-300 transition-all uppercase" 
                       value={complaintDetails} 
@@ -457,21 +497,6 @@ const ComplaintsPage: React.FC = () => {
                     {/* Hidden Fallback Inputs */}
                     <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
                     <input type="file" ref={galleryInputRef} accept="image/*" multiple className="hidden" onChange={handleFileChange} />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Budget Estimate (₹)</label>
-                    <div className="relative">
-                      <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-black">₹</div>
-                      <input 
-                        required 
-                        type="number" 
-                        placeholder="0.00" 
-                        className="w-full p-5 pl-10 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-black text-lg text-slate-900" 
-                        value={estCost} 
-                        onChange={e => setEstCost(e.target.value)} 
-                      />
-                    </div>
                   </div>
                 </div>
 

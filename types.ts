@@ -30,6 +30,9 @@ export interface Complaint {
   estimatedCost: number;
   status: ComplaintStatus;
   createdAt: string;
+  odometerReading?: string;
+  mechanicId?: string;
+  mechanicName?: string;
 }
 
 export enum PickupStatus {
@@ -101,6 +104,7 @@ export interface Invoice {
   paymentStatus: 'Paid' | 'Unpaid';
   paymentMode: 'Cash' | 'UPI' | 'Card';
   date: string;
+  odometerReading?: string;
 }
 
 export interface Transaction {
