@@ -1,43 +1,50 @@
 
-import { Customer, Complaint, Invoice, Transaction, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, PickupBooking, PickupSlot, StaffLocation, PickupStatus } from './types';
+import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, PickupBooking, PickupSlot, StaffLocation, PickupStatus, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
 
-const isGAS = typeof window !== 'undefined' && (window as any).google?.script?.run;
-
 const LS_KEYS = {
-  CUSTOMERS: 'bp_customers',
-  COMPLAINTS: 'bp_complaints',
-  INVOICES: 'bp_invoices',
-  INVENTORY: 'bp_inventory',
-  EXPENSES: 'bp_expenses',
-  TRANSACTIONS: 'bp_transactions',
-  REMINDERS: 'bp_reminders',
-  SETTINGS: 'bp_settings',
-  STOCK_TRANSACTIONS: 'bp_stock_txns',
-  SALESMEN: 'bp_salesmen',
-  PICKUP_BOOKINGS: 'bp_pickup_bookings',
-  LIVE_TRACKING: 'bp_live_tracking',
-  WA_DEVICE_STATUS: 'bp_wa_status',
-  PICKUP_SLOTS: 'bp_pickup_slots'
+  CUSTOMERS: 'mg_customers',
+  VISITORS: 'mg_visitors',
+  STOCK_WANTING: 'mg_stock_wanting',
+  COMPLAINTS: 'mg_complaints',
+  INVOICES: 'mg_invoices',
+  INVENTORY: 'mg_inventory',
+  EXPENSES: 'mg_expenses',
+  REMINDERS: 'mg_reminders',
+  SETTINGS: 'mg_settings',
+  STOCK_TXNS: 'mg_stock_txns',
+  TRANSACTIONS: 'mg_transactions',
+  SALESMEN: 'mg_salesmen',
+  PICKUP_BOOKINGS: 'mg_pickups',
+  PICKUP_SLOTS: 'mg_slots',
+  WA_STATUS: 'mg_wa_status',
+  STAFF_LOCS: 'mg_staff_locs',
+  RECYCLE_BIN: 'mg_recycle_bin',
+  BANK_ACCOUNTS: 'mg_bank_accounts'
+};
+
+const DEFAULT_BANK: BankAccount = {
+  id: 'CASH-01',
+  name: 'CASH IN HAND',
+  type: 'Cash',
+  openingBalance: 0,
+  createdAt: new Date().toISOString()
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
   general: {
+    businessAddress: '123 Main Street, Sector 7, New Delhi, 110001',
+    businessPhone: '+91 98765 43210',
     passcodeEnabled: false,
     passcode: '',
     currency: '₹',
     decimalPlaces: 2,
     stopNegativeStock: true,
     blockNewItems: false,
-    features: {
-      estimates: true,
-      proforma: false,
-      orders: false,
-      challan: true,
-      fixedAssets: false,
-    },
+    features: { estimates: true, proforma: false, orders: false, challan: true, fixedAssets: false },
     multiFirm: false,
     auditTrail: true,
+    recycleBinDays: 30
   },
   transaction: {
     showInvoiceNumber: true,
@@ -54,7 +61,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     txnWiseTax: false,
     txnWiseDiscount: true,
     roundOffTransaction: true,
-    shareTransactionAs: 'Ask me Everytime',
+    shareTransactionAs: 'PDF',
     passcodeEditDelete: false,
     discountDuringPayment: false,
     linkPaymentsToInvoices: true,
@@ -64,25 +71,18 @@ const DEFAULT_SETTINGS: AppSettings = {
     additionalFields: false,
     transportationDetails: false,
     additionalCharges: false,
-    prefixes: {
-      firmName: 'SRK BIKE SERVICE',
-      sale: 'INV-',
-      estimate: 'EST-',
-      creditNote: 'CN-',
-      saleOrder: 'None',
-      purchaseOrder: 'SBS-',
-      paymentIn: 'PI-'
-    },
+    overdueDaysLimit: 15,
+    prefixes: { firmName: 'MOTO GEAR SRK', sale: 'INV-', estimate: 'EST-', creditNote: 'CN-', saleOrder: 'None', purchaseOrder: 'SBS-', paymentIn: 'PI-' }
   },
   print: {
     printerType: 'Regular',
-    theme: 'GST Theme 1',
+    theme: 'Pro Theme 1',
     textSize: 'Medium',
-    pageSize: 'A4 (210 x 297 mm)',
+    pageSize: 'A4',
     orientation: 'Portrait',
     showUnsavedWarning: true,
     showCompanyName: true,
-    companyNameSize: 'Large',
+    companyNameSize: 'Small',
     showLogo: true,
     showAddress: true,
     showEmail: true,
@@ -99,7 +99,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     printCurrentBalance: false,
     taxDetails: false,
     amountGrouping: true,
-    amountInWordsFormat: 'Indian (e.g. 1,00,000)',
+    amountInWordsFormat: 'Indian',
     showYouSaved: false,
     printDescription: true,
     printReceivedBy: true,
@@ -107,249 +107,408 @@ const DEFAULT_SETTINGS: AppSettings = {
     printSignatureText: false,
     customSignatureText: '',
     printPaymentMode: false,
-    printAcknowledgement: false,
+    printAcknowledgement: false
   },
-  gst: {
-    enabled: true,
-    showHsn: true,
-    rcm: false,
-    placeOfSupply: true,
-    composite: false,
-    reverseCharge: false,
-    stateOfSupply: true,
-    ewayBill: false
-  },
-  messages: {
-    channel: 'WhatsApp',
-    sendToParty: true,
-    copyToSelf: false,
-    template: 'Hi {{CustomerName}}, your bill of {{InvoiceAmount}} for bike {{BikeNumber}} is ready at Moto Gear SRK. Ride safe!',
-    transactionMessaging: {
-      sendToParty: true,
-      smsCopyToSelf: false,
-      txnUpdateSms: false,
-      showPartyBalance: false,
-      showWebInvoiceLink: false,
-      autoShareVyapar: false,
-      autoMsgTypes: {
-        sale: true,
-        purchase: false,
-        saleReturn: false,
-        purchaseReturn: false,
-        estimate: false,
-        proforma: false,
-        paymentIn: false,
-        paymentOut: false,
-        saleOrder: true,
-        purchaseOrder: false,
-        deliveryChallan: false,
-        cancelledInvoice: false
-      }
-    }
-  },
-  party: {
-    gstin: true,
-    grouping: false,
-    shippingAddress: true,
-    loyaltyPoints: true,
-    paymentReminders: true,
-    reminderOffset: 3,
-    additionalFields: [
-      { label: 'GSTIN', showOnPrint: true },
-      { label: 'DL Number', showOnPrint: true }
-    ],
-  },
-  item: {
-    isProduct: true,
-    stockMaintenance: true,
-    serialTracking: false,
-    batchTracking: false,
-    mrpColumn: true,
-  },
-  reminders: {
-    enabled: true,
-    autoSchedule: true,
-    manualDateSelection: true,
-    defaultInterval: '3 Months',
-    reminderTemplate: 'Hello {{CustomerName}}, your bike {{BikeNumber}} is due for service. Visit Moto Gear SRK today!',
-    reminderDaysBefore: 3,
-    remindersPerDay: 1,
-  },
-  accounting: {
-    enabled: false,
-    allowJournalEntries: false,
-  },
-};
-
-const runGAS = (funcName: string, ...args: any[]): Promise<any> => {
-  return new Promise((resolve, reject) => {
-    if (isGAS) {
-      (window as any).google.script.run
-        .withSuccessHandler((data: any) => {
-          if (Array.isArray(data)) {
-            resolve(data.filter(item => item !== null));
-          } else {
-            resolve(data);
-          }
-        })
-        .withFailureHandler(reject)[funcName](...args);
-    } else {
-      resolve(null);
-    }
-  });
+  gst: { enabled: true, showHsn: true, rcm: false, placeOfSupply: true, composite: false, reverseCharge: false, stateOfSupply: true, ewayBill: false },
+  messages: { channel: 'WhatsApp', sendToParty: true, copyToSelf: false, template: 'Hi {{CustomerName}}, your bill of {{InvoiceAmount}} for bike {{BikeNumber}} is ready at Moto Gear SRK.', transactionMessaging: { sendToParty: true, smsCopyToSelf: false, txnUpdateSms: false, showPartyBalance: false, showWebInvoiceLink: false, autoShareVyapar: false, autoMsgTypes: { sale: true, purchase: false, saleReturn: false, purchaseReturn: false, estimate: false, proforma: false, paymentIn: false, paymentOut: false, saleOrder: true, purchaseOrder: false, deliveryChallan: false, cancelledInvoice: false } } },
+  party: { gstin: true, grouping: false, shippingAddress: true, loyaltyPoints: true, loyaltyRate: 100, paymentReminders: true, reminderOffset: 3, additionalFields: [{ label: 'GSTIN', showOnPrint: true }] },
+  item: { isProduct: true, stockMaintenance: true, serialTracking: false, batchTracking: false, mrpColumn: true },
+  reminders: { enabled: true, autoSchedule: true, manualDateSelection: true, defaultInterval: '3 Months', reminderTemplate: 'Hello {{CustomerName}}, your bike {{BikeNumber}} is due for service.', reminderDaysBefore: 3, remindersPerDay: 1 },
+  accounting: { enabled: false, allowJournalEntries: false }
 };
 
 export const dbService = {
-  getConnectionStatus: () => isGAS ? 'connected' : 'preview',
+  getConnectionStatus: () => 'connected',
 
   getSettings: async (): Promise<AppSettings> => {
-    const gasData = await runGAS('getSettings');
-    if (gasData) return gasData;
     const local = localStorage.getItem(LS_KEYS.SETTINGS);
     return local ? JSON.parse(local) : DEFAULT_SETTINGS;
   },
+
   updateSettings: async (settings: AppSettings): Promise<void> => {
-    await runGAS('updateSettings', settings);
     localStorage.setItem(LS_KEYS.SETTINGS, JSON.stringify(settings));
   },
 
+  getBankAccounts: async (): Promise<BankAccount[]> => {
+    const local = localStorage.getItem(LS_KEYS.BANK_ACCOUNTS);
+    if (!local) {
+      const initial = [DEFAULT_BANK];
+      localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify(initial));
+      return initial;
+    }
+    return JSON.parse(local);
+  },
+
+  addBankAccount: async (data: Omit<BankAccount, 'id' | 'createdAt'>): Promise<BankAccount> => {
+    const current = await dbService.getBankAccounts();
+    const newBank = { ...data, id: 'BANK-' + Date.now(), createdAt: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify([...current, newBank]));
+    return newBank;
+  },
+
+  deleteBankAccount: async (id: string): Promise<void> => {
+    if (id === 'CASH-01') throw new Error("Cannot delete primary Cash account");
+    const current = await dbService.getBankAccounts();
+    localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify(current.filter(b => b.id !== id)));
+  },
+
+  getAccountBalance: async (accountId: string): Promise<number> => {
+    const accounts = await dbService.getBankAccounts();
+    const target = accounts.find(a => a.id === accountId);
+    if (!target) return 0;
+
+    const txns = await dbService.getTransactions();
+    const accountTxns = txns.filter(t => t.accountId === accountId);
+    
+    const flow = accountTxns.reduce((sum, t) => t.type === 'IN' ? sum + t.amount : sum - t.amount, 0);
+    return target.openingBalance + flow;
+  },
+
+  getBusinessHoroscope: async (businessName: string): Promise<string> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Short, motivational business insight for motor bike service center "${businessName}". Focus on technical excellence, rider safety, and precision tuning. Max 30 words.`
+    });
+    return response.text || "Smooth ride ahead!";
+  },
+
+  searchLocalMarket: async (query: string, lat: number, lng: number): Promise<{ text: string, grounding: any[] }> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Explore "${query}" specifically for motorcycle parts, riding gear, or bike repair shops near these coordinates.`,
+      config: {
+        tools: [{ googleMaps: {} }],
+        toolConfig: { retrievalConfig: { latLng: { latitude: lat, longitude: lng } } }
+      }
+    });
+    return { 
+      text: response.text || "Searching local bike databases...", 
+      grounding: response.candidates?.[0]?.groundingMetadata?.groundingChunks || [] 
+    };
+  },
+
+  /**
+   * AI Resolver for location links that don't have coordinates in the URL (like short links)
+   */
+  resolveLocationViaAI: async (text: string): Promise<{ lat: number, lng: number, address: string } | { error: string } | null> => {
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Precisely identify GPS coordinates for: "${text}". Result must be valid JSON with lat, lng, address.`,
+        config: {
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              lat: { type: Type.NUMBER },
+              lng: { type: Type.NUMBER },
+              address: { type: Type.STRING }
+            },
+            required: ["lat", "lng", "address"]
+          }
+        }
+      });
+      
+      const result = JSON.parse(response.text || '{}');
+      if (result.lat && result.lng) return result;
+      return null;
+    } catch (e: any) {
+      console.error("AI Location Resolution Failed", e);
+      // Specific detection for Rate Limit / Quota Exhaustion
+      if (e?.message?.includes('429') || e?.message?.includes('RESOURCE_EXHAUSTED')) {
+        return { error: 'QUOTA_EXCEEDED' };
+      }
+      return null;
+    }
+  },
+
   sendWhatsApp: (phone: string, message: string) => {
-    const formattedPhone = phone.replace(/\D/g, '');
-    const url = `https://wa.me/${formattedPhone.length === 10 ? '91' + formattedPhone : formattedPhone}?text=${encodeURIComponent(message)}`;
+    const formatted = phone.replace(/\D/g, '');
+    const url = `https://wa.me/${formatted.length === 10 ? '91' + formatted : formatted}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   },
 
-  getWADeviceStatus: () => {
-    const status = localStorage.getItem(LS_KEYS.WA_DEVICE_STATUS);
-    return status ? JSON.parse(status) : { connected: false, lastSeen: null, deviceName: 'Unknown' };
+  getCustomers: async (): Promise<Customer[]> => JSON.parse(localStorage.getItem(LS_KEYS.CUSTOMERS) || '[]'),
+  addCustomer: async (data: any): Promise<Customer> => {
+    const current = await dbService.getCustomers();
+    const newUser = { ...data, id: 'C' + Date.now(), loyaltyPoints: 0, createdAt: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify([...current, newUser]));
+    return newUser;
   },
-  setWADeviceStatus: (status: any) => {
-    localStorage.setItem(LS_KEYS.WA_DEVICE_STATUS, JSON.stringify(status));
+  updateCustomerLoyalty: async (id: string, points: number): Promise<void> => {
+    const current = await dbService.getCustomers();
+    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(current.map(c => c.id === id ? { ...c, loyaltyPoints: points } : c)));
   },
-
-  parseLocationFromLink: (text: string) => {
-    const longRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const queryRegex = /q=(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const shortRegex = /maps\.app\.goo\.gl\/([a-zA-Z0-9]+)/;
-    
-    const longMatch = text.match(longRegex);
-    if (longMatch) return { lat: parseFloat(longMatch[1]), lng: parseFloat(longMatch[2]) };
-    
-    const queryMatch = text.match(queryRegex);
-    if (queryMatch) return { lat: parseFloat(queryMatch[1]), lng: parseFloat(queryMatch[2]) };
-    
-    return null;
+  deleteCustomer: async (id: string): Promise<void> => {
+    const current = await dbService.getCustomers();
+    const itemToDelete = current.find(c => c.id === id);
+    if (itemToDelete) {
+      await dbService.moveToRecycleBin('Customer', itemToDelete);
+      localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(current.filter(c => c.id !== id)));
+    }
   },
 
-  updateCustomerLocation: async (customerId: string, location: { lat: number; lng: number; address: string }): Promise<void> => {
-    const customers = await dbService.getCustomers();
-    const updated = customers.map(c => c.id === customerId ? { ...c, location } : c);
-    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(updated));
-  },
-
-  getSlotsByDate: async (date: string): Promise<PickupSlot[]> => {
-    const local = localStorage.getItem(LS_KEYS.PICKUP_SLOTS);
-    const all: PickupSlot[] = local ? JSON.parse(local) : [];
-    return all.filter(s => s.date === date);
-  },
-
-  initSlotsForDate: async (date: string, capacity: number): Promise<PickupSlot[]> => {
-    const local = localStorage.getItem(LS_KEYS.PICKUP_SLOTS);
-    let all: PickupSlot[] = local ? JSON.parse(local) : [];
-    all = all.filter(s => s.date !== date);
-    const timeRanges = ["9-11", "11-1", "2-4", "4-6"];
-    const newSlots = timeRanges.map(range => ({
-      id: `SLOT-${date}-${range}`,
-      date,
-      timeRange: range,
-      capacity,
-      bookedCount: 0
-    }));
-    all.push(...newSlots);
-    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(all));
-    return newSlots;
-  },
-
-  updateSlotBookingCount: async (slotId: string, delta: number): Promise<void> => {
-    const local = localStorage.getItem(LS_KEYS.PICKUP_SLOTS);
-    if (!local) return;
-    const all: PickupSlot[] = JSON.parse(local);
-    const updated = all.map(s => s.id === slotId ? { ...s, bookedCount: Math.max(0, s.bookedCount + delta) } : s);
-    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(updated));
-  },
-
-  getPickupBookings: async (): Promise<PickupBooking[]> => {
-    const local = localStorage.getItem(LS_KEYS.PICKUP_BOOKINGS);
-    return local ? JSON.parse(local) : [];
-  },
-
-  addPickupBooking: async (data: Partial<PickupBooking>): Promise<PickupBooking> => {
-    const current = await dbService.getPickupBookings();
-    const newBooking: PickupBooking = {
-      id: 'PCK-' + Date.now(),
-      customerId: data.customerId || '',
-      customerName: data.customerName || '',
-      customerPhone: data.customerPhone || '',
-      bikeNumber: data.bikeNumber || '',
-      slotId: data.slotId || '',
-      date: data.date || new Date().toISOString().split('T')[0],
-      timeRange: data.timeRange || '',
-      status: PickupStatus.SCHEDULED,
-      location: data.location || { lat: 0, lng: 0, address: '' },
-      createdAt: new Date().toISOString()
+  getTransactions: async (): Promise<Transaction[]> => JSON.parse(localStorage.getItem(LS_KEYS.TRANSACTIONS) || '[]'),
+  addTransaction: async (data: any): Promise<Transaction> => {
+    const settings = await dbService.getSettings();
+    const prefix = settings.transaction.prefixes.paymentIn || 'PI-';
+    const current = await dbService.getTransactions();
+    const newTxn = { 
+      ...data, 
+      id: prefix + Date.now(), 
+      date: new Date().toISOString(),
+      accountId: data.accountId || 'CASH-01' 
     };
+    localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify([newTxn, ...current]));
+    return newTxn;
+  },
 
-    if (newBooking.slotId) {
-      await dbService.updateSlotBookingCount(newBooking.slotId, 1);
+  getCustomerBalance: async (bikeNumber: string, customerName: string): Promise<number> => {
+    const invoices = await dbService.getInvoices();
+    const txns = await dbService.getTransactions();
+    
+    const customerInvoices = invoices.filter(inv => 
+      inv.docType === 'Sale' && (inv.bikeNumber === bikeNumber || inv.customerName === customerName)
+    );
+    const totalBilled = customerInvoices.reduce((sum, inv) => sum + inv.finalAmount, 0);
+    
+    const prepaidAmount = customerInvoices
+      .filter(inv => inv.paymentStatus === 'Paid')
+      .reduce((sum, inv) => sum + inv.finalAmount, 0);
+
+    const manualPayments = txns.filter(t => 
+      t.type === 'IN' && t.entityId === bikeNumber 
+    ).reduce((sum, t) => sum + t.amount, 0);
+
+    return totalBilled - prepaidAmount - manualPayments;
+  },
+
+  getVisitors: async (): Promise<Visitor[]> => JSON.parse(localStorage.getItem(LS_KEYS.VISITORS) || '[]'),
+  addVisitor: async (data: any): Promise<Visitor> => {
+    const current = await dbService.getVisitors();
+    const newVisitor = { ...data, id: 'V' + Date.now(), createdAt: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.VISITORS, JSON.stringify([newVisitor, ...current]));
+    return newVisitor;
+  },
+  deleteVisitor: async (id: string): Promise<void> => {
+    const current = await dbService.getVisitors();
+    const itemToDelete = current.find(v => v.id === id);
+    if (itemToDelete) {
+      await dbService.moveToRecycleBin('Visitor', itemToDelete);
+      localStorage.setItem(LS_KEYS.VISITORS, JSON.stringify(current.filter(v => v.id !== id)));
+    }
+  },
+
+  getStockWanting: async (): Promise<StockWantingItem[]> => JSON.parse(localStorage.getItem(LS_KEYS.STOCK_WANTING) || '[]'),
+  addStockWantingItem: async (data: Omit<StockWantingItem, 'id' | 'createdAt'>): Promise<StockWantingItem> => {
+    const current = await dbService.getStockWanting();
+    const newItem = { ...data, id: 'W' + Date.now(), createdAt: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.STOCK_WANTING, JSON.stringify([...current, newItem]));
+    return newItem;
+  },
+  deleteStockWantingItem: async (id: string): Promise<void> => {
+    const current = await dbService.getStockWanting();
+    localStorage.setItem(LS_KEYS.STOCK_WANTING, JSON.stringify(current.filter(i => i.id !== id)));
+  },
+
+  getComplaints: async (): Promise<Complaint[]> => JSON.parse(localStorage.getItem(LS_KEYS.COMPLAINTS) || '[]'),
+  addComplaint: async (data: any): Promise<Complaint> => {
+    const current = await dbService.getComplaints();
+    const newComp = { ...data, id: 'J' + Date.now(), status: ComplaintStatus.PENDING, createdAt: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify([newComp, ...current]));
+    return newComp;
+  },
+  updateComplaintStatus: async (id: string, status: ComplaintStatus): Promise<void> => {
+    const current = await dbService.getComplaints();
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(current.map(c => c.id === id ? { ...c, status } : c)));
+  },
+  updateComplaintPhotos: async (id: string, photos: string[]): Promise<void> => {
+    const current = await dbService.getComplaints();
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(current.map(c => c.id === id ? { ...c, photoUrls: photos } : c)));
+  },
+  deleteComplaint: async (id: string): Promise<void> => {
+    const current = await dbService.getComplaints();
+    const itemToDelete = current.find(c => c.id === id);
+    if (itemToDelete) {
+      await dbService.moveToRecycleBin('Complaint', itemToDelete);
+      localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(current.filter(c => c.id !== id)));
+    }
+  },
+
+  getInvoices: async (): Promise<Invoice[]> => JSON.parse(localStorage.getItem(LS_KEYS.INVOICES) || '[]'),
+  generateInvoice: async (data: any): Promise<Invoice> => {
+    const current = await dbService.getInvoices();
+    const newInv = { ...data, id: 'I' + Date.now(), date: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...current]));
+    
+    if (data.paymentStatus === 'Paid') {
+       const settings = await dbService.getSettings();
+       const rate = settings.party.loyaltyRate || 100;
+       const earned = Math.floor(data.finalAmount / rate);
+       
+       const customers = await dbService.getCustomers();
+       const cust = customers.find(c => c.bikeNumber === data.bikeNumber || c.name === data.customerName);
+       if (cust) {
+          await dbService.updateCustomerLoyalty(cust.id, (cust.loyaltyPoints || 0) + earned);
+       }
     }
 
-    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify([...current, newBooking]));
-    const msg = `Hi ${newBooking.customerName}, your pickup for ${newBooking.bikeNumber} is scheduled for ${newBooking.date} during the ${newBooking.timeRange} slot. We will notify you when our staff is on the way!`;
-    dbService.sendWhatsApp(newBooking.customerPhone, msg);
-    return newBooking;
+    return newInv;
+  },
+  deleteInvoice: async (id: string): Promise<void> => {
+    const current = await dbService.getInvoices();
+    const itemToDelete = current.find(i => i.id === id);
+    if (itemToDelete) {
+      await dbService.moveToRecycleBin('Invoice', itemToDelete);
+      localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify(current.filter(i => i.id !== id)));
+    }
   },
 
-  updatePickupStatus: async (id: string, status: PickupStatus, staffId?: string, staffName?: string): Promise<void> => {
-    const bookings = await dbService.getPickupBookings();
-    const updated = bookings.map(b => {
-      if (b.id === id) {
-        const up = { ...b, status, staffId: staffId || b.staffId, staffName: staffName || b.staffName };
-        if (status === PickupStatus.SCHEDULED && staffId && staffName) {
-           const mapsLink = `https://www.google.com/maps?q=${b.location.lat},${b.location.lng}`;
-           const msg = `New Pickup Assigned!\nCustomer: ${b.customerName}\nBike: ${b.bikeNumber}\nAddress: ${b.location.address}\nLocation: ${mapsLink}`;
-           dbService.sendWhatsApp('9123456789', msg);
-        }
-        return up;
+  getInventory: async (): Promise<InventoryItem[]> => JSON.parse(localStorage.getItem(LS_KEYS.INVENTORY) || '[]'),
+  addInventoryItem: async (data: any): Promise<InventoryItem> => {
+    const current = await dbService.getInventory();
+    const newItem = { ...data, id: 'S' + Date.now(), lastUpdated: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify([...current, newItem]));
+    return newItem;
+  },
+  bulkUpdateInventory: async (updates: Partial<InventoryItem>[]): Promise<{ updated: number, created: number }> => {
+    const current = await dbService.getInventory();
+    let updatedCount = 0;
+    let createdCount = 0;
+    
+    const updatedInventory = [...current];
+    
+    for (const update of updates) {
+      // Use itemCode as primary key for bulk updates
+      const index = updatedInventory.findIndex(i => i.itemCode === update.itemCode);
+      if (index !== -1) {
+        updatedInventory[index] = { ...updatedInventory[index], ...update, lastUpdated: new Date().toISOString() };
+        updatedCount++;
+      } else {
+        // Option: Create if not exists
+        const newItem: InventoryItem = {
+          id: 'S' + Date.now() + Math.random().toString(36).substr(2, 5),
+          name: update.name || 'NEW ITEM',
+          category: update.category || 'MISC',
+          stock: update.stock || 0,
+          unitPrice: update.unitPrice || 0,
+          purchasePrice: update.purchasePrice || 0,
+          itemCode: update.itemCode || '',
+          gstRate: update.gstRate || 0,
+          hsn: update.hsn || '',
+          lastUpdated: new Date().toISOString()
+        };
+        updatedInventory.push(newItem);
+        createdCount++;
       }
-      return b;
-    });
-    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify(updated));
+    }
+    
+    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(updatedInventory));
+    return { updated: updatedCount, created: createdCount };
+  },
+  deleteInventoryItem: async (id: string): Promise<void> => {
+    const current = await dbService.getInventory();
+    const itemToDelete = current.find(i => i.id === id);
+    if (itemToDelete) {
+      await dbService.moveToRecycleBin('Inventory', itemToDelete);
+      localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(current.filter(i => i.id !== id)));
+    }
+  },
+  updateStock: async (id: string, delta: number, note: string): Promise<void> => {
+    const inv = await dbService.getInventory();
+    const updated = inv.map(i => i.id === id ? { ...i, stock: i.stock + delta, lastUpdated: new Date().toISOString() } : i);
+    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(updated));
+    const txns = JSON.parse(localStorage.getItem(LS_KEYS.STOCK_TXNS) || '[]');
+    txns.push({ id: 'T' + Date.now(), itemId: id, type: delta > 0 ? 'IN' : 'OUT', quantity: Math.abs(delta), date: new Date().toISOString(), note });
+    localStorage.setItem(LS_KEYS.STOCK_TXNS, JSON.stringify(txns));
+  },
+  getStockTransactions: async (itemId: string): Promise<StockTransaction[]> => {
+    const txns = JSON.parse(localStorage.getItem(LS_KEYS.STOCK_TXNS) || '[]');
+    return txns.filter((t: any) => t.itemId === itemId).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
   },
 
-  getLiveStaffTracking: async (bookingId: string): Promise<StaffLocation | null> => {
-    const all = JSON.parse(localStorage.getItem(LS_KEYS.LIVE_TRACKING) || '{}');
-    return all[bookingId] || null;
+  getExpenses: async (): Promise<Expense[]> => JSON.parse(localStorage.getItem(LS_KEYS.EXPENSES) || '[]'),
+  addExpense: async (data: any): Promise<Expense> => {
+    const current = await dbService.getExpenses();
+    const newExp = { ...data, id: 'E' + Date.now(), date: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify([newExp, ...current]));
+    return newExp;
+  },
+  deleteExpense: async (id: string): Promise<void> => {
+    const current = await dbService.getExpenses();
+    const itemToDelete = current.find(e => e.id === id);
+    if (itemToDelete) {
+      await dbService.moveToRecycleBin('Expense', itemToDelete);
+      localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(current.filter(e => e.id !== id)));
+    }
   },
 
-  getAllStaffLocations: async (): Promise<StaffLocation[]> => {
-    const all = JSON.parse(localStorage.getItem(LS_KEYS.LIVE_TRACKING) || '{}');
-    return Object.values(all);
+  getReminders: async (): Promise<ServiceReminder[]> => JSON.parse(localStorage.getItem(LS_KEYS.REMINDERS) || '[]'),
+  addReminder: async (data: any): Promise<ServiceReminder> => {
+    const current = await dbService.getReminders();
+    const newRem = { ...data, id: 'R' + Date.now(), status: 'Pending' };
+    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify([...current, newRem]));
+    return newRem;
+  },
+  updateReminderStatus: async (id: string, status: 'Pending' | 'Sent'): Promise<void> => {
+    const current = await dbService.getReminders();
+    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify(current.map(r => r.id === id ? { ...r, status, lastNotified: new Date().toISOString() } : r)));
+  },
+  deleteReminder: async (id: string): Promise<void> => {
+    const current = await dbService.getReminders();
+    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify(current.filter(r => r.id !== id)));
   },
 
-  updateStaffLocation: async (data: StaffLocation): Promise<void> => {
-    const all = JSON.parse(localStorage.getItem(LS_KEYS.LIVE_TRACKING) || '{}');
-    const key = data.bookingId === 'IDLE' ? `IDLE_${data.staffId}` : data.bookingId;
-    all[key] = { ...data, lastUpdated: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.LIVE_TRACKING, JSON.stringify(all));
+  getDashboardStats: async (): Promise<DashboardStats> => {
+    const [c, j, i, e, txns, accounts] = await Promise.all([
+      dbService.getCustomers(), 
+      dbService.getComplaints(), 
+      dbService.getInvoices(), 
+      dbService.getExpenses(),
+      dbService.getTransactions(),
+      dbService.getBankAccounts()
+    ]);
+    
+    const totalRev = txns.filter(t => t.type === 'IN').reduce((s, t) => s + t.amount, 0);
+    const pend = i.filter(inv => inv.paymentStatus === 'Unpaid').reduce((s, inv) => s + inv.finalAmount, 0);
+    const exp = e.reduce((s, ex) => s + ex.amount, 0);
+
+    let cashBal = 0;
+    let bankBal = 0;
+
+    for (const acc of accounts) {
+      const balance = await dbService.getAccountBalance(acc.id);
+      if (acc.type === 'Cash') cashBal += balance;
+      else bankBal += balance;
+    }
+    
+    return {
+      totalCustomers: c.length,
+      totalComplaints: j.length,
+      totalInvoices: i.length,
+      totalReceived: totalRev,
+      totalPending: pend,
+      totalExpenses: exp,
+      netProfit: totalRev - exp,
+      cashInHand: cashBal,
+      bankBalance: bankBal
+    };
   },
 
   getAdSuggestions: async (businessName: string): Promise<AdSuggestion[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Generate 3 professional social media ad suggestions for a bike service center named "${businessName}".`,
-      config: { 
-        responseMimeType: 'application/json',
+      contents: `Generate 3 professional motor bike service advertisements for "${businessName}". 
+      Focus on high-performance bikes like Royal Enfield, KTM, and Hero/Honda commuters. 
+      Services to highlight: Ceramic Coating, Full Engine Overhaul, Computerized Scan, and Rider Safety Checks. 
+      Format for Instagram/Facebook with technical yet catchy copy.`,
+      config: {
+        responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -359,210 +518,231 @@ export const dbService = {
               headline: { type: Type.STRING },
               copy: { type: Type.STRING },
               targetAudience: { type: Type.STRING },
-              estimatedPerformance: { type: Type.STRING }
+              estimatedPerformance: { type: Type.STRING },
             },
-            required: ["platform", "headline", "copy", "targetAudience", "estimatedPerformance"]
+            required: ["platform", "headline", "copy", "targetAudience", "estimatedPerformance"],
           }
         }
       }
     });
-    return JSON.parse(response.text || '[]');
+    try {
+      return JSON.parse(response.text || '[]');
+    } catch {
+      return [];
+    }
   },
 
-  getBusinessHoroscope: async (businessName: string): Promise<string> => {
+  generateAdImage: async (prompt: string): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Give a short, motivational, mechanic-themed business insight for a bike center named "${businessName}". Max 40 words.`,
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          { text: `A cinematic, ultra-high-resolution professional advertisement for a motor bike service center. Topic: ${prompt}. Show a clean, futuristic workshop, a professional mechanic working on a sports bike or cruiser, specialized tools, or a gleaming polished motorcycle. Premium aesthetic.` }
+        ]
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1"
+        }
+      }
     });
-    return response.text || "Perfect day for growth!";
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    throw new Error("No image generated");
   },
 
   generateMarketingContent: async (topic: string): Promise<{ caption: string, tags: string }> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Write an engaging Instagram caption and hashtags for this bike service promotion: "${topic}".`,
-      config: { 
-        responseMimeType: 'application/json',
+      contents: `Write a viral social media caption for a bike service promotion: "${topic}". Use rider-friendly emojis, technical keywords like Torque, Performance, and Stability. Include 5 hashtags for bike enthusiasts.`,
+      config: {
+        responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             caption: { type: Type.STRING },
-            tags: { type: Type.STRING }
+            tags: { type: Type.STRING },
           },
-          required: ["caption", "tags"]
+          required: ["caption", "tags"],
         }
       }
     });
-    return JSON.parse(response.text || '{"caption":"","tags":""}');
+    try {
+      return JSON.parse(response.text || '{"caption": "", "tags": ""}');
+    } catch {
+      return { caption: response.text || "", tags: "" };
+    }
   },
 
-  searchLocalMarket: async (query: string, lat: number, lng: number): Promise<{ text: string, grounding: any[] }> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-12-2024", // Using 2.5 series as required for Maps Grounding
-      contents: `Explore "${query}" in the local market area around Pune. Focus on businesses that can supply or support a bike service center.`,
-      config: {
-        tools: [{ googleMaps: {} }],
-        toolConfig: {
-          retrievalConfig: {
-            latLng: {
-              latitude: lat,
-              longitude: lng
-            }
-          }
-        }
-      },
-    });
-    return { 
-      text: response.text || "No details found.", 
-      grounding: response.candidates?.[0]?.groundingMetadata?.groundingChunks || [] 
-    };
+  getWADeviceStatus: () => JSON.parse(localStorage.getItem(LS_KEYS.WA_STATUS) || '{"connected": false}'),
+  setWADeviceStatus: (status: any) => localStorage.setItem(LS_KEYS.WA_STATUS, JSON.stringify(status)),
+
+  getPickupBookings: async (): Promise<PickupBooking[]> => JSON.parse(localStorage.getItem(LS_KEYS.PICKUP_BOOKINGS) || '[]'),
+  addPickupBooking: async (data: any): Promise<PickupBooking> => {
+    const current = await dbService.getPickupBookings();
+    const newBooking = { ...data, id: 'B' + Date.now(), status: PickupStatus.SCHEDULED, createdAt: new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify([...current, newBooking]));
+    
+    if (data.slotId) {
+      const slots = await dbService.getPickupSlots();
+      const updated = slots.map(s => s.id === data.slotId ? { ...s, bookedCount: s.bookedCount + 1 } : s);
+      localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(updated));
+    }
+    return newBooking;
+  },
+  updatePickupStatus: async (id: string, status: PickupStatus, staffId?: string, staffName?: string): Promise<void> => {
+    const current = await dbService.getPickupBookings();
+    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify(current.map(b => b.id === id ? { ...b, status, staffId, staffName } : b)));
+    
+    if (staffId) {
+      const salesmen = await dbService.getSalesmen();
+      localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify(salesmen.map(s => s.id === staffId ? { ...s, status: status === PickupStatus.DELIVERED ? 'Available' : 'On Task' } : s)));
+    }
   },
 
-  getCustomers: async (): Promise<Customer[]> => {
-    const local = localStorage.getItem(LS_KEYS.CUSTOMERS);
-    return local ? JSON.parse(local) : [];
+  getPickupSlots: async (): Promise<PickupSlot[]> => JSON.parse(localStorage.getItem(LS_KEYS.PICKUP_SLOTS) || '[]'),
+  getSlotsByDate: async (date: string): Promise<PickupSlot[]> => {
+    const slots = await dbService.getPickupSlots();
+    return slots.filter(s => s.date === date);
   },
-  addCustomer: async (data: any): Promise<Customer> => {
-    const customers = await dbService.getCustomers();
-    const newCust = { ...data, id: 'CUST-' + Date.now(), loyaltyPoints: 0, createdAt: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify([...customers, newCust]));
-    return newCust;
-  },
-  deleteCustomer: async (id: string): Promise<void> => {
-    const customers = await dbService.getCustomers();
-    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(customers.filter(c => c.id !== id)));
+  initSlotsForDate: async (date: string, capacity: number): Promise<void> => {
+    const current = await dbService.getPickupSlots();
+    const filtered = current.filter(s => s.date !== date);
+    const timeRanges = ["9-11", "11-1", "2-4", "4-6"];
+    const newSlots = timeRanges.map((tr, i) => ({
+      id: `S-${date}-${i}`,
+      date,
+      timeRange: tr,
+      capacity,
+      bookedCount: 0
+    }));
+    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify([...filtered, ...newSlots]));
   },
 
-  getSalesmen: async (): Promise<Salesman[]> => {
-    const local = localStorage.getItem(LS_KEYS.SALESMEN);
-    return local ? JSON.parse(local) : [];
-  },
+  getSalesmen: async (): Promise<Salesman[]> => JSON.parse(localStorage.getItem(LS_KEYS.SALESMEN) || '[]'),
   addSalesman: async (data: any): Promise<Salesman> => {
-    const salesmen = await dbService.getSalesmen();
-    const newSalesman: Salesman = { ...data, id: 'SM-' + Date.now(), salesCount: 0, totalSalesValue: 0, joinDate: new Date().toISOString(), status: 'Available' };
-    localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify([...salesmen, newSalesman]));
-    return newSalesman;
+    const current = await dbService.getSalesmen();
+    const newStaff = { 
+      ...data, 
+      id: 'ST' + Date.now(), 
+      salesCount: 0, 
+      totalSalesValue: 0, 
+      joinDate: new Date().toISOString(),
+      status: 'Available'
+    };
+    localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify([...current, newStaff]));
+    return newStaff;
   },
   deleteSalesman: async (id: string): Promise<void> => {
-    const salesmen = await dbService.getSalesmen();
-    localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify(salesmen.filter(s => s.id !== id)));
+    const current = await dbService.getSalesmen();
+    localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify(current.filter(s => s.id !== id)));
   },
 
-  getComplaints: async (): Promise<Complaint[]> => {
-    const local = localStorage.getItem(LS_KEYS.COMPLAINTS);
-    return local ? JSON.parse(local) : [];
+  getLiveStaffTracking: async (bookingId: string): Promise<StaffLocation | null> => {
+    const locs: Record<string, StaffLocation> = JSON.parse(localStorage.getItem(LS_KEYS.STAFF_LOCS) || '{}');
+    return locs[bookingId] || null;
   },
-  addComplaint: async (data: any): Promise<Complaint> => {
-    const complaints = await dbService.getComplaints();
-    const newComp = { ...data, id: 'CMP-' + Date.now(), status: ComplaintStatus.PENDING, createdAt: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify([...complaints, newComp]));
-    return newComp;
-  },
-  updateComplaintStatus: async (id: string, status: ComplaintStatus): Promise<void> => {
-    const complaints = await dbService.getComplaints();
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(complaints.map(c => c.id === id ? { ...c, status } : c)));
-  },
-  assignComplaintMechanic: async (id: string, mechanicId: string, mechanicName: string): Promise<void> => {
-    const complaints = await dbService.getComplaints();
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(complaints.map(c => 
-      c.id === id ? { ...c, mechanicId, mechanicName, status: ComplaintStatus.IN_PROGRESS } : c
-    )));
-  },
-  deleteComplaint: async (id: string): Promise<void> => {
-    const complaints = await dbService.getComplaints();
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(complaints.filter(c => c.id !== id)));
+  updateStaffLocation: async (loc: StaffLocation): Promise<void> => {
+    const locs: Record<string, StaffLocation> = JSON.parse(localStorage.getItem(LS_KEYS.STAFF_LOCS) || '{}');
+    locs[loc.bookingId] = loc;
+    localStorage.setItem(LS_KEYS.STAFF_LOCS, JSON.stringify(locs));
   },
 
-  getInvoices: async (): Promise<Invoice[]> => {
-    const local = localStorage.getItem(LS_KEYS.INVOICES);
-    return local ? JSON.parse(local) : [];
-  },
-  generateInvoice: async (data: any): Promise<Invoice> => {
-    const invoices = await dbService.getInvoices();
-    const newInv = { ...data, id: 'INV-' + Date.now(), date: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([...invoices, newInv]));
-    return newInv;
-  },
-  deleteInvoice: async (id: string): Promise<void> => {
-    const invoices = await dbService.getInvoices();
-    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify(invoices.filter(i => i.id !== id)));
+  parseLocationFromLink: (text: string): { lat: number, lng: number, address?: string } | null => {
+    if (!text) return null;
+    
+    // Normalize input
+    const cleanText = text.replace(/["']/g, '').trim();
+
+    // 1. Direct coordinates (18.52, 73.85)
+    const directRegex = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
+    const directMatch = cleanText.match(directRegex);
+    if (directMatch) return { lat: parseFloat(directMatch[1]), lng: parseFloat(directMatch[2]) };
+
+    // 2. Google Maps Desktop (@lat,lng)
+    const desktopRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const desktopMatch = cleanText.match(desktopRegex);
+    if (desktopMatch) return { lat: parseFloat(desktopMatch[1]), lng: parseFloat(desktopMatch[2]) };
+
+    // 3. Expanded Query Pattern (q= or query= or ll= or search/)
+    const queryRegex = /[?&/](q|query|ll|search\/)(=?)(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const queryMatch = cleanText.match(queryRegex);
+    if (queryMatch) return { lat: parseFloat(queryMatch[3]), lng: parseFloat(queryMatch[4]) };
+
+    // 4. Place/Dir Pattern (/place/lat,lng or /dir/lat,lng)
+    const placeRegex = /\/(place|dir)\/(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const placeMatch = cleanText.match(placeRegex);
+    if (placeMatch) return { lat: parseFloat(placeMatch[2]), lng: parseFloat(placeMatch[3]) };
+
+    // 5. Street View pattern (cbll=lat,lng)
+    const streetRegex = /[?&]cbll=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const streetMatch = cleanText.match(streetRegex);
+    if (streetMatch) return { lat: parseFloat(streetMatch[1]), lng: parseFloat(streetMatch[2]) };
+
+    return null;
   },
 
-  getInventory: async (): Promise<InventoryItem[]> => {
-    const local = localStorage.getItem(LS_KEYS.INVENTORY);
-    return local ? JSON.parse(local) : [];
-  },
-  addInventoryItem: async (data: any): Promise<InventoryItem> => {
-    const inventory = await dbService.getInventory();
-    const newItem = { ...data, id: 'SKU-' + Date.now(), lastUpdated: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify([...inventory, newItem]));
-    return newItem;
-  },
-  updateStock: async (id: string, delta: number, note: string = 'Manual Adjustment'): Promise<void> => {
-    const inventory = await dbService.getInventory();
-    const updatedInventory = inventory.map(i => i.id === id ? { ...i, stock: i.stock + delta, lastUpdated: new Date().toISOString() } : i);
-    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(updatedInventory));
-  },
-  getStockTransactions: async (itemId: string): Promise<StockTransaction[]> => {
-    const allTxns = JSON.parse(localStorage.getItem(LS_KEYS.STOCK_TRANSACTIONS) || '[]');
-    return allTxns.filter((t: StockTransaction) => t.itemId === itemId).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  },
-  deleteInventoryItem: async (id: string): Promise<void> => {
-    const inventory = await dbService.getInventory();
-    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(inventory.filter(i => i.id !== id)));
+  getRecycleBin: async (): Promise<RecycleBinItem[]> => {
+    const local = localStorage.getItem(LS_KEYS.RECYCLE_BIN);
+    const bin: RecycleBinItem[] = local ? JSON.parse(local) : [];
+    const settings = await dbService.getSettings();
+    const purgeDays = settings.general.recycleBinDays || 30;
+    const now = new Date().getTime();
+    const filteredBin = bin.filter(item => {
+      const deletedAt = new Date(item.deletedAt).getTime();
+      return (now - deletedAt) < (purgeDays * 24 * 60 * 60 * 1000);
+    });
+    if (filteredBin.length !== bin.length) {
+      localStorage.setItem(LS_KEYS.RECYCLE_BIN, JSON.stringify(filteredBin));
+    }
+    return filteredBin;
   },
 
-  getExpenses: async (): Promise<Expense[]> => {
-    const local = localStorage.getItem(LS_KEYS.EXPENSES);
-    return local ? JSON.parse(local) : [];
-  },
-  addExpense: async (data: any): Promise<Expense> => {
-    const expenses = await dbService.getExpenses();
-    const newExp = { ...data, id: 'EXP-' + Date.now(), date: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify([...expenses, newExp]));
-    return newExp;
-  },
-  deleteExpense: async (id: string): Promise<void> => {
-    const expenses = await dbService.getExpenses();
-    localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(expenses.filter(e => e.id !== id)));
-  },
-
-  getReminders: async (): Promise<ServiceReminder[]> => {
-    const local = localStorage.getItem(LS_KEYS.REMINDERS);
-    return local ? JSON.parse(local) : [];
-  },
-  addReminder: async (data: any): Promise<ServiceReminder> => {
-    const reminders = await dbService.getReminders();
-    const newRem = { ...data, id: 'REM-' + Date.now(), status: 'Pending' };
-    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify([...reminders, newRem]));
-    return newRem;
-  },
-  deleteReminder: async (id: string): Promise<void> => {
-    const reminders = await dbService.getReminders();
-    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify(reminders.filter(r => r.id !== id)));
-  },
-
-  getDashboardStats: async (): Promise<DashboardStats> => {
-    const customers = await dbService.getCustomers();
-    const complaints = await dbService.getComplaints();
-    const invoices = await dbService.getInvoices();
-    const expenses = await dbService.getExpenses();
-    const received = invoices.filter(i => i.paymentStatus === 'Paid').reduce((sum, i) => sum + i.finalAmount, 0);
-    const pending = invoices.filter(i => i.paymentStatus === 'Unpaid').reduce((sum, i) => sum + i.finalAmount, 0);
-    const spent = expenses.reduce((sum, e) => sum + e.amount, 0);
-    return {
-      totalCustomers: customers.length,
-      totalComplaints: complaints.length,
-      totalInvoices: invoices.length,
-      totalReceived: received,
-      totalPending: pending,
-      totalExpenses: spent,
-      netProfit: received - spent,
-      cashInHand: received - spent,
-      bankBalance: 0
+  moveToRecycleBin: async (type: RecycleBinCategory, data: any): Promise<void> => {
+    const bin = await dbService.getRecycleBin();
+    const newItem: RecycleBinItem = {
+      binId: 'BIN-' + Date.now(),
+      originalId: data.id,
+      type,
+      data,
+      deletedAt: new Date().toISOString()
     };
+    localStorage.setItem(LS_KEYS.RECYCLE_BIN, JSON.stringify([newItem, ...bin]));
+  },
+
+  restoreFromBin: async (binId: string): Promise<void> => {
+    const bin = await dbService.getRecycleBin();
+    const item = bin.find(i => i.binId === binId);
+    if (!item) return;
+    let key = '';
+    switch (item.type) {
+      case 'Customer': key = LS_KEYS.CUSTOMERS; break;
+      case 'Invoice': key = LS_KEYS.INVOICES; break;
+      case 'Complaint': key = LS_KEYS.COMPLAINTS; break;
+      case 'Inventory': key = LS_KEYS.INVENTORY; break;
+      case 'Expense': key = LS_KEYS.EXPENSES; break;
+      case 'Visitor': key = LS_KEYS.VISITORS; break;
+    }
+    if (key) {
+      const current = JSON.parse(localStorage.getItem(key) || '[]');
+      localStorage.setItem(key, JSON.stringify([...current, item.data]));
+    }
+    // Fix: replaced 'id' with 'binId' to resolve "Cannot find name 'id'" error
+    localStorage.setItem(LS_KEYS.RECYCLE_BIN, JSON.stringify(bin.filter(i => i.binId !== binId)));
+  },
+
+  purgeFromBin: async (binId: string): Promise<void> => {
+    const bin = await dbService.getRecycleBin();
+    localStorage.setItem(LS_KEYS.RECYCLE_BIN, JSON.stringify(bin.filter(i => i.binId !== binId)));
+  },
+
+  emptyRecycleBin: async (): Promise<void> => {
+    localStorage.setItem(LS_KEYS.RECYCLE_BIN, JSON.stringify([]));
   }
 };

@@ -6,7 +6,8 @@ import {
   Monitor, Smartphone, Settings as SettingsIcon, ShieldCheck, CreditCard, Sparkles,
   Eye, X, Scissors, Barcode, Info, Edit2, Crown, Search, ArrowLeft, Minus,
   Truck, Hash, Percent, FileText, AlertCircle, RefreshCw, Menu as MenuIcon,
-  MessageSquareMore, Download, BarChart3, Briefcase
+  MessageSquareMore, Download, BarChart3, Briefcase, Phone, MapPin, Coins,
+  CalendarClock
 } from 'lucide-react';
 import { dbService } from '../db';
 import { AppSettings } from '../types';
@@ -84,6 +85,35 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'general',
       case 'general':
         return (
           <div className="space-y-6 animate-in fade-in duration-300 p-4 md:p-8">
+            <SettingsGroup title="Business Profile">
+               <div className="space-y-4 px-6 pb-4 pt-2">
+                 <div className="space-y-2">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                     <MapPin className="w-3 h-3" /> Official Address
+                   </label>
+                   <textarea 
+                     rows={3}
+                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                     placeholder="Enter full company address..."
+                     value={settings.general.businessAddress || ''}
+                     onChange={(e) => handleUpdate('general', { businessAddress: e.target.value })}
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                     <Phone className="w-3 h-3" /> Business Contact
+                   </label>
+                   <input 
+                     type="tel"
+                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                     placeholder="+91 00000 00000"
+                     value={settings.general.businessPhone || ''}
+                     onChange={(e) => handleUpdate('general', { businessPhone: e.target.value })}
+                   />
+                 </div>
+               </div>
+            </SettingsGroup>
+
             <SettingsGroup title="Core System Settings">
               <ToggleRow 
                 label="Passcode Protection" 
@@ -124,9 +154,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'general',
           <div className="space-y-6 animate-in fade-in duration-300 p-4 md:p-8">
             <SettingsGroup title="Billing & Invoicing Rules">
               <ToggleRow label="Show Invoice Number" checked={settings.transaction.showInvoiceNumber} onChange={(v) => handleUpdate('transaction', { showInvoiceNumber: v })} />
+              <ToggleRow label="Enable Invoice Preview" desc="Preview bill layout before final commit" checked={settings.transaction.enableInvoicePreview} onChange={(v) => handleUpdate('transaction', { enableInvoicePreview: v })} />
               <ToggleRow label="Inclusive Tax Pricing" desc="Prices entered include GST" checked={settings.transaction.inclusiveTax} onChange={(v) => handleUpdate('transaction', { inclusiveTax: v })} />
               <ToggleRow label="Round off Total" desc="Automatically round off to nearest Rupee" checked={settings.transaction.roundOffTransaction} onChange={(v) => handleUpdate('transaction', { roundOffTransaction: v })} />
               <ToggleRow label="Show Profit on Dashboard" checked={settings.transaction.showProfit} onChange={(v) => handleUpdate('transaction', { showProfit: v })} />
+              <StepperRow 
+                label="Overdue Days Limit" 
+                desc="Days before an unpaid bill is flagged as overdue"
+                value={settings.transaction.overdueDaysLimit || 15} 
+                onChange={(v) => handleUpdate('transaction', { overdueDaysLimit: v })} 
+              />
             </SettingsGroup>
             
             <SettingsGroup title="Document Prefixes">
@@ -286,8 +323,37 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'general',
       case 'party':
         return (
           <div className="space-y-6 animate-in fade-in duration-300 p-4 md:p-8">
+            <SettingsGroup title="Loyalty & Rewards Configuration">
+              <ToggleRow 
+                label="Loyalty Points Tracking" 
+                desc="Enable automated rewards for customers" 
+                checked={settings.party.loyaltyPoints} 
+                onChange={(v) => handleUpdate('party', { loyaltyPoints: v })} 
+              />
+              {settings.party.loyaltyPoints && (
+                 <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100 mb-4 animate-in slide-in-from-top-2">
+                    <div className="flex items-center gap-3 mb-4">
+                       <Coins className="w-5 h-5 text-blue-600" />
+                       <h5 className="text-[10px] font-black uppercase text-blue-800 tracking-widest">Points Allocation Policy</h5>
+                    </div>
+                    <div className="space-y-4">
+                       <div className="space-y-2">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">₹ Amount spent for 1 Point</label>
+                          <input 
+                            type="number"
+                            className="w-full p-4 bg-white border border-blue-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="e.g. 100"
+                            value={settings.party.loyaltyRate || 100}
+                            onChange={(e) => handleUpdate('party', { loyaltyRate: parseFloat(e.target.value) || 0 })}
+                          />
+                          <p className="text-[8px] font-bold text-blue-500/60 uppercase italic ml-1">Ex: ₹1000 bill will earn 10 points if rate is 100.</p>
+                       </div>
+                    </div>
+                 </div>
+              )}
+            </SettingsGroup>
+            
             <SettingsGroup title="Customer & Vendor Settings">
-              <ToggleRow label="Loyalty Points Tracking" checked={settings.party.loyaltyPoints} onChange={(v) => handleUpdate('party', { loyaltyPoints: v })} />
               <ToggleRow label="Shipping Address" checked={settings.party.shippingAddress} onChange={(v) => handleUpdate('party', { shippingAddress: v })} />
               <ToggleRow label="Payment Reminders" checked={settings.party.paymentReminders} onChange={(v) => handleUpdate('party', { paymentReminders: v })} />
               <StepperRow label="Reminder Offset (Days)" value={settings.party.reminderOffset} onChange={(v) => handleUpdate('party', { reminderOffset: v })} />
@@ -363,6 +429,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'general',
                  <TagLabel text="{{ServiceType}}" />
               </div>
             </SettingsGroup>
+          </div>
+        );
+
+      case 'utilities':
+        return (
+          <div className="p-8 text-center text-slate-400 font-bold uppercase tracking-widest">
+            Module under construction
           </div>
         );
 
@@ -505,14 +578,17 @@ const SelectRow: React.FC<{ label: string, value: string, options: string[], onC
   </div>
 );
 
-const StepperRow: React.FC<{ label: string, value: number, onChange: (v: number) => void }> = ({ label, value, onChange }) => (
-  <div className="flex items-center justify-between py-3 px-6">
-    <div className="flex items-center gap-2">
-      <label className="font-medium text-slate-700 text-sm">{label}</label>
-      <Info className="w-4 h-4 text-slate-300" />
+const StepperRow: React.FC<{ label: string, desc?: string, value: number, onChange: (v: number) => void }> = ({ label, desc, value, onChange }) => (
+  <div className="flex items-center justify-between py-3 px-6 bg-white border-b border-slate-50">
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-2">
+        <label className="font-medium text-slate-700 text-sm">{label}</label>
+        <Info className="w-4 h-4 text-slate-300" />
+      </div>
+      {desc && <p className="text-[10px] text-slate-400 font-medium">{desc}</p>}
     </div>
     <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-1.5 py-1 scale-90">
-       <button onClick={() => onChange(Math.max(0, value - 1))} className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400"><Minus className="w-3.5 h-3.5" /></button>
+       <button onClick={() => onChange(Math.max(1, value - 1))} className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400"><Minus className="w-3.5 h-3.5" /></button>
        <span className="font-bold text-xs text-slate-500 w-6 text-center">{value.toString().padStart(2, '0')}</span>
        <button onClick={() => onChange(value + 1)} className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400"><Plus className="w-3.5 h-3.5" /></button>
     </div>

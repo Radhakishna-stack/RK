@@ -13,6 +13,28 @@ export interface Customer {
   location?: { lat: number; lng: number; address: string };
 }
 
+export type VisitorType = 'Spare Part Enquiry' | 'Other';
+
+export interface Visitor {
+  id: string;
+  name: string;
+  bikeNumber: string;
+  phone: string;
+  remarks: string;
+  type: VisitorType;
+  photoUrls: string[];
+  createdAt: string;
+}
+
+export interface StockWantingItem {
+  id: string;
+  partNumber: string;
+  itemName: string;
+  quantity: number;
+  rate: number;
+  createdAt: string;
+}
+
 export enum ComplaintStatus {
   PENDING = 'Pending',
   IN_PROGRESS = 'In Progress',
@@ -30,9 +52,8 @@ export interface Complaint {
   estimatedCost: number;
   status: ComplaintStatus;
   createdAt: string;
-  odometerReading?: string;
-  mechanicId?: string;
-  mechanicName?: string;
+  dueDate?: string;
+  odometerReading?: number;
 }
 
 export enum PickupStatus {
@@ -102,17 +123,28 @@ export interface Invoice {
   taxAmount?: number;
   subTotal?: number;
   paymentStatus: 'Paid' | 'Unpaid';
-  paymentMode: 'Cash' | 'UPI' | 'Card';
+  accountId: string; // References BankAccount.id
+  paymentMode: string; // Account Name for display
   date: string;
-  odometerReading?: string;
+  odometerReading?: number;
+  docType?: 'Sale' | 'Estimate';
+}
+
+export interface BankAccount {
+  id: string;
+  name: string;
+  type: 'Cash' | 'Savings' | 'Current' | 'UPI/Wallet';
+  openingBalance: number;
+  createdAt: string;
 }
 
 export interface Transaction {
   id: string;
-  entityId: string;
+  entityId: string; // Party ID or description
+  accountId: string; // Reference to BankAccount.id
   type: 'IN' | 'OUT';
   amount: number;
-  paymentMode: 'Cash' | 'UPI' | 'Card' | 'Cheque';
+  paymentMode: string; // For legacy/display
   date: string;
   description: string;
 }
@@ -145,7 +177,8 @@ export interface Expense {
   amount: number;
   date: string;
   notes: string;
-  paymentMode: 'Cash' | 'UPI' | 'Card' | 'Cheque';
+  accountId: string;
+  paymentMode: string;
 }
 
 export interface Salesman {
@@ -167,6 +200,7 @@ export interface ServiceReminder {
   reminderDate: string;
   serviceType: string;
   status: 'Pending' | 'Sent';
+  lastNotified?: string;
 }
 
 export interface DashboardStats {
@@ -189,8 +223,20 @@ export interface AdSuggestion {
   estimatedPerformance: string;
 }
 
+export type RecycleBinCategory = 'Customer' | 'Invoice' | 'Complaint' | 'Inventory' | 'Expense' | 'Visitor';
+
+export interface RecycleBinItem {
+  binId: string;
+  originalId: string;
+  type: RecycleBinCategory;
+  data: any;
+  deletedAt: string;
+}
+
 export interface AppSettings {
   general: {
+    businessAddress: string;
+    businessPhone: string;
     passcodeEnabled: boolean;
     passcode: string;
     currency: string;
@@ -206,6 +252,7 @@ export interface AppSettings {
     };
     multiFirm: boolean;
     auditTrail: boolean;
+    recycleBinDays: number;
   };
   transaction: {
     showInvoiceNumber: boolean;
@@ -232,6 +279,7 @@ export interface AppSettings {
     additionalFields: boolean;
     transportationDetails: boolean;
     additionalCharges: boolean;
+    overdueDaysLimit: number; // Threshold for marking unpaid bills as overdue
     prefixes: {
       firmName: string;
       sale: string;
@@ -320,6 +368,7 @@ export interface AppSettings {
     grouping: boolean;
     shippingAddress: boolean;
     loyaltyPoints: boolean;
+    loyaltyRate: number; // ₹ amount spent for 1 point
     paymentReminders: boolean;
     reminderOffset: number;
     additionalFields: Array<{ label: string; showOnPrint: boolean }>;

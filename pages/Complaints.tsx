@@ -1,5 +1,11 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Loader2, Camera, Trash2, X, Image as ImageIcon, Search, ChevronRight, Bike, User, Clock, CheckCircle2, Phone, Upload, Filter, FlipHorizontal, Gauge } from 'lucide-react';
+import { 
+  Plus, Loader2, Camera, Trash2, X, Image as ImageIcon, Search, 
+  ChevronRight, Bike, User, Clock, CheckCircle2, Phone, Upload, 
+  Filter, FlipHorizontal, Activity, Gauge, IndianRupee, Layers,
+  CheckCircle, AlertCircle, CalendarDays
+} from 'lucide-react';
 import { dbService } from '../db';
 import { Complaint, ComplaintStatus, Customer } from '../types';
 
@@ -16,15 +22,20 @@ const ComplaintsPage: React.FC = () => {
   const [nameInput, setNameInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
   const [complaintDetails, setComplaintDetails] = useState('');
-  const [odometerInput, setOdometerInput] = useState('');
   const [estCost, setEstCost] = useState('');
+  const [odometerReading, setOdometerReading] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [images, setImages] = useState<string[]>([]);
   
   // UI State
   const [showBikeSuggestions, setShowBikeSuggestions] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Camera Targeting
+  const [cameraTargetId, setCameraTargetId] = useState<string | null>(null); // null means new complaint form
+
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -51,13 +62,14 @@ const ComplaintsPage: React.FC = () => {
     }
   };
 
-  // --- In-App Camera Logic ---
-  const openCamera = async () => {
+  // --- Pro Camera Logic ---
+  const openCamera = async (targetId: string | null = null) => {
+    setCameraTargetId(targetId);
     setIsCameraOpen(true);
     setCameraError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false
       });
       if (videoRef.current) {
@@ -66,8 +78,7 @@ const ComplaintsPage: React.FC = () => {
       }
     } catch (err) {
       console.error("Camera access denied:", err);
-      setCameraError("Could not access camera. Using fallback.");
-      // Auto-fallback to native picker after a delay if permission fails
+      setCameraError("Camera access failed. Using device picker.");
       setTimeout(() => {
         closeCamera();
         cameraInputRef.current?.click();
@@ -83,7 +94,7 @@ const ComplaintsPage: React.FC = () => {
     setIsCameraOpen(false);
   };
 
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -93,10 +104,22 @@ const ComplaintsPage: React.FC = () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setImages(prev => [...prev, dataUrl]);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
         
-        // Visual feedback (flash)
+        if (cameraTargetId) {
+          // Add to existing complaint
+          const complaint = complaints.find(c => c.id === cameraTargetId);
+          if (complaint) {
+            const updatedPhotos = [...(complaint.photoUrls || []), dataUrl];
+            await dbService.updateComplaintPhotos(cameraTargetId, updatedPhotos);
+            setComplaints(prev => prev.map(c => c.id === cameraTargetId ? { ...c, photoUrls: updatedPhotos } : c));
+          }
+        } else {
+          // Add to form state
+          setImages(prev => [...prev, dataUrl]);
+        }
+        
+        // Flash animation
         const flash = document.createElement('div');
         flash.className = 'fixed inset-0 bg-white z-[100] animate-flash pointer-events-none';
         document.body.appendChild(flash);
@@ -105,29 +128,59 @@ const ComplaintsPage: React.FC = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
-    Array.from(files).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImages(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
+    const newPhotos: string[] = [];
+    const readers = Array.from(files).map((file: File) => {
+      return new Promise<void>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newPhotos.push(reader.result as string);
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      });
     });
+
+    await Promise.all(readers);
+
+    if (cameraTargetId) {
+      // Add to existing complaint
+      const complaint = complaints.find(c => c.id === cameraTargetId);
+      if (complaint) {
+        const updatedPhotos = [...(complaint.photoUrls || []), ...newPhotos];
+        await dbService.updateComplaintPhotos(cameraTargetId, updatedPhotos);
+        setComplaints(prev => prev.map(c => c.id === cameraTargetId ? { ...c, photoUrls: updatedPhotos } : c));
+      }
+    } else {
+      setImages(prev => [...prev, ...newPhotos]);
+    }
     
+    // Clear inputs
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
 
-  const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+  const removeImage = async (index: number, complaintId?: string) => {
+    if (complaintId) {
+      const complaint = complaints.find(c => c.id === complaintId);
+      if (complaint) {
+        const updatedPhotos = complaint.photoUrls.filter((_, i) => i !== index);
+        await dbService.updateComplaintPhotos(complaintId, updatedPhotos);
+        setComplaints(prev => prev.map(c => c.id === complaintId ? { ...c, photoUrls: updatedPhotos } : c));
+      }
+    } else {
+      setImages(prev => prev.filter((_, i) => i !== index));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
     try {
       const newComplaint = await dbService.addComplaint({
         bikeNumber: bikeInput.toUpperCase(),
@@ -136,24 +189,25 @@ const ComplaintsPage: React.FC = () => {
         details: complaintDetails,
         photoUrls: images,
         estimatedCost: parseFloat(estCost) || 0,
-        odometerReading: odometerInput
+        odometerReading: odometerReading ? parseFloat(odometerReading) : undefined,
+        dueDate: dueDate || undefined
       });
       
-      setComplaints([newComplaint, ...complaints]);
+      setComplaints(prev => [newComplaint, ...prev]);
       setIsModalOpen(false);
       resetForm();
     } catch (err) {
-      alert("Failed to create job card.");
+      alert("Error: " + (err instanceof Error ? err.message : "Failed to create job card"));
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this job card?")) {
+    if (window.confirm("Delete this Job Card forever?")) {
       setLoading(true);
       await dbService.deleteComplaint(id);
-      setComplaints(complaints.filter(c => c.id !== id));
+      setComplaints(prev => prev.filter(c => c.id !== id));
       setLoading(false);
     }
   };
@@ -163,22 +217,23 @@ const ComplaintsPage: React.FC = () => {
     setNameInput('');
     setPhoneInput('');
     setComplaintDetails('');
-    setOdometerInput('');
     setEstCost('');
+    setOdometerReading('');
+    setDueDate('');
     setImages([]);
   };
 
   const updateStatus = async (id: string, status: ComplaintStatus) => {
     try {
       await dbService.updateComplaintStatus(id, status);
-      setComplaints(complaints.map(c => c.id === id ? { ...c, status } : c));
+      setComplaints(prev => prev.map(c => c.id === id ? { ...c, status } : c));
     } catch (err) {
       alert("Failed to update status.");
     }
   };
 
   const bikeSuggestions = useMemo(() => {
-    if (!bikeInput) return [];
+    if (!bikeInput || bikeInput.length < 2) return [];
     return customers.filter(c => 
       c.bikeNumber.toLowerCase().includes(bikeInput.toLowerCase())
     ).slice(0, 5);
@@ -193,129 +248,184 @@ const ComplaintsPage: React.FC = () => {
     });
   }, [complaints, searchTerm, statusFilter]);
 
+  const isOverdue = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const due = new Date(dateStr);
+    due.setHours(23, 59, 59, 999);
+    return due < new Date();
+  };
+
   return (
-    <div className="space-y-6 pb-24 animate-in fade-in duration-500 max-w-lg mx-auto">
-      <header className="flex justify-between items-center px-1">
+    <div className="space-y-6 pb-24 animate-in fade-in duration-500 max-w-lg mx-auto px-1">
+      <header className="flex justify-between items-end mb-2">
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-slate-900 uppercase">Job Cards</h2>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Service Requests</p>
+          <h2 className="text-3xl font-black tracking-tighter text-slate-900 uppercase">Job Cards</h2>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mt-1">
+             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+             Master Terminal Active
+          </p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)} 
-          className="bg-blue-600 text-white p-3 rounded-2xl shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
+          onClick={() => { resetForm(); setIsModalOpen(true); }} 
+          className="bg-slate-900 text-white p-4 rounded-[22px] shadow-2xl active:scale-95 transition-all group"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform" />
         </button>
       </header>
 
+      {/* Control Strip */}
       <div className="space-y-3">
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors" />
           <input 
             type="text" 
-            placeholder="SEARCH BIKE OR CUSTOMER..."
-            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-xs tracking-widest uppercase shadow-sm"
+            placeholder="Search bike number or name..."
+            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl focus:ring-4 focus:ring-blue-500/5 outline-none font-bold text-xs tracking-widest uppercase shadow-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
-          <Filter className="w-4 h-4 text-blue-500 ml-1" />
-          <select 
-            className="flex-1 bg-transparent text-[10px] font-black uppercase tracking-widest outline-none appearance-none cursor-pointer"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="All">All Statuses</option>
-            {Object.values(ComplaintStatus).map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
-          <div className="text-[10px] font-bold text-slate-300 mr-1">
-            {filteredComplaints.length} Records
+        <div className="flex gap-2">
+          <div className="flex-1 flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <Filter className="w-4 h-4 text-blue-500 ml-1 shrink-0" />
+            <select 
+              className="w-full bg-transparent text-[10px] font-black uppercase tracking-widest outline-none appearance-none cursor-pointer"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="All">All Statuses</option>
+              {Object.values(ComplaintStatus).map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+          </div>
+          <div className="bg-slate-900 text-white px-4 flex items-center justify-center rounded-2xl font-black text-[9px] uppercase tracking-tighter shadow-lg">
+            {filteredComplaints.length} Units
           </div>
         </div>
       </div>
 
       {loading && complaints.length === 0 ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-4 text-slate-300">
-          <Loader2 className="w-10 h-10 animate-spin" />
-          <p className="text-[10px] font-black uppercase tracking-[0.2em]">Synchronizing...</p>
+        <div className="py-32 flex flex-col items-center justify-center gap-6 text-slate-300">
+          <div className="relative">
+             <div className="w-16 h-16 border-4 border-slate-100 rounded-full"></div>
+             <Loader2 className="w-16 h-16 animate-spin text-blue-500 absolute top-0 left-0" />
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em]">Recalibrating Archives...</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {filteredComplaints.map(c => (
-            <div key={c.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden group">
-              <div className="p-5">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                       <span className="bg-slate-900 text-white px-3 py-1 rounded text-[11px] font-black tracking-widest uppercase border border-slate-800 shadow-md">
+            <div key={c.id} className="bg-white rounded-[32px] border border-slate-50 shadow-sm overflow-hidden group hover:border-blue-100 transition-all">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-3">
+                       <span className="bg-slate-900 text-white px-4 py-1.5 rounded-xl text-sm font-black tracking-widest uppercase shadow-lg">
                          {c.bikeNumber}
                        </span>
-                       <span className={`text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-tighter border ${
+                       <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-tighter ${
                         c.status === ComplaintStatus.COMPLETED ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                         c.status === ComplaintStatus.IN_PROGRESS ? 'bg-blue-50 text-blue-600 border-blue-100' : 
                         c.status === ComplaintStatus.CANCELLED ? 'bg-red-50 text-red-600 border-red-100' : 'bg-amber-50 text-amber-600 border-amber-100'
                       }`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${
+                          c.status === ComplaintStatus.COMPLETED ? 'bg-emerald-500' : 
+                          c.status === ComplaintStatus.IN_PROGRESS ? 'bg-blue-500' : 
+                          c.status === ComplaintStatus.CANCELLED ? 'bg-red-500' : 'bg-amber-500'
+                        }`} />
                         {c.status}
-                      </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</p>
-                       {c.odometerReading && (
-                         <div className="flex items-center gap-1">
-                            <div className="w-1 h-1 rounded-full bg-slate-300" />
-                            <p className="text-[9px] font-black text-slate-400 uppercase">{c.odometerReading} KM</p>
-                         </div>
-                       )}
+                    <div className="flex flex-wrap items-center gap-y-2 gap-x-4 pl-1">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3 h-3 text-slate-300" />
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                      </div>
+                      
+                      {c.dueDate && (
+                        <div className={`flex items-center gap-2 px-2 py-0.5 rounded-lg border ${isOverdue(c.dueDate) && c.status !== ComplaintStatus.COMPLETED ? 'bg-red-50 border-red-100 text-red-600' : 'bg-blue-50 border-blue-100 text-blue-600'}`}>
+                          <CalendarDays className="w-3 h-3" />
+                          <p className="text-[9px] font-black uppercase tracking-tight">Due: {new Date(c.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</p>
+                        </div>
+                      )}
+
+                      {c.odometerReading && (
+                        <div className="flex items-center gap-1 text-slate-500">
+                          <Gauge className="w-3 h-3" />
+                          <span className="text-[9px] font-black uppercase">{c.odometerReading.toLocaleString()} KM</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <button 
-                    onClick={() => handleDelete(c.id)}
-                    className="p-2 text-slate-200 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={() => openCamera(c.id)}
+                      className="p-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all active:scale-90"
+                      title="Take Photo Directly"
+                    >
+                      <Camera className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(c.id)}
+                      className="p-2.5 bg-slate-50 text-slate-300 hover:text-red-500 rounded-xl transition-all active:scale-90"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
                 
-                <div className="mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
-                  <p className="text-sm font-bold text-slate-700 leading-relaxed italic line-clamp-2">"{c.details}"</p>
+                <div className="mb-6 bg-slate-50/50 p-5 rounded-[24px] border border-slate-100/50 relative overflow-hidden">
+                  <p className="text-sm font-bold text-slate-700 leading-relaxed italic line-clamp-2 z-10 relative">"{c.details}"</p>
+                  <Layers className="absolute right-[-20px] bottom-[-20px] w-20 h-20 text-slate-100 z-0" />
                 </div>
 
                 {c.photoUrls && c.photoUrls.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
+                  <div className="flex gap-3 overflow-x-auto pb-6 no-scrollbar">
                     {c.photoUrls.map((url, idx) => (
-                      <div key={idx} className="w-14 h-14 rounded-xl border border-slate-200 overflow-hidden flex-shrink-0 shadow-sm">
+                      <div key={idx} className="relative w-20 h-20 rounded-2xl border-2 border-white overflow-hidden flex-shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                         <img src={url} alt="inspection" className="w-full h-full object-cover" />
+                        <button 
+                          onClick={() => removeImage(idx, c.id)}
+                          className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </div>
                     ))}
+                    <button 
+                      onClick={() => openCamera(c.id)}
+                      className="w-20 h-20 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-300 hover:border-blue-300 hover:text-blue-500 transition-all"
+                    >
+                       <Camera className="w-5 h-5 mb-1" />
+                       <span className="text-[8px] font-black uppercase">Take Pic</span>
+                    </button>
                   </div>
                 )}
 
-                <div className="flex justify-between items-center pt-4 border-t border-slate-50">
-                   <div className="flex items-center gap-2">
-                     <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-black text-xs">
+                <div className="flex justify-between items-center pt-5 border-t border-slate-50">
+                   <div className="flex items-center gap-3">
+                     <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-lg shadow-blue-500/20">
                         {c.customerName.charAt(0)}
                      </div>
                      <div>
-                       <p className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{c.customerName}</p>
-                       <p className="text-[9px] font-bold text-slate-400">{c.customerPhone}</p>
+                       <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{c.customerName}</p>
+                       <p className="text-[9px] font-bold text-slate-400">Est. ₹{c.estimatedCost.toLocaleString()}</p>
                      </div>
                    </div>
                    
                    <div className="flex gap-2">
                     {c.status === ComplaintStatus.PENDING && (
-                      <button onClick={() => updateStatus(c.id, ComplaintStatus.IN_PROGRESS)} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all">Start Work</button>
+                      <button onClick={() => updateStatus(c.id, ComplaintStatus.IN_PROGRESS)} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all">Start Task</button>
                     )}
                     {c.status === ComplaintStatus.IN_PROGRESS && (
-                      <button onClick={() => updateStatus(c.id, ComplaintStatus.COMPLETED)} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all">Complete</button>
+                      <button onClick={() => updateStatus(c.id, ComplaintStatus.COMPLETED)} className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">Mark Ready</button>
                     )}
                     {c.status === ComplaintStatus.COMPLETED && (
-                      <div className="flex items-center gap-1 text-emerald-500">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span className="text-[9px] font-black uppercase">Finalized</span>
+                      <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2 rounded-xl text-emerald-600 border border-emerald-100">
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="text-[9px] font-black uppercase tracking-widest">Finalized</span>
                       </div>
                     )}
                    </div>
@@ -325,190 +435,250 @@ const ComplaintsPage: React.FC = () => {
           ))}
 
           {filteredComplaints.length === 0 && (
-            <div className="py-20 text-center space-y-4">
-              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto">
-                <Bike className="w-10 h-10 text-slate-300" />
+            <div className="py-24 text-center space-y-4">
+              <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto border-2 border-dashed border-slate-200">
+                <Bike className="w-12 h-12 text-slate-200" />
               </div>
-              <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">No active job cards found</p>
+              <div className="space-y-1">
+                <p className="text-slate-400 font-black text-xs uppercase tracking-widest">Empty Terminal</p>
+                <p className="text-slate-300 text-[10px] font-bold uppercase">No matching job cards found</p>
+              </div>
             </div>
           )}
         </div>
       )}
 
+      {/* --- New Job Card Modal --- */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-           <div className="bg-white w-full max-w-lg rounded-t-[40px] sm:rounded-[40px] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full duration-300 flex flex-col max-h-[95vh]">
-             <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-               <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">New Job Card</h3>
-               <button onClick={() => setIsModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors"><X className="w-6 h-6" /></button>
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-lg rounded-t-[48px] sm:rounded-[48px] shadow-2xl overflow-hidden flex flex-col max-h-[96vh] relative">
+             
+             {/* Header */}
+             <div className="px-8 py-8 border-b border-slate-50 flex justify-between items-center bg-white sticky top-0 z-10">
+               <div>
+                 <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">New Job Card</h3>
+                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Diagnostics & Intake</p>
+               </div>
+               <button onClick={() => setIsModalOpen(false)} className="p-3 bg-slate-50 text-slate-400 hover:text-slate-900 rounded-2xl transition-all active:scale-90"><X className="w-7 h-7" /></button>
              </div>
              
-             <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto">
-                <div className="space-y-6">
-                  <div className="space-y-2 relative">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Bike Number (Type or Choose)</label>
-                    <div className="relative">
-                      <Bike className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500" />
-                      <input 
-                        required 
-                        type="text"
-                        placeholder="e.g. MH12AB1234"
-                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-sm text-slate-700 uppercase" 
-                        value={bikeInput}
-                        onChange={e => setBikeInput(e.target.value)}
-                        onFocus={() => setShowBikeSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowBikeSuggestions(false), 200)}
-                      />
-                    </div>
-                    {showBikeSuggestions && bikeSuggestions.length > 0 && (
-                      <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
-                        {bikeSuggestions.map(cust => (
-                          <button 
-                            key={cust.id} 
-                            type="button"
-                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
-                            onClick={() => {
-                              setBikeInput(cust.bikeNumber);
-                              setNameInput(cust.name);
-                              setPhoneInput(cust.phone);
-                              setShowBikeSuggestions(false);
-                            }}
-                          >
-                            <div>
-                               <p className="font-black text-slate-900 text-xs uppercase">{cust.bikeNumber}</p>
-                               <p className="text-[10px] text-slate-400 font-bold">{cust.name}</p>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-slate-300" />
-                          </button>
-                        ))}
+             <form onSubmit={handleSubmit} className="p-8 space-y-10 overflow-y-auto no-scrollbar pb-32">
+                
+                {/* Identity Segment */}
+                <section className="space-y-6">
+                  <div className="flex items-center gap-3">
+                     <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
+                     <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em]">Vehicle & Client</h4>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2 relative">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Bike Number</label>
+                      <div className="relative group">
+                        <Bike className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500 transition-transform group-focus-within:scale-110" />
+                        <input 
+                          required 
+                          type="text"
+                          placeholder="E.G. MH12AB1234"
+                          className="w-full pl-14 pr-4 py-5 bg-slate-50 border border-slate-100 rounded-3xl focus:ring-8 focus:ring-blue-500/5 outline-none font-black text-sm text-slate-700 uppercase transition-all" 
+                          value={bikeInput}
+                          onChange={e => setBikeInput(e.target.value)}
+                          onFocus={() => setShowBikeSuggestions(true)}
+                          onBlur={() => setTimeout(() => setShowBikeSuggestions(false), 200)}
+                        />
                       </div>
-                    )}
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Name</label>
-                        <div className="relative">
-                           <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                           <input 
-                             required
-                             type="text"
-                             placeholder="Full Name"
-                             className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-sm text-slate-700"
-                             value={nameInput}
-                             onChange={e => setNameInput(e.target.value)}
-                           />
+                      {showBikeSuggestions && bikeSuggestions.length > 0 && (
+                        <div className="absolute z-50 top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[32px] shadow-2xl overflow-hidden animate-in slide-in-from-top-2">
+                          {bikeSuggestions.map(cust => (
+                            <button 
+                              key={cust.id} 
+                              type="button"
+                              className="w-full px-6 py-4 flex items-center justify-between hover:bg-blue-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                              onClick={() => {
+                                setBikeInput(cust.bikeNumber);
+                                setNameInput(cust.name);
+                                setPhoneInput(cust.phone);
+                                setShowBikeSuggestions(false);
+                              }}
+                            >
+                              <div className="flex items-center gap-4">
+                                 <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 font-black text-xs uppercase">{cust.name.charAt(0)}</div>
+                                 <div>
+                                    <p className="font-black text-slate-900 text-xs uppercase tracking-tight">{cust.bikeNumber}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{cust.name}</p>
+                                 </div>
+                              </div>
+                              <ChevronRight className="w-5 h-5 text-slate-300" />
+                            </button>
+                          ))}
                         </div>
-                     </div>
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
-                        <div className="relative">
-                           <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                           <input 
-                             required
-                             type="tel"
-                             placeholder="Contact No"
-                             className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-bold text-sm text-slate-700"
-                             value={phoneInput}
-                             onChange={e => setPhoneInput(e.target.value)}
-                           />
-                        </div>
-                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Odometer Reading (KM)</label>
-                        <div className="relative">
-                           <Gauge className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500" />
-                           <input 
-                             type="number"
-                             placeholder="Mileage"
-                             className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-black text-sm text-slate-900"
-                             value={odometerInput}
-                             onChange={e => setOdometerInput(e.target.value)}
-                           />
-                        </div>
-                     </div>
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Budget Estimate (₹)</label>
-                        <div className="relative">
-                          <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-black">₹</div>
-                          <input 
-                            required 
-                            type="number" 
-                            placeholder="0.00" 
-                            className="w-full p-4 pl-10 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none font-black text-lg text-slate-900" 
-                            value={estCost} 
-                            onChange={e => setEstCost(e.target.value)} 
-                          />
-                        </div>
-                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Service Details</label>
-                    <textarea 
-                      required 
-                      rows={3}
-                      placeholder="DESCRIBE ISSUES REPORTED BY THE CUSTOMER..." 
-                      className="w-full p-5 bg-slate-50 border border-slate-200 rounded-3xl focus:ring-4 focus:ring-blue-500/10 outline-none resize-none font-bold text-sm text-slate-700 placeholder:text-slate-300 transition-all uppercase" 
-                      value={complaintDetails} 
-                      onChange={e => setComplaintDetails(e.target.value)} 
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Inspection Photos</label>
-                    <div className="grid grid-cols-4 gap-3">
-                      {images.map((img, idx) => (
-                        <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 group shadow-sm">
-                          <img src={img} alt="Evidence" className="w-full h-full object-cover" />
-                          <button 
-                            type="button"
-                            onClick={() => removeImage(idx)}
-                            className="absolute inset-0 bg-red-500/80 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      ))}
-                      
-                      {/* Integrated Camera Button */}
-                      <button 
-                        type="button"
-                        onClick={openCamera}
-                        className="aspect-square rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 transition-all group"
-                      >
-                        <Camera className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                        <span className="text-[8px] font-black uppercase tracking-widest">Camera</span>
-                      </button>
-
-                      <button 
-                        type="button"
-                        onClick={() => galleryInputRef.current?.click()}
-                        className="aspect-square rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50/50 transition-all group"
-                      >
-                        <Upload className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                        <span className="text-[8px] font-black uppercase tracking-widest">Gallery</span>
-                      </button>
+                      )}
                     </div>
                     
-                    {/* Hidden Fallback Inputs */}
-                    <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
-                    <input type="file" ref={galleryInputRef} accept="image/*" multiple className="hidden" onChange={handleFileChange} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Customer Name</label>
+                          <div className="relative">
+                             <User className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
+                             <input 
+                               required
+                               type="text"
+                               placeholder="Full Name"
+                               className="w-full pl-14 pr-4 py-5 bg-slate-50 border border-slate-100 rounded-3xl outline-none font-black text-sm text-slate-700 uppercase"
+                               value={nameInput}
+                               onChange={e => setNameInput(e.target.value)}
+                             />
+                          </div>
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Link</label>
+                          <div className="relative">
+                             <Phone className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
+                             <input 
+                               required
+                               type="tel"
+                               placeholder="Phone No"
+                               className="w-full pl-14 pr-4 py-5 bg-slate-50 border border-slate-100 rounded-3xl outline-none font-black text-sm text-slate-700"
+                               value={phoneInput}
+                               onChange={e => setPhoneInput(e.target.value)}
+                             />
+                          </div>
+                       </div>
+                    </div>
                   </div>
-                </div>
+                </section>
 
-                <div className="pt-4 flex gap-4 sticky bottom-0 bg-white pb-4">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-5 border border-slate-200 rounded-3xl font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all">Cancel</button>
+                {/* Diagnostics Segment */}
+                <section className="space-y-6">
+                  <div className="flex items-center gap-3">
+                     <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
+                     <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em]">Diagnostic Data</h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center justify-between">
+                         Odometer (KM)
+                         {odometerReading && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
+                      </label>
+                      <div className="relative group">
+                        <Gauge className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-amber-500" />
+                        <input 
+                          type="number" 
+                          placeholder="Current KM"
+                          className="w-full pl-14 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-8 focus:ring-amber-500/5 outline-none font-black text-sm text-slate-700"
+                          value={odometerReading}
+                          onChange={e => setOdometerReading(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Budget Estimate</label>
+                      <div className="relative group">
+                        <IndianRupee className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500" />
+                        <input 
+                          required 
+                          type="number" 
+                          placeholder="0.00" 
+                          className="w-full pl-14 pr-4 py-5 bg-slate-50 border border-slate-100 rounded-3xl focus:ring-8 focus:ring-emerald-500/5 outline-none font-black text-lg text-slate-900" 
+                          value={estCost} 
+                          onChange={e => setEstCost(e.target.value)} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                        <CalendarDays className="w-4 h-4 text-blue-500" />
+                        Target Delivery Date
+                      </label>
+                      <input 
+                        type="date"
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-8 focus:ring-blue-500/5 outline-none font-bold text-sm text-slate-700 transition-all"
+                        value={dueDate}
+                        onChange={e => setDueDate(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Issue Details</label>
+                      <textarea 
+                        required 
+                        rows={4}
+                        placeholder="ENTER SPECIFIC COMPLAINTS AND DIAGNOSTICS..." 
+                        className="w-full p-6 bg-slate-50 border border-slate-100 rounded-[32px] focus:ring-8 focus:ring-slate-500/5 outline-none resize-none font-black text-xs text-slate-700 placeholder:text-slate-300 uppercase leading-relaxed transition-all" 
+                        value={complaintDetails} 
+                        onChange={e => setComplaintDetails(e.target.value)} 
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Documentation Segment */}
+                <section className="space-y-6">
+                  <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-3">
+                        <div className="w-1.5 h-6 bg-pink-500 rounded-full"></div>
+                        <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em]">Evidence Bundle</h4>
+                     </div>
+                     <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{images.length} Captured</span>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-4">
+                    {images.map((img, idx) => (
+                      <div key={idx} className="relative aspect-square rounded-[22px] overflow-hidden border-2 border-white shadow-lg group transform hover:scale-105 transition-all">
+                        <img src={img} alt="Evidence" className="w-full h-full object-cover" />
+                        <button 
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute inset-0 bg-red-500/80 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 className="w-6 h-6" />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    <button 
+                      type="button"
+                      onClick={() => openCamera(null)}
+                      className="aspect-square rounded-[22px] border-2 border-dashed border-slate-100 bg-slate-50 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-all group active:scale-95 shadow-sm"
+                    >
+                      <Camera className="w-7 h-7 group-hover:scale-110 transition-transform" />
+                      <span className="text-[8px] font-black uppercase tracking-widest">Take Photo</span>
+                    </button>
+
+                    <button 
+                      type="button"
+                      onClick={() => { setCameraTargetId(null); galleryInputRef.current?.click(); }}
+                      className="aspect-square rounded-[22px] border-2 border-dashed border-slate-100 bg-slate-50 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all group active:scale-95 shadow-sm"
+                    >
+                      <Upload className="w-7 h-7 group-hover:scale-110 transition-transform" />
+                      <span className="text-[8px] font-black uppercase tracking-widest">Upload Images</span>
+                    </button>
+                  </div>
+                  
+                  {/* Hidden Native Controls */}
+                  <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+                  <input type="file" ref={galleryInputRef} accept="image/*" multiple className="hidden" onChange={handleFileChange} />
+                </section>
+
+                <div className="pt-8 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-xl pb-4 z-20 border-t border-slate-50">
+                  <button 
+                    type="button" 
+                    onClick={() => setIsModalOpen(false)} 
+                    className="flex-1 p-5 border border-slate-200 rounded-[28px] font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all"
+                  >
+                    Discard
+                  </button>
                   <button 
                     type="submit" 
-                    disabled={loading}
-                    className="flex-[2] p-5 bg-blue-600 text-white rounded-3xl font-black text-xs uppercase tracking-widest hover:bg-blue-700 shadow-2xl shadow-blue-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                    disabled={isSubmitting}
+                    className="flex-[2] p-5 bg-slate-900 text-white rounded-[28px] font-black text-xs uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                   >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
-                    Finalize Job Card
+                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Layers className="w-5 h-5" />}
+                    Lock Entry
                   </button>
                 </div>
              </form>
@@ -516,26 +686,26 @@ const ComplaintsPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- Fullscreen Camera UI --- */}
+      {/* --- Immersive Pro Camera UI --- */}
       {isCameraOpen && (
-        <div className="fixed inset-0 bg-black z-[100] flex flex-col animate-in fade-in duration-300">
-           <div className="p-4 flex justify-between items-center text-white z-10 bg-gradient-to-b from-black/50 to-transparent">
-              <button onClick={closeCamera} className="p-2 bg-white/10 rounded-full backdrop-blur-md">
-                 <X className="w-6 h-6" />
+        <div className="fixed inset-0 bg-black z-[200] flex flex-col animate-in fade-in duration-300">
+           {/* Top HUD */}
+           <div className="p-6 flex justify-between items-center text-white z-10 bg-gradient-to-b from-black/80 to-transparent">
+              <button onClick={closeCamera} className="p-3 bg-white/10 rounded-2xl backdrop-blur-md border border-white/5 active:scale-90 transition-all">
+                 <X className="w-7 h-7" />
               </button>
-              <h3 className="text-xs font-black uppercase tracking-widest">Job Card Photos</h3>
-              <div className="flex items-center gap-4">
-                 <div className="flex -space-x-2">
-                    {images.slice(-3).map((img, i) => (
-                      <div key={i} className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-slate-800">
-                        <img src={img} className="w-full h-full object-cover" />
-                      </div>
-                    ))}
+              <div className="flex flex-col items-center">
+                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em]">Documentation Lens</h3>
+                 <div className="flex items-center gap-2 mt-1">
+                    <div className="w-1 h-1 rounded-full bg-red-500 animate-pulse"></div>
+                    <span className="text-[8px] font-bold text-slate-400">REC • RAW</span>
                  </div>
               </div>
+              <div className="w-12"></div>
            </div>
 
-           <div className="flex-1 relative overflow-hidden flex items-center justify-center">
+           {/* Viewport */}
+           <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-slate-950">
               <video 
                 ref={videoRef} 
                 autoPlay 
@@ -544,39 +714,58 @@ const ComplaintsPage: React.FC = () => {
               />
               <canvas ref={canvasRef} className="hidden" />
               
+              {/* Target Reticle */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+                 <div className="w-64 h-64 border border-white/40 rounded-3xl"></div>
+                 <div className="absolute w-full h-[1px] bg-white/20"></div>
+                 <div className="absolute w-[1px] h-full bg-white/20"></div>
+              </div>
+
               {cameraError && (
-                <div className="absolute inset-0 flex items-center justify-center p-8 text-center bg-black/80">
+                <div className="absolute inset-0 flex items-center justify-center p-12 text-center bg-black/90">
                    <div className="space-y-4">
-                      <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto" />
-                      <p className="text-sm font-bold">{cameraError}</p>
+                      <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
+                      <p className="text-sm font-bold text-white uppercase">{cameraError}</p>
                    </div>
                 </div>
               )}
            </div>
 
-           <div className="p-10 pb-16 flex flex-col items-center gap-8 bg-gradient-to-t from-black/80 to-transparent">
+           {/* Bottom Shutter & Previews */}
+           <div className="p-8 pb-16 flex flex-col items-center gap-8 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+              {/* Film Strip */}
+              <div className="flex gap-3 overflow-x-auto w-full px-4 no-scrollbar justify-center">
+                 {(!cameraTargetId ? images : (complaints.find(c => c.id === cameraTargetId)?.photoUrls || [])).slice(-4).map((img, i) => (
+                    <div key={i} className="w-12 h-12 rounded-xl border-2 border-white/20 overflow-hidden shrink-0 shadow-2xl">
+                       <img src={img} className="w-full h-full object-cover" />
+                    </div>
+                 ))}
+                 {(!cameraTargetId ? images.length : (complaints.find(c => c.id === cameraTargetId)?.photoUrls.length || 0)) > 4 && (
+                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white text-[10px] font-black">
+                       +{(!cameraTargetId ? images.length : (complaints.find(c => c.id === cameraTargetId)?.photoUrls.length || 0)) - 4}
+                    </div>
+                 )}
+              </div>
+
               <div className="flex items-center gap-12">
-                 <div className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center">
-                    <FlipHorizontal className="w-6 h-6 text-white/50" />
+                 <div className="w-14 h-14 rounded-full border border-white/10 flex items-center justify-center active:scale-90 transition-all">
+                    <FlipHorizontal className="w-6 h-6 text-white/40" />
                  </div>
                  
                  <button 
                    onClick={capturePhoto}
-                   className="w-20 h-20 rounded-full bg-white p-1 border-4 border-white/30 active:scale-90 transition-all shadow-2xl"
+                   className="w-24 h-24 rounded-full bg-white p-2 border-8 border-white/20 active:scale-90 transition-all shadow-[0_0_40px_rgba(255,255,255,0.2)]"
                  >
-                   <div className="w-full h-full rounded-full border-2 border-slate-900 bg-white"></div>
+                   <div className="w-full h-full rounded-full border-4 border-slate-900 bg-white"></div>
                  </button>
 
                  <button 
                    onClick={closeCamera}
-                   className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white font-black text-[10px] uppercase"
+                   className="w-14 h-14 rounded-full bg-emerald-600 flex items-center justify-center text-white shadow-xl shadow-emerald-500/20 active:scale-95 transition-all"
                  >
-                   Done
+                   <CheckCircle2 className="w-7 h-7" />
                  </button>
               </div>
-              <p className="text-[10px] font-black text-white/50 uppercase tracking-widest">
-                {images.length} Photos Taken
-              </p>
            </div>
         </div>
       )}

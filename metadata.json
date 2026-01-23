@@ -1,8 +1,8 @@
 {
-  "name": "Moto Gear Srk - Comprehensive Center Management",
-  "description": "A full-featured management system for bike service centers including customer tracking, complaint registration with photo uploads, billing, inventory, and analytics.",
   "requestFramePermissions": [
     "camera",
     "geolocation"
-  ]
+  ],
+  "name": "Moto Gear Srk - Comprehensive Center Management",
+  "description": ""
 }

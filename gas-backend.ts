@@ -1,3 +1,4 @@
+
 /**
  * BIKE SERVICE PRO - BACKEND CONTROLLER
  * Paste this into Code.gs in your Google Apps Script Editor.
@@ -13,8 +14,10 @@ function initProject() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheets = {
     'Customers': ['Customer_ID', 'Customer_Name', 'Phone_Number', 'Bike_Number', 'City', 'Loyalty_Points', 'Created_At', 'GSTIN', 'Email', 'Address'],
-    'Complaints': ['Complaint_ID', 'Bike_Number', 'Customer_Name', 'Phone_Number', 'Complaint_List', 'Complaint_Photos_URL', 'Estimated_Cost', 'Status', 'Created_Date', 'Odometer_Reading'],
-    'Invoices': ['Invoice_ID', 'Complaint_ID', 'Bike_Number', 'Customer_Name', 'Complaint_Details', 'Items_JSON', 'Estimated_Cost', 'Final_Amount', 'Payment_Status', 'Payment_Mode', 'Invoice_Date', 'Tax_Amount', 'Sub_Total', 'Odometer_Reading'],
+    'Visitors': ['Visitor_ID', 'Visitor_Name', 'Bike_Number', 'Phone_Number', 'Remarks', 'Visitor_Type', 'Visitor_Photos_URL', 'Logged_At'],
+    'StockWanting': ['Item_ID', 'Part_Number', 'Item_Name', 'Quantity', 'Rate', 'Created_At'],
+    'Complaints': ['Complaint_ID', 'Bike_Number', 'Customer_Name', 'Phone_Number', 'Complaint_List', 'Complaint_Photos_URL', 'Estimated_Cost', 'Status', 'Created_Date', 'Odometer_Reading', 'Due_Date'],
+    'Invoices': ['Invoice_ID', 'Complaint_ID', 'Bike_Number', 'Customer_Name', 'Complaint_Details', 'Items_JSON', 'Estimated_Cost', 'Final_Amount', 'Payment_Status', 'Payment_Mode', 'Invoice_Date', 'Tax_Amount', 'Sub_Total', 'Odometer_Reading', 'Type'],
     'Transactions': ['Transaction_ID', 'Invoice_ID', 'Amount', 'Payment_Mode', 'Date'],
     'Inventory': ['Item_ID', 'Item_Name', 'Category', 'Quantity_In_Stock', 'Unit_Price', 'Purchase_Price', 'Item_Code', 'Last_Updated', 'GST_Rate', 'HSN_Code'],
     'Expenses': ['Expense_ID', 'Expense_Title', 'Amount', 'Date', 'Notes', 'Payment_Mode'],
@@ -48,11 +51,12 @@ function doGet(e) {
 // Mapping from Sheet Headers to Frontend Type Keys
 const MAPPINGS = {
   'Customer_ID': 'id', 'Customer_Name': 'name', 'Phone_Number': 'phone', 'Bike_Number': 'bikeNumber', 'City': 'city', 'Loyalty_Points': 'loyaltyPoints', 'Created_At': 'createdAt', 'GSTIN': 'gstin', 'Email': 'email', 'Address': 'address',
-  'Complaint_ID': 'id', 'Complaint_List': 'details', 'Complaint_Photos_URL': 'photoUrls', 'Created_Date': 'createdAt', 'Odometer_Reading': 'odometerReading',
+  'Visitor_ID': 'id', 'Visitor_Name': 'name', 'Visitor_Type': 'type', 'Visitor_Photos_URL': 'photoUrls', 'Logged_At': 'createdAt',
+  'Item_ID': 'id', 'Part_Number': 'partNumber', 'Item_Name': 'itemName', 'Quantity': 'quantity', 'Rate': 'rate',
+  'Complaint_ID': 'id', 'Complaint_List': 'details', 'Complaint_Photos_URL': 'photoUrls', 'Created_Date': 'createdAt', 'Odometer_Reading': 'odometerReading', 'Due_Date': 'dueDate',
   'Invoice_ID': 'id', 'Invoice_Date': 'date', 'Payment_Status': 'paymentStatus', 'Payment_Mode': 'paymentMode', 'Final_Amount': 'finalAmount', 'Estimated_Cost': 'estimatedCost', 'Items_JSON': 'items', 'Tax_Amount': 'taxAmount', 'Sub_Total': 'subTotal',
-  'Item_ID': 'id', 'Item_Name': 'name', 'Quantity_In_Stock': 'stock', 'Unit_Price': 'unitPrice', 'Purchase_Price': 'purchasePrice', 'Item_Code': 'itemCode', 'Last_Updated': 'lastUpdated', 'GST_Rate': 'gstRate', 'HSN_Code': 'hsn',
   'Expense_ID': 'id', 'Expense_Title': 'title',
-  'Reminder_ID': 'id', 'Reminder_Date': 'reminderDate', 'Service_Type': 'serviceType'
+  'Reminder_ID': 'id', 'Reminder_Date': 'reminderDate', 'Service_Type': 'serviceType', 'Type': 'docType'
 };
 
 function getSheetData(name) {
@@ -99,18 +103,6 @@ function deleteRowById(sheetName, id, idColIndex = 0) {
   return false;
 }
 
-// --- APP SETTINGS ---
-function getSettings() {
-  const props = PropertiesService.getScriptProperties();
-  const settings = props.getProperty('APP_SETTINGS');
-  return settings ? JSON.parse(settings) : null;
-}
-
-function updateSettings(settings) {
-  const props = PropertiesService.getScriptProperties();
-  props.setProperty('APP_SETTINGS', JSON.stringify(settings));
-}
-
 // --- API ENDPOINTS ---
 
 function getCustomers() { return getSheetData('Customers'); }
@@ -124,6 +116,26 @@ function createCustomer(data) {
   return { ...data, id, loyaltyPoints: 0, createdAt: now.toISOString() };
 }
 
+function getVisitors() { return getSheetData('Visitors'); }
+function createVisitor(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Visitors');
+  const id = 'VIS-' + Date.now();
+  const now = new Date();
+  sheet.appendRow([id, data.name, data.bikeNumber, data.phone, data.remarks, data.type, (data.photoUrls || []).join(','), now]);
+  return { ...data, id, createdAt: now.toISOString() };
+}
+function deleteVisitor(id) { return deleteRowById('Visitors', id); }
+
+function getStockWanting() { return getSheetData('StockWanting'); }
+function addStockWanting(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('StockWanting');
+  const id = 'WANT-' + Date.now();
+  const now = new Date();
+  sheet.appendRow([id, data.partNumber, data.itemName, data.quantity, data.rate, now]);
+  return { ...data, id, createdAt: now.toISOString() };
+}
+function deleteStockWanting(id) { return deleteRowById('StockWanting', id); }
+
 function getComplaints() { return getSheetData('Complaints'); }
 function deleteComplaint(id) { return deleteRowById('Complaints', id); }
 
@@ -131,7 +143,7 @@ function createComplaint(data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Complaints');
   const id = 'CMP-' + Date.now();
   const now = new Date();
-  sheet.appendRow([id, data.bikeNumber, data.customerName, data.customerPhone, data.details, (data.photoUrls || []).join(','), data.estimatedCost, 'Pending', now, data.odometerReading || '']);
+  sheet.appendRow([id, data.bikeNumber, data.customerName, data.customerPhone, data.details, (data.photoUrls || []).join(','), data.estimatedCost, 'Pending', now, data.odometerReading || '', data.dueDate || '']);
   return { ...data, id, status: 'Pending', createdAt: now.toISOString() };
 }
 
@@ -151,21 +163,21 @@ function generateInvoice(data) {
   const custSheet = ss.getSheetByName('Customers');
   const inventorySheet = ss.getSheetByName('Inventory');
   
-  const id = 'INV-' + Date.now();
+  const isEstimate = data.docType === 'Estimate';
+  const id = (isEstimate ? 'EST-' : 'INV-') + Date.now();
   const now = new Date();
   
   const itemsJson = JSON.stringify(data.items || []);
-  invSheet.appendRow([id, data.complaintId, data.bikeNumber, data.customerName, data.details, itemsJson, data.estimatedCost, data.finalAmount, data.paymentStatus, data.paymentMode, now, data.taxAmount || 0, data.subTotal || 0, data.odometerReading || '']);
+  invSheet.appendRow([id, data.complaintId, data.bikeNumber, data.customerName, data.details, itemsJson, data.estimatedCost, data.finalAmount, data.paymentStatus, data.paymentMode, now, data.taxAmount || 0, data.subTotal || 0, data.odometerReading || '', data.docType || 'Sale']);
   
-  // Deduct Inventory Stock
-  if (data.items && Array.isArray(data.items)) {
+  // Only Deduct Inventory Stock if it's a REAL Sale
+  if (!isEstimate && data.items && Array.isArray(data.items)) {
     data.items.forEach(item => {
-      // Try finding by name or code
       const invData = inventorySheet.getDataRange().getValues();
       for (let i = 1; i < invData.length; i++) {
         if (invData[i][1].toString().toLowerCase() === item.description.toString().toLowerCase()) {
           const currentQty = Number(invData[i][3]);
-          inventorySheet.getRange(i + 1, 4).setValue(currentQty - 1); // Deduct 1 per item row, or improve logic for qty
+          inventorySheet.getRange(i + 1, 4).setValue(currentQty - 1); 
           inventorySheet.getRange(i + 1, 8).setValue(now);
           break;
         }
@@ -173,7 +185,8 @@ function generateInvoice(data) {
     });
   }
 
-  if (data.paymentStatus === 'Paid') {
+  // Only handle payments and points if it's a REAL Paid Sale
+  if (!isEstimate && data.paymentStatus === 'Paid') {
     txnSheet.appendRow(['TXN-' + Date.now(), id, data.finalAmount, data.paymentMode, now]);
     let custRow = findRowById(custSheet, data.bikeNumber, 3);
     if (!custRow) custRow = findRowById(custSheet, data.customerPhone, 2);
