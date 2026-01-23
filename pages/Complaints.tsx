@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus, Search, Clock, CheckCircle, AlertCircle, Bike, Phone, Calendar, DollarSign, X,
-  Camera, Upload, FlipHorizontal, Image as ImageIcon, Trash2
+  Camera, Upload, FlipHorizontal, Image as ImageIcon, Trash2, User
 } from 'lucide-react';
 import { dbService } from '../db';
-import { Complaint, ComplaintStatus } from '../types';
+import { Complaint, ComplaintStatus, Customer } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -14,11 +14,14 @@ import { Modal } from '../components/ui/Modal';
 
 const ComplaintsPage: React.FC = () => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<ComplaintStatus | 'ALL'>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [suggestions, setSuggestions] = useState<Customer[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [formData, setFormData] = useState({
     bikeNumber: '',
     customerName: '',
@@ -39,6 +42,7 @@ const ComplaintsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    loadCustomers();
   }, []);
 
   const loadData = async () => {
@@ -51,6 +55,51 @@ const ComplaintsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadCustomers = async () => {
+    try {
+      const data = await dbService.getCustomers();
+      setCustomers(data);
+    } catch (err) {
+      console.error('Failed to load customers:', err);
+    }
+  };
+
+  const handleBikeNumberChange = (value: string) => {
+    setFormData({ ...formData, bikeNumber: value.toUpperCase() });
+    if (value.length >= 2) {
+      const filtered = customers.filter(c =>
+        c.bikeNumber.toUpperCase().includes(value.toUpperCase())
+      ).slice(0, 5);
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handlePhoneChange = (value: string) => {
+    setFormData({ ...formData, customerPhone: value });
+    if (value.length >= 3) {
+      const filtered = customers.filter(c =>
+        c.phone.includes(value)
+      ).slice(0, 5);
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectCustomer = (customer: Customer) => {
+    setFormData({
+      ...formData,
+      bikeNumber: customer.bikeNumber,
+      customerName: customer.name,
+      customerPhone: customer.phone
+    });
+    setShowSuggestions(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -203,15 +252,42 @@ const ComplaintsPage: React.FC = () => {
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Bike Number"
-            type="text"
-            required
-            placeholder="MH12AB1234"
-            value={formData.bikeNumber}
-            onChange={(e) => setFormData({ ...formData, bikeNumber: e.target.value.toUpperCase() })}
-            icon={<Bike className="w-5 h-5" />}
-          />
+          <div className="relative">
+            <Input
+              label="Bike Number"
+              type="text"
+              required
+              placeholder="MH12AB1234"
+              value={formData.bikeNumber}
+              onChange={(e) => handleBikeNumberChange(e.target.value)}
+              onFocus={() => formData.bikeNumber.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
+              icon={<Bike className="w-5 h-5" />}
+            />
+            {showSuggestions && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
+                {suggestions.map((customer) => (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    onClick={() => selectCustomer(customer)}
+                    className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 border-b border-slate-100 last:border-0"
+                  >
+                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <User className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 text-sm">{customer.name}</div>
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        <span className="font-mono">{customer.bikeNumber}</span>
+                        <span>•</span>
+                        <span>{customer.phone}</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Input
@@ -223,15 +299,42 @@ const ComplaintsPage: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
             />
 
-            <Input
-              label="Phone"
-              type="tel"
-              required
-              placeholder="10-digit number"
-              value={formData.customerPhone}
-              onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-              icon={<Phone className="w-5 h-5" />}
-            />
+            <div className="relative">
+              <Input
+                label="Phone"
+                type="tel"
+                required
+                placeholder="10-digit number"
+                value={formData.customerPhone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                onFocus={() => formData.customerPhone.length >= 3 && suggestions.length > 0 && setShowSuggestions(true)}
+                icon={<Phone className="w-5 h-5" />}
+              />
+              {showSuggestions && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
+                  {suggestions.map((customer) => (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      onClick={() => selectCustomer(customer)}
+                      className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 border-b border-slate-100 last:border-0"
+                    >
+                      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                        <User className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-bold text-slate-900 text-sm">{customer.name}</div>
+                        <div className="flex items-center gap-3 text-xs text-slate-500">
+                          <span className="font-mono">{customer.bikeNumber}</span>
+                          <span>•</span>
+                          <span>{customer.phone}</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-1.5">
