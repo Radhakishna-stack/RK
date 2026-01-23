@@ -1,65 +1,43 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, IndianRupee, ChevronRight, Bike, Phone, MapPin, Loader2, CheckCircle, Wallet, ArrowDownCircle, History, Clock, X, MessageCircle, Info, Receipt, Sparkles, User, AlertCircle, Landmark } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Plus, Search, DollarSign, Calendar, User, CreditCard, Wallet, CheckCircle
+} from 'lucide-react';
 import { dbService } from '../db';
-import { Customer, Transaction, BankAccount } from '../types';
+import { Invoice, Customer } from '../types';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
+import { Badge } from '../components/ui/Badge';
 
 const PaymentInPage: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [accounts, setAccounts] = useState<BankAccount[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [currentBalance, setCurrentBalance] = useState<number>(0);
-  const [recentTxns, setRecentTxns] = useState<Transaction[]>([]);
-  const [showSuccess, setShowSuccess] = useState(false);
-
-  // Form State
-  const [amount, setAmount] = useState('');
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('CASH-01');
-  const [description, setDescription] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMode, setPaymentMode] = useState('Cash');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
-    loadBaseData();
-    searchInputRef.current?.focus();
+    loadData();
   }, []);
 
-  const loadBaseData = async () => {
-    const [cData, aData] = await Promise.all([
-      dbService.getCustomers(),
-      dbService.getBankAccounts()
-    ]);
-    setCustomers(cData || []);
-    setAccounts(aData || []);
-  };
-
-  const suggestions = useMemo(() => {
-    if (!searchTerm.trim()) return [];
-    const key = searchTerm.toLowerCase();
-    return customers.filter(c => {
-      const nameMatch = (c.name || '').toLowerCase().includes(key);
-      const bikeMatch = (c.bikeNumber || '').toLowerCase().includes(key);
-      const phoneMatch = (c.phone || '').toLowerCase().includes(key);
-      return nameMatch || bikeMatch || phoneMatch;
-    }).slice(0, 5);
-  }, [customers, searchTerm]);
-
-  const fetchLedger = async (cust: Customer) => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const balance = await dbService.getCustomerBalance(cust.bikeNumber, cust.name);
-      const allTxns = await dbService.getTransactions();
-      const relevant = allTxns.filter(t => t.entityId === cust.bikeNumber).slice(0, 5);
-      
-      setCurrentBalance(balance);
-      setRecentTxns(relevant);
-      setSelectedCustomer(cust);
-      setSearchTerm(cust.bikeNumber);
-      setShowSuggestions(false);
+      const [invData, custData] = await Promise.all([
+        dbService.getInvoices(),
+        dbService.getCustomers()
+      ]);
+      // Only show unpaid invoices
+      setInvoices(invData.filter(inv => inv.paymentStatus !== 'Paid'));
+      setCustomers(custData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -67,159 +45,224 @@ const PaymentInPage: React.FC = () => {
     }
   };
 
-  const handlePayment = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!selectedCustomer || !amount || parseFloat(amount) <= 0) return;
+  const handleRecordPayment = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setPaymentAmount(invoice.finalAmount.toString());
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvoice) return;
 
     setIsSubmitting(true);
     try {
-      const accName = accounts.find(a => a.id === selectedAccountId)?.name || 'Generic';
+      const amount = parseFloat(paymentAmount);
+
+      // Update invoice payment status
+      await dbService.updateInvoicePaymentStatus(selectedInvoice.id, 'Paid');
+
+      // Record transaction
       await dbService.addTransaction({
-        entityId: selectedCustomer.bikeNumber,
-        accountId: selectedAccountId,
+        date: paymentDate,
         type: 'IN',
-        amount: parseFloat(amount),
-        paymentMode: accName,
-        description: description || 'Account Payment'
+        amount: amount,
+        description: `Payment received from ${selectedInvoice.customerName} for invoice #${selectedInvoice.id.slice(-8)}`,
+        category: 'Payment',
+        paymentMode: paymentMode,
+        accountId: paymentMode === 'Cash' ? 'CASH-01' : 'BANK-01'
       });
-      
-      await fetchLedger(selectedCustomer);
-      setAmount('');
-      setDescription('');
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+
+      alert('Payment recorded successfully!');
+      setIsModalOpen(false);
+      setSelectedInvoice(null);
+      setPaymentAmount('');
+      loadData();
     } catch (err) {
-      alert("Error saving transaction.");
+      alert('Failed to record payment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const payFullBalance = () => {
-    if (currentBalance > 0) {
-      setAmount(currentBalance.toString());
-      setDescription(`Settlement - ${selectedCustomer?.bikeNumber}`);
-    }
-  };
+  const filteredInvoices = invoices.filter(invoice =>
+    invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    invoice.bikeNumber.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  return (
-    <div className="max-w-lg mx-auto space-y-6 pb-28 animate-in fade-in duration-500 px-1 relative">
-      {showSuccess && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-4">
-           <div className="bg-emerald-600 text-white px-8 py-4 rounded-3xl shadow-2xl flex items-center gap-3 border border-emerald-400">
-              <Sparkles className="w-5 h-5 text-emerald-200 fill-emerald-200" />
-              <span className="text-sm font-black uppercase tracking-widest">Entry Recorded</span>
-           </div>
-        </div>
-      )}
+  // Calculate total pending
+  const totalPending = invoices.reduce((sum, inv) => sum + inv.finalAmount, 0);
 
-      <header className="flex flex-col items-center pt-4">
-        <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Payment In</h2>
-        <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-[0.4em] mt-2">Party Settle Terminal</p>
-      </header>
-
-      <div className="bg-white p-5 rounded-[40px] border border-slate-100 shadow-sm relative z-[60]">
-        <div className="relative group">
-           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-500 w-5 h-5" />
-           <input 
-             ref={searchInputRef}
-             type="text" 
-             placeholder="SEARCH PARTY IDENTITY..."
-             className="w-full pl-14 pr-12 py-5 bg-slate-50 border border-slate-100 rounded-3xl focus:ring-8 focus:ring-emerald-500/5 outline-none font-black text-[11px] tracking-widest transition-all uppercase"
-             value={searchTerm}
-             onChange={e => { setSearchTerm(e.target.value); setShowSuggestions(true); }}
-             onFocus={() => setShowSuggestions(true)}
-           />
-           {searchTerm && <button onClick={() => { setSearchTerm(''); setSelectedCustomer(null); searchInputRef.current?.focus(); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300"><X className="w-5 h-5" /></button>}
-
-           {showSuggestions && suggestions.length > 0 && (
-             <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-slate-100 rounded-[32px] shadow-2xl overflow-hidden z-[70] animate-in slide-in-from-top-2">
-                {suggestions.map(c => (
-                  <button key={c.id} onMouseDown={() => fetchLedger(c)} className="w-full px-6 py-4 flex items-center justify-between hover:bg-emerald-50 transition-colors border-b border-slate-50 last:border-0 group text-left">
-                     <div className="flex items-center gap-4">
-                        <div className="bg-emerald-50 p-2 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors"><Bike className="w-5 h-5" /></div>
-                        <div>
-                           <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{c.bikeNumber}</p>
-                           <p className="text-[10px] text-slate-400 font-bold uppercase">{c.name}</p>
-                        </div>
-                     </div>
-                     <ChevronRight className="w-5 h-5 text-slate-300" />
-                  </button>
-                ))}
-             </div>
-           )}
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-600">Loading payments...</p>
         </div>
       </div>
+    );
+  }
 
-      {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-4 text-slate-300"><Loader2 className="w-10 h-10 animate-spin text-emerald-500" /><p className="text-[10px] font-black uppercase tracking-[0.4em]">Loading Financials...</p></div>
-      ) : selectedCustomer && (
-        <div className="space-y-6 animate-in slide-in-from-bottom-4">
-           <div className={`p-8 rounded-[40px] border shadow-xl flex flex-col items-center gap-4 relative overflow-hidden ${currentBalance > 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}>
-              {currentBalance > 0 && <button onClick={payFullBalance} className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg border border-red-400">Settle Full</button>}
-              <p className={`text-[10px] font-black uppercase tracking-[0.4em] ${currentBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{currentBalance > 0 ? 'Balance Due' : 'Account Settled'}</p>
-              <div className="flex items-baseline gap-1"><span className="text-xl font-black opacity-40">₹</span><h3 className={`text-5xl font-black tracking-tighter ${currentBalance > 0 ? 'text-red-900' : 'text-emerald-900'}`}>{Math.abs(currentBalance).toLocaleString()}</h3></div>
-              <div className="flex items-center gap-2 bg-white/50 px-4 py-1.5 rounded-full border border-black/5"><User className="w-3 h-3 text-slate-400" /><span className="text-[10px] font-black uppercase text-slate-600">{selectedCustomer.name} • {selectedCustomer.bikeNumber}</span></div>
-           </div>
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Collect Payment</h1>
+        <p className="text-sm text-slate-600 mt-1">
+          {invoices.length} pending payment{invoices.length !== 1 ? 's' : ''}
+        </p>
+      </div>
 
-           <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-8">
-              <form onSubmit={handlePayment} className="space-y-6">
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Received Amount</label>
-                    <div className="relative group">
-                       <IndianRupee className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-emerald-500 transition-transform group-focus-within:scale-110" />
-                       <input required type="number" placeholder="0.00" className="w-full pl-16 pr-6 py-6 bg-slate-50 border border-slate-100 rounded-3xl outline-none font-black text-2xl text-slate-900 focus:ring-8 focus:ring-emerald-500/5 transition-all" value={amount} onChange={e => setAmount(e.target.value)} />
-                    </div>
-                 </div>
-
-                 <div className="space-y-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Deposit Into Account</p>
-                    <div className="grid grid-cols-1 gap-2">
-                       {accounts.map(acc => (
-                         <button 
-                           key={acc.id} 
-                           type="button" 
-                           onClick={() => setSelectedAccountId(acc.id)} 
-                           className={`px-4 py-3 rounded-2xl text-[10px] font-black uppercase border-2 transition-all flex items-center justify-between ${selectedAccountId === acc.id ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
-                         >
-                            <div className="flex items-center gap-2">
-                              {acc.type === 'Cash' ? <Wallet className="w-4 h-4" /> : <Landmark className="w-4 h-4" />}
-                              {acc.name}
-                            </div>
-                            {selectedAccountId === acc.id && <CheckCircle className="w-4 h-4" />}
-                         </button>
-                       ))}
-                    </div>
-                 </div>
-
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Internal Note</label>
-                    <input type="text" placeholder="MEMO..." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-xs font-bold text-slate-700 uppercase" value={description} onChange={e => setDescription(e.target.value)} />
-                 </div>
-
-                 <button type="submit" disabled={isSubmitting || !amount} className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3">{isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />} Commit Collection</button>
-              </form>
-           </div>
-
-           <div className="space-y-4 px-1">
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><History className="w-4 h-4 text-emerald-500" /> Recent Activity</h4>
-              <div className="space-y-3">
-                 {recentTxns.length > 0 ? recentTxns.map(t => (
-                    <div key={t.id} className="bg-white p-5 rounded-[28px] border border-slate-100 flex items-center justify-between group animate-in slide-in-from-right-2">
-                       <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-sm"><Receipt className="w-4 h-4" /></div>
-                          <div>
-                             <p className="text-xs font-black text-slate-900 uppercase truncate max-w-[120px]">{t.description}</p>
-                             <p className="text-[9px] font-black text-emerald-600 uppercase">{t.paymentMode} • {new Date(t.date).toLocaleDateString()}</p>
-                          </div>
-                       </div>
-                       <p className="text-sm font-black text-emerald-600">+ ₹{t.amount.toLocaleString()}</p>
-                    </div>
-                 )) : <div className="bg-slate-50 p-12 rounded-[40px] border border-dashed border-slate-200 text-center"><p className="text-[10px] font-black text-slate-300 uppercase">No recent entries</p></div>}
-              </div>
-           </div>
+      {/* Total Pending Card */}
+      <Card className="bg-gradient-to-br from-amber-500 to-amber-600 border-0 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-amber-100 mb-1">Total Pending</p>
+            <h2 className="text-4xl font-bold">₹{totalPending.toLocaleString()}</h2>
+          </div>
+          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+            <DollarSign className="w-8 h-8" />
+          </div>
         </div>
-      )}
+      </Card>
+
+      {/* Search */}
+      <Input
+        type="text"
+        placeholder="Search by customer name or bike number..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        icon={<Search className="w-5 h-5" />}
+      />
+
+      {/* Pending Invoices */}
+      <div className="space-y-3">
+        {filteredInvoices.length === 0 ? (
+          <Card>
+            <div className="text-center py-12">
+              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                {searchTerm ? 'No matching invoices' : 'All payments collected!'}
+              </h3>
+              <p className="text-slate-600">
+                {searchTerm ? 'Try a different search term' : 'Great job! No pending payments.'}
+              </p>
+            </div>
+          </Card>
+        ) : (
+          filteredInvoices.map((invoice) => (
+            <Card key={invoice.id} padding="md">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-bold text-slate-900">{invoice.customerName}</h3>
+                    <Badge variant="warning" size="sm">Unpaid</Badge>
+                  </div>
+
+                  <p className="text-sm text-slate-600">Bike: {invoice.bikeNumber}</p>
+
+                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <Calendar className="w-4 h-4" />
+                    <span>Invoice Date: {new Date(invoice.date).toLocaleDateString()}</span>
+                  </div>
+
+                  <div className="pt-2">
+                    <p className="text-2xl font-bold text-slate-900">₹{invoice.finalAmount.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <Button onClick={() => handleRecordPayment(invoice)}>
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  Record Payment
+                </Button>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Payment Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Record Payment"
+        size="md"
+      >
+        {selectedInvoice && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Customer Info */}
+            <Card padding="sm" className="bg-slate-50">
+              <div className="text-sm">
+                <p className="text-slate-600">Customer</p>
+                <p className="font-semibold text-slate-900 text-lg">{selectedInvoice.customerName}</p>
+                <p className="text-slate-600 mt-1">Invoice Amount: ₹{selectedInvoice.finalAmount.toLocaleString()}</p>
+              </div>
+            </Card>
+
+            <Input
+              label="Payment Amount"
+              type="number"
+              required
+              placeholder="₹ 0"
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              icon={<DollarSign className="w-5 h-5" />}
+            />
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-semibold text-slate-700">
+                Payment Mode
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {['Cash', 'Card', 'UPI'].map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setPaymentMode(mode)}
+                    className={`
+                      p-3 rounded-xl font-semibold text-sm transition-all
+                      ${paymentMode === mode
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
+                    `}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Input
+              label="Payment Date"
+              type="date"
+              required
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              icon={<Calendar className="w-5 h-5" />}
+            />
+
+            <div className="border-t border-slate-200 pt-4 mt-6 flex gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsModalOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                isLoading={isSubmitting}
+                className="flex-1"
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Confirm Payment
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };

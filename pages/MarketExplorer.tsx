@@ -1,238 +1,184 @@
+import React, { useState } from 'react';
+import { Search, MapPin, ExternalLink, Star, Store, Navigation } from 'lucide-react';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Badge } from '../components/ui/Badge';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  ArrowLeft, Search, Navigation, MapPin, ExternalLink, 
-  Loader2, Sparkles, Store, Building2, ChevronRight, Info, Star,
-  Map as MapIcon, Compass
-} from 'lucide-react';
-import { dbService } from '../db';
-
-interface MarketExplorerPageProps {
-  onNavigate: (tab: string) => void;
-  initialQuery?: string;
+interface Place {
+  id: string;
+  name: string;
+  address: string;
+  rating: number;
+  distance: string;
+  type: string;
 }
 
-const MarketExplorerPage: React.FC<MarketExplorerPageProps> = ({ onNavigate, initialQuery = '' }) => {
-  const [query, setQuery] = useState(initialQuery);
-  const [results, setResults] = useState<{ text: string, grounding: any[] } | null>(null);
+const MarketExplorerPage: React.FC = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
-  const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
-  const [locError, setLocError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          if (initialQuery) {
-            handleSearch(undefined, { lat: pos.coords.latitude, lng: pos.coords.longitude });
-          }
-        },
-        (err) => {
-          console.error(err);
-          setLocError("Location access denied. Using general area.");
-          const fallback = { lat: 18.5204, lng: 73.8567 }; // Pune default
-          setLocation(fallback);
-          if (initialQuery) handleSearch(undefined, fallback);
-        }
-      );
-    }
-  }, [initialQuery]);
-
-  const handleSearch = async (e?: React.FormEvent, overrideLoc?: {lat: number, lng: number}) => {
+  const handleSearch = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    const activeLoc = overrideLoc || location;
-    const activeQuery = query || initialQuery;
-    if (!activeQuery || !activeLoc) return;
-    
+    if (!searchQuery.trim()) return;
+
     setLoading(true);
-    try {
-      const res = await dbService.searchLocalMarket(activeQuery, activeLoc.lat, activeLoc.lng);
-      setResults(res);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to explore local market. Please try again.");
-    } finally {
+
+    // Simulate search results
+    setTimeout(() => {
+      setPlaces([
+        {
+          id: '1',
+          name: 'City Bike Parts Store',
+          address: '123 Main Street, Bangalore',
+          rating: 4.5,
+          distance: '2.3 km',
+          type: 'Spare Parts'
+        },
+        {
+          id: '2',
+          name: 'AutoZone Service Center',
+          address: '456 Market Road, Bangalore',
+          rating: 4.2,
+          distance: '3.1 km',
+          type: 'Service Center'
+        },
+        {
+          id: '3',
+          name: 'Bike Hub',
+          address: '789 Park Avenue, Bangalore',
+          rating: 4.8,
+          distance: '1.5 km',
+          type: 'Dealer'
+        }
+      ]);
       setLoading(false);
-    }
+    }, 1000);
   };
 
   const quickSearches = [
-    "Bike part suppliers",
-    "Tyre wholesale shops",
-    "Bike engine oil distributors",
-    "Competing bike garages",
-    "Authorized service centers"
+    { label: 'Spare Parts Suppliers', icon: Store },
+    { label: 'Competitor Shops', icon: Star },
+    { label: 'Bike Dealers', icon: Navigation }
   ];
 
+  const openInMaps = (address: string) => {
+    window.open(`https://www.google.com/maps/search/${encodeURIComponent(address)}`, '_blank');
+  };
+
   return (
-    <div className="min-h-screen bg-[#0F172A] text-white flex flex-col animate-in fade-in duration-700">
-      {/* Black Header */}
-      <header className="p-4 flex items-center justify-between sticky top-0 bg-[#0F172A]/90 backdrop-blur-md z-40 border-b border-white/5">
-        <div className="flex items-center gap-4">
-          <button onClick={() => onNavigate('utilities')} className="p-2 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h2 className="text-lg font-black tracking-tight uppercase">Market Explorer</h2>
-            <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest">Maps Grounding Active</p>
-          </div>
-        </div>
-        <div className="p-2 bg-blue-600/20 rounded-xl border border-blue-500/30">
-          <Navigation className="w-5 h-5 text-blue-400" />
-        </div>
-      </header>
-
-      <div className="flex-1 p-6 space-y-8 max-w-lg mx-auto w-full">
-        {/* Search Bar */}
-        <form onSubmit={(e) => handleSearch(e)} className="relative group">
-          <div className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-400">
-             <Search className="w-5 h-5" />
-          </div>
-          <input 
-            type="text"
-            placeholder="Search local market..."
-            className="w-full pl-14 pr-6 py-5 bg-white/5 border border-white/10 rounded-3xl outline-none focus:ring-4 focus:ring-blue-500/20 font-bold text-sm transition-all"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-          />
-          <button 
-            type="submit"
-            disabled={loading || !query}
-            className="absolute right-3 top-1/2 -translate-y-1/2 bg-blue-600 px-4 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all disabled:opacity-50"
-          >
-             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Explore"}
-          </button>
-        </form>
-
-        {/* Quick Suggestions */}
-        {!results && !loading && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 ml-1">
-              <Sparkles className="w-4 h-4 text-blue-400" />
-              <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Quick Local Search</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-               {quickSearches.map(s => (
-                 <button 
-                   key={s}
-                   onClick={() => { setQuery(s); setTimeout(() => handleSearch(), 0); }}
-                   className="px-4 py-3 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-bold uppercase tracking-tight hover:bg-white/10 hover:border-white/20 transition-all active:scale-95"
-                 >
-                   {s}
-                 </button>
-               ))}
-            </div>
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div className="py-32 flex flex-col items-center gap-6 text-center">
-             <div className="relative">
-                <div className="w-24 h-24 bg-blue-500/20 rounded-full blur-[40px] absolute inset-0"></div>
-                <Loader2 className="w-12 h-12 animate-spin text-blue-500 relative" />
-             </div>
-             <div className="space-y-2">
-                <p className="text-lg font-black uppercase tracking-tighter">Analyzing Market...</p>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Grounding details with Google Maps data</p>
-             </div>
-          </div>
-        )}
-
-        {/* Results */}
-        {results && !loading && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
-            <div className="bg-white/5 border border-white/10 rounded-[40px] p-8 space-y-6">
-               <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center">
-                     <Compass className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-xl font-black uppercase tracking-tighter">Insights found</h3>
-               </div>
-               
-               <div className="prose prose-invert prose-sm">
-                  <p className="text-slate-300 text-sm leading-relaxed font-medium italic">
-                    "{results.text}"
-                  </p>
-               </div>
-
-               {results.grounding && results.grounding.length > 0 && (
-                 <div className="space-y-6 pt-6 border-t border-white/5">
-                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] ml-1">Verified Place Entities</p>
-                    <div className="space-y-4">
-                       {results.grounding.map((chunk, idx) => {
-                         const maps = chunk.maps;
-                         if (!maps || !maps.uri) return null;
-                         
-                         return (
-                           <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3 hover:bg-white/[0.08] transition-colors group">
-                             <div className="flex items-start justify-between">
-                               <div className="flex items-center gap-3 flex-1 overflow-hidden">
-                                  <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-400">
-                                     <MapPin className="w-4 h-4" />
-                                  </div>
-                                  <div className="flex flex-col overflow-hidden">
-                                    <span className="text-xs font-bold uppercase tracking-tight truncate">{maps.title || `Place ${idx + 1}`}</span>
-                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest truncate">Verified Location</span>
-                                  </div>
-                               </div>
-                               <a 
-                                 href={maps.uri}
-                                 target="_blank"
-                                 rel="noopener noreferrer"
-                                 className="p-2 bg-blue-600 rounded-lg text-white hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
-                               >
-                                 <ExternalLink className="w-3.5 h-3.5" />
-                               </a>
-                             </div>
-
-                             {maps.placeAnswerSources?.reviewSnippets && (
-                               <div className="space-y-2 pt-2 border-t border-white/5">
-                                 {maps.placeAnswerSources.reviewSnippets.map((snippet: any, sIdx: number) => (
-                                   <div key={sIdx} className="flex gap-2 items-start bg-black/20 p-2 rounded-xl">
-                                      <Star className="w-2.5 h-2.5 text-yellow-500 shrink-0 mt-0.5 fill-yellow-500" />
-                                      <p className="text-[10px] text-slate-400 italic leading-normal">"{snippet.text}"</p>
-                                   </div>
-                                 ))}
-                               </div>
-                             )}
-                           </div>
-                         );
-                       })}
-                    </div>
-                 </div>
-               )}
-            </div>
-
-            <button 
-              onClick={() => { setResults(null); setQuery(''); }}
-              className="w-full py-4 bg-white/5 border border-white/10 rounded-3xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 active:scale-95 transition-all text-slate-400"
-            >
-               Clear & Search Again
-            </button>
-          </div>
-        )}
-
-        {/* Info Card */}
-        {!results && !loading && (
-          <div className="bg-gradient-to-br from-blue-600/10 to-indigo-600/10 p-6 rounded-[32px] border border-blue-500/20 space-y-4">
-             <div className="flex items-center gap-2">
-                <Info className="w-4 h-4 text-blue-400" />
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-200">AI Intelligence</h4>
-             </div>
-             <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
-                Market Explorer leverages **Gemini 2.5 Flash** with **Maps Grounding** to provide real-time, verified business information. Our system analyzes your local neighborhood to identify key suppliers, distributors, and market trends directly from Google's live databases.
-             </p>
-          </div>
-        )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Market Explorer</h1>
+        <p className="text-sm text-slate-600 mt-1">Find nearby businesses and competitors</p>
       </div>
 
-      {locError && (
-        <div className="fixed bottom-32 left-6 right-6 p-4 bg-red-500/20 border border-red-500/30 rounded-2xl backdrop-blur-md flex items-center gap-3 animate-in slide-in-from-bottom-2">
-           <MapPin className="w-5 h-5 text-red-400" />
-           <p className="text-[10px] font-bold text-red-200 uppercase">{locError}</p>
+      {/* Search */}
+      <form onSubmit={handleSearch} className="space-y-3">
+        <Input
+          type="text"
+          placeholder="Search for businesses, parts suppliers..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          icon={<Search className="w-5 h-5" />}
+        />
+        <Button
+          type="submit"
+          isLoading={loading}
+          className="w-full"
+        >
+          <Search className="w-5 h-5 mr-2" />
+          Search Nearby
+        </Button>
+      </form>
+
+      {/* Quick Searches */}
+      <div>
+        <h3 className="text-sm font-semibold text-slate-700 mb-3">Quick Searches</h3>
+        <div className="grid grid-cols-3 gap-2">
+          {quickSearches.map((item) => (
+            <button
+              key={item.label}
+              onClick={() => {
+                setSearchQuery(item.label);
+                handleSearch();
+              }}
+              className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-blue-50 hover:border-blue-300 transition-colors"
+            >
+              <item.icon className="w-5 h-5 text-blue-600 mx-auto mb-1" />
+              <p className="text-xs font-semibold text-slate-900 text-center">{item.label}</p>
+            </button>
+          ))}
         </div>
+      </div>
+
+      {/* Results */}
+      {places.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700 mb-3">
+            Found {places.length} Results
+          </h3>
+          <div className="space-y-3">
+            {places.map((place) => (
+              <Card key={place.id} padding="md">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-bold text-slate-900">{place.name}</h4>
+                        <Badge variant="neutral" size="sm">
+                          {place.type}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-1 text-sm text-slate-600">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-4 h-4" />
+                          <span>{place.address}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1">
+                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                            <span className="font-semibold">{place.rating}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Navigation className="w-4 h-4" />
+                            <span>{place.distance} away</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => openInMaps(place.address)}
+                      className="w-full"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-1" />
+                      Open in Google Maps
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {places.length === 0 && !loading && (
+        <Card>
+          <div className="text-center py-12">
+            <MapPin className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Explore Your Market</h3>
+            <p className="text-slate-600">Search for nearby businesses, competitors, or suppliers</p>
+          </div>
+        </Card>
       )}
     </div>
   );

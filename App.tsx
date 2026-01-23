@@ -1,15 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Home, 
-  BarChart3, 
-  MessageCircle, 
-  Package, 
-  Menu as MenuIcon, 
-  Shield, 
-  Settings, 
-  Hammer,
-  Bot
+import {
+  Home,
+  BarChart3,
+  DollarSign,
+  LayoutGrid,
+  Bot,
+  Shield,
+  Settings
 } from 'lucide-react';
 import DashboardPage from './pages/Dashboard';
 import DashboardV2 from './pages/DashboardV2';
@@ -28,7 +26,6 @@ import SettingsPage from './pages/Settings';
 import SaleReportPage from './pages/SaleReport';
 import PartyStatementPage from './pages/PartyStatement';
 import AdsManagerPage from './pages/AdsManager';
-import MenuPage from './pages/Menu';
 import UtilitiesPage from './pages/Utilities';
 import BusinessHoroscope from './pages/BusinessHoroscope';
 import MarketingTools from './pages/MarketingTools';
@@ -45,6 +42,7 @@ import GoogleProfilePage from './pages/GoogleProfile';
 import BankAccountsPage from './pages/BankAccounts';
 import CashInHandPage from './pages/CashInHand';
 import ChequesPage from './pages/Cheques';
+import MorePage from './pages/More';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
@@ -69,12 +67,14 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'home': return <DashboardPage onNavigate={setActiveTab} />;
       case 'dashboard': return <DashboardV2 onNavigate={setActiveTab} />;
+      case 'business': return <DashboardV2 onNavigate={setActiveTab} />;
+      case 'money': return <BankAccountsPage onNavigate={setActiveTab} />;
+      case 'more': return <MorePage onNavigate={setActiveTab} />;
       case 'staff_control': return <StaffControlCenter />;
       case 'items': return <InventoryPage onNavigate={(tab, query) => {
         if (tab === 'market_explorer') navigateToMarketExplorer(query);
         else setActiveTab(tab);
       }} />;
-      case 'menu': return <MenuPage onNavigate={setActiveTab} userRole={userRole} setUserRole={setUserRole} />;
       case 'connect': return <ConnectPage />;
       case 'horoscope': return <BusinessHoroscope onNavigate={setActiveTab} />;
       case 'marketing_tools': return <MarketingTools onNavigate={setActiveTab} />;
@@ -112,73 +112,64 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 overflow-hidden text-slate-900">
-      {activeTab !== 'dashboard' && activeTab !== 'horoscope' && activeTab !== 'market_explorer' && activeTab !== 'tech_agent' && (
-        <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-40 no-print shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className={`w-10 h-10 ${userRole === 'admin' ? 'bg-slate-900' : 'bg-orange-600'} rounded-xl flex items-center justify-center shadow-lg transition-transform active:scale-90`}>
-              {userRole === 'admin' ? <BarChart3 className="w-6 h-6 text-white" /> : <Hammer className="w-6 h-6 text-white" />}
+      {activeTab !== 'dashboard' && activeTab !== 'business' && activeTab !== 'horoscope' && activeTab !== 'market_explorer' && activeTab !== 'tech_agent' && (
+        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-40 no-print shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-md">
+              <BarChart3 className="w-6 h-6 text-white" />
             </div>
             <div className="flex flex-col">
-              <h1 className="text-base font-black tracking-tighter uppercase leading-none text-slate-900">Moto Gear SRK</h1>
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1 opacity-80">{userRole} Terminal Active</span>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900">Moto Gear SRK</h1>
+              <span className="text-xs text-slate-500">Service Management</span>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <button onClick={() => setActiveTab('tech_agent')} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setActiveTab('tech_agent')} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all">
               <Bot className="w-5 h-5" />
             </button>
             {userRole === 'admin' && (
-              <button onClick={() => setActiveTab('staff_control')} className="relative text-slate-400 hover:text-blue-600 transition-colors p-2 bg-slate-50 rounded-xl">
+              <button onClick={() => setActiveTab('staff_control')} className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors rounded-xl">
                 <Shield className="w-5 h-5" />
               </button>
             )}
-            <button onClick={() => setActiveTab('settings')} className="text-slate-400 hover:text-blue-600 transition-colors p-2 bg-slate-50 rounded-xl">
+            <button onClick={() => setActiveTab('settings')} className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors rounded-xl">
               <Settings className="w-5 h-5" />
             </button>
           </div>
         </header>
       )}
 
-      <main className={`flex-1 overflow-y-auto relative ${activeTab === 'dashboard' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'pb-28' : 'pb-32'}`}>
-        <div className={`max-w-screen-xl mx-auto ${activeTab === 'dashboard' || activeTab === 'horoscope' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'px-0 pt-0' : 'px-4 pt-4'}`}>
+      <main className={`flex-1 overflow-y-auto relative ${activeTab === 'dashboard' || activeTab === 'business' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'pb-28' : 'pb-32'}`}>
+        <div className={`max-w-screen-xl mx-auto ${activeTab === 'dashboard' || activeTab === 'business' || activeTab === 'horoscope' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'px-0 pt-0' : 'px-4 pt-4'}`}>
           {renderContent()}
         </div>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around py-4 px-2 z-50 no-print safe-area-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
-        <BottomNavItem icon={<Home />} label="HOME" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
-        {userRole === 'admin' ? (
-          <>
-            <BottomNavItem icon={<BarChart3 />} label="STATS" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-            <BottomNavItem icon={<MessageCircle />} label="CHAT" active={activeTab === 'connect'} onClick={() => setActiveTab('connect')} />
-          </>
-        ) : (
-          <BottomNavItem icon={<Hammer />} label="TASKS" active={activeTab === 'employee_panel'} onClick={() => setActiveTab('employee_panel')} />
-        )}
-        <BottomNavItem icon={<Package />} label="ITEMS" active={activeTab === 'items'} onClick={() => setActiveTab('items')} />
-        <BottomNavItem icon={<MenuIcon />} label="MENU" active={activeTab === 'menu'} onClick={() => setActiveTab('menu')} />
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex items-center justify-around py-3 px-2 z-50 no-print shadow-lg">
+        <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+        <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business' || activeTab === 'dashboard'} onClick={() => setActiveTab('business')} />
+        <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money' || activeTab === 'bank_accounts'} onClick={() => setActiveTab('money')} />
+        <BottomNavItem icon={<LayoutGrid />} label="More" active={activeTab === 'more'} onClick={() => setActiveTab('more')} />
       </nav>
     </div>
   );
 };
 
-const BottomNavItem: React.FC<{ 
-  icon: React.ReactNode; 
-  label: string; 
-  active: boolean; 
-  onClick: () => void; 
+const BottomNavItem: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
 }> = ({ icon, label, active, onClick }) => (
   <button
     onClick={onClick}
-    className={`flex flex-col items-center gap-1.5 min-w-[72px] transition-all relative ${
-      active ? 'text-blue-600' : 'text-slate-400'
-    }`}
+    className={`flex flex-col items-center gap-1 min-w-[70px] transition-all ${active ? 'text-blue-600' : 'text-slate-400'
+      }`}
   >
-    {active && <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-1 bg-blue-600 rounded-full" />}
-    <div className={`p-2 rounded-2xl transition-all ${active ? 'bg-blue-50 scale-110 shadow-sm' : 'bg-transparent'}`}>
-      {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-6 h-6 stroke-[2.5]' })}
+    <div className={`p-2.5 rounded-2xl transition-all ${active ? 'bg-blue-50' : 'bg-transparent'}`}>
+      {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
     </div>
-    <span className="text-[9px] font-black tracking-widest uppercase">{label}</span>
+    <span className="text-xs font-semibold">{label}</span>
   </button>
 );
 

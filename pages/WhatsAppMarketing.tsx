@@ -1,194 +1,241 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  ArrowLeft, MessageCircle, Send, Users, Filter, 
-  CheckCircle2, Loader2, Smartphone, ShieldCheck, 
-  ChevronRight, Calendar, Award, Sparkles, Wand2
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MessageCircle, Send, Users, CheckCircle2, Smartphone } from 'lucide-react';
 import { dbService } from '../db';
 import { Customer } from '../types';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
 
-interface WhatsAppMarketingPageProps {
-  onNavigate: (tab: string) => void;
-}
+const WhatsAppMarketingPage: React.FC = () => {
+   const [customers, setCustomers] = useState<Customer[]>([]);
+   const [loading, setLoading] = useState(true);
+   const [selectedSegment, setSelectedSegment] = useState<'all' | 'vip' | 'regular'>('all');
+   const [message, setMessage] = useState('');
+   const [sendingCount, setSendingCount] = useState(0);
 
-const WhatsAppMarketingPage: React.FC<WhatsAppMarketingPageProps> = ({ onNavigate }) => {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedSegment, setSelectedSegment] = useState<'all' | 'loyal' | 'inactive'>('all');
-  const [broadcastText, setBroadcastText] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [progress, setProgress] = useState(0);
+   useEffect(() => {
+      loadData();
+   }, []);
 
-  useEffect(() => {
-    dbService.getCustomers().then(data => {
-      setCustomers(data);
-      setLoading(false);
-    });
-  }, []);
+   const loadData = async () => {
+      setLoading(true);
+      try {
+         const data = await dbService.getCustomers();
+         setCustomers(data);
+      } catch (err) {
+         console.error(err);
+      } finally {
+         setLoading(false);
+      }
+   };
 
-  const filteredTarget = useMemo(() => {
-    if (selectedSegment === 'all') return customers;
-    if (selectedSegment === 'loyal') return customers.filter(c => c.loyaltyPoints > 50);
-    if (selectedSegment === 'inactive') return customers.filter(c => c.loyaltyPoints === 0);
-    return customers;
-  }, [customers, selectedSegment]);
+   const getFilteredCustomers = () => {
+      if (selectedSegment === 'vip') {
+         return customers.filter(c => (c.loyaltyPoints || 0) >= 100);
+      } else if (selectedSegment === 'regular') {
+         return customers.filter(c => (c.loyaltyPoints || 0) < 100);
+      }
+      return customers;
+   };
 
-  const handleBroadcast = async () => {
-    if (!broadcastText || filteredTarget.length === 0) return;
-    setIsSending(true);
-    setProgress(0);
+   const handleBroadcast = () => {
+      const filtered = getFilteredCustomers();
+      if (!message.trim()) {
+         alert('Please enter a message');
+         return;
+      }
 
-    for (let i = 0; i < filteredTarget.length; i++) {
-      const c = filteredTarget[i];
-      // Simulated small delay between sends
-      await new Promise(r => setTimeout(r, 200));
-      // In a real app, this would use a bulk API. For this UI demo, we open WhatsApp links.
-      // But for a true broadcast, we'll just simulate the success.
-      setProgress(Math.round(((i + 1) / filteredTarget.length) * 100));
-    }
+      if (filtered.length === 0) {
+         alert('No customers in selected segment');
+         return;
+      }
 
-    setTimeout(() => {
-      alert(`Broadcast sent to ${filteredTarget.length} customers!`);
-      setIsSending(false);
-      setProgress(0);
-      setBroadcastText('');
-    }, 500);
-  };
+      setSendingCount(filtered.length);
 
-  const templates = [
-    { label: 'Sunday Offer', text: "Happy Sunday! 🏍️ Visit Moto Gear SRK today for a FREE general checkup and chain lubrication. Ride safe!" },
-    { label: 'New Parts', text: "New Stock Alert! 📦 Fresh inventory of high-performance engine oils and brake pads arrived at Moto Gear SRK. Upgrade today!" },
-    { label: 'Loyalty Reward', text: "You've earned it! 🏆 As a valued customer, get 10% off on your next service at Moto Gear SRK. Show this message at counter." }
-  ];
+      // Simulate sending
+      filtered.forEach((customer, index) => {
+         setTimeout(() => {
+            const whatsappUrl = `https://wa.me/${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+            if (index === 0) {
+               window.open(whatsappUrl, '_blank');
+            }
+         }, index * 100);
+      });
 
-  return (
-    <div className="space-y-6 pb-28 animate-in fade-in duration-500 max-w-lg mx-auto px-1">
-      <header className="flex items-center gap-4 mb-4">
-        <button onClick={() => onNavigate('menu')} className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 hover:bg-slate-50 transition-all">
-          <ArrowLeft className="w-5 h-5 text-slate-800" />
-        </button>
-        <div>
-          <h2 className="text-2xl font-black tracking-tight text-slate-900 uppercase leading-none">WA Marketing</h2>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Broadcast Campaigns</p>
-        </div>
-      </header>
+      setTimeout(() => {
+         alert(`Message queued for ${filtered.length} customers. Opening WhatsApp for first customer.`);
+         setSendingCount(0);
+      }, filtered.length * 100 + 500);
+   };
 
-      <div className="bg-slate-900 rounded-[32px] p-6 text-white shadow-xl relative overflow-hidden">
-         <div className="relative z-10 space-y-4">
-            <div className="flex items-center gap-2 bg-emerald-500/20 w-fit px-3 py-1 rounded-full border border-emerald-500/30">
-               <Sparkles className="w-3 h-3 text-emerald-400" />
-               <span className="text-[9px] font-black uppercase tracking-widest text-emerald-300">AI Boosted Reach</span>
+   const quickTemplates = [
+      {
+         label: 'Service Reminder',
+         message: 'Hi {name}, it\'s time for your bike service! Book your slot now and get 10% off. - SRK Bike Service'
+      },
+      {
+         label: 'Payment Reminder',
+         message: 'Hi {name}, you have a pending payment of ₹{amount}. Please clear it at your earliest convenience. - SRK Bike Service'
+      },
+      {
+         label: 'Special Offer',
+         message: 'Hi {name}, enjoy 20% off on all spare parts this week! Visit us now. - SRK Bike Service'
+      },
+      {
+         label: 'Thank You',
+         message: 'Thank you for choosing SRK Bike Service, {name}! Your satisfaction is our priority. 🙏'
+      }
+   ];
+
+   const filteredCustomers = getFilteredCustomers();
+
+   if (loading) {
+      return (
+         <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+               <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+               <p className="text-slate-600">Loading customers...</p>
             </div>
-            <h3 className="text-xl font-black uppercase tracking-tight">Broadcast Engine</h3>
-            <p className="text-slate-400 text-xs font-medium leading-relaxed">Reach your customers directly on WhatsApp with customized promotions and retention alerts.</p>
          </div>
-         <Smartphone className="absolute right-[-10px] bottom-[-10px] w-24 h-24 text-white/5 -rotate-12" />
-      </div>
+      );
+   }
 
+   return (
       <div className="space-y-6">
-         {/* Segment Selection */}
-         <section className="space-y-3">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Audience</h4>
-            <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
-               <SegmentTab active={selectedSegment === 'all'} onClick={() => setSelectedSegment('all')} label={`All (${customers.length})`} />
-               <SegmentTab active={selectedSegment === 'loyal'} onClick={() => setSelectedSegment('loyal')} label="Loyal" />
-               <SegmentTab active={selectedSegment === 'inactive'} onClick={() => setSelectedSegment('inactive')} label="Inactive" />
-            </div>
-         </section>
+         {/* Header */}
+         <div>
+            <h1 className="text-2xl font-bold text-slate-900">WhatsApp Marketing</h1>
+            <p className="text-sm text-slate-600 mt-1">Send bulk messages to customers</p>
+         </div>
 
-         {/* Message Composer */}
-         <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm space-y-6">
-            <div className="space-y-2">
-               <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Message Content</label>
-                  <button className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1">
-                     <Wand2 className="w-3 h-3" /> AI Help
-                  </button>
+         {/* Customer Count */}
+         <Card className="bg-gradient-to-br from-green-500 to-green-600 border-0 text-white">
+            <div className="flex items-center gap-3">
+               <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
+                  <MessageCircle className="w-7 h-7" />
                </div>
-               <textarea 
-                  rows={4}
-                  placeholder="Type your promotion message..."
-                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-xs font-bold transition-all focus:ring-4 focus:ring-emerald-500/5 resize-none"
-                  value={broadcastText}
-                  onChange={e => setBroadcastText(e.target.value)}
-               />
-            </div>
-
-            <div className="space-y-3">
-               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Templates</p>
-               <div className="flex flex-wrap gap-2">
-                  {templates.map(t => (
-                     <button 
-                        key={t.label}
-                        onClick={() => setBroadcastText(t.text)}
-                        className="px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl text-[9px] font-black text-blue-600 uppercase transition-all active:scale-95 hover:bg-blue-600 hover:text-white"
-                     >
-                        {t.label}
-                     </button>
-                  ))}
+               <div>
+                  <p className="text-sm text-green-100 mb-1">Total Customers</p>
+                  <h2 className="text-4xl font-bold">{customers.length}</h2>
                </div>
             </div>
+         </Card>
 
-            <div className="pt-4 border-t border-slate-50">
-               {isSending ? (
-                  <div className="space-y-4">
-                     <div className="flex justify-between items-center px-1">
-                        <span className="text-[9px] font-black text-slate-400 uppercase">Sending Broadcast...</span>
-                        <span className="text-[9px] font-black text-emerald-600 uppercase">{progress}% Complete</span>
-                     </div>
-                     <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                        <div 
-                           className="h-full bg-emerald-500 transition-all duration-300" 
-                           style={{ width: `${progress}%` }}
-                        />
-                     </div>
-                  </div>
-               ) : (
-                  <button 
-                     onClick={handleBroadcast}
-                     disabled={!broadcastText || filteredTarget.length === 0}
-                     className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
+         {/* Segment Tabs */}
+         <div className="flex gap-2">
+            <button
+               onClick={() => setSelectedSegment('all')}
+               className={`
+            flex-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all
+            ${selectedSegment === 'all'
+                     ? 'bg-blue-600 text-white shadow-md'
+                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
+          `}
+            >
+               All ({customers.length})
+            </button>
+            <button
+               onClick={() => setSelectedSegment('vip')}
+               className={`
+            flex-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all
+            ${selectedSegment === 'vip'
+                     ? 'bg-blue-600 text-white shadow-md'
+                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
+          `}
+            >
+               VIP ({customers.filter(c => (c.loyaltyPoints || 0) >= 100).length})
+            </button>
+            <button
+               onClick={() => setSelectedSegment('regular')}
+               className={`
+            flex-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all
+            ${selectedSegment === 'regular'
+                     ? 'bg-blue-600 text-white shadow-md'
+                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
+          `}
+            >
+               Regular ({customers.filter(c => (c.loyaltyPoints || 0) < 100).length})
+            </button>
+         </div>
+
+         {/* Quick Templates */}
+         <div>
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Quick Templates</h3>
+            <div className="grid grid-cols-2 gap-2">
+               {quickTemplates.map((template) => (
+                  <button
+                     key={template.label}
+                     onClick={() => setMessage(template.message)}
+                     className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-blue-50 hover:border-blue-300 transition-colors text-left"
                   >
-                     <Send className="w-4 h-4" /> Start Broadcast to {filteredTarget.length} Users
+                     <p className="text-xs font-semibold text-slate-900">{template.label}</p>
                   </button>
+               ))}
+            </div>
+         </div>
+
+         {/* Message Compose */}
+         <Card>
+            <div className="space-y-3">
+               <label className="block text-sm font-semibold text-slate-700">
+                  Compose Message
+               </label>
+               <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Type your message here... Use {name} for customer name."
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  rows={4}
+               />
+               <div className="flex items-center justify-between pt-2">
+                  <p className="text-sm text-slate-600">
+                     Will send to <strong>{filteredCustomers.length}</strong> customer{filteredCustomers.length !== 1 ? 's' : ''}
+                  </p>
+                  <Button
+                     onClick={handleBroadcast}
+                     isLoading={sendingCount > 0}
+                     disabled={!message.trim() || filteredCustomers.length === 0}
+                  >
+                     <Send className="w-5 h-5 mr-2" />
+                     Send via WhatsApp
+                  </Button>
+               </div>
+            </div>
+         </Card>
+
+         {/* Recipients Preview */}
+         <div>
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">
+               Recipients ({filteredCustomers.length})
+            </h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+               {filteredCustomers.slice(0, 10).map((customer) => (
+                  <Card key={customer.id} padding="sm">
+                     <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                           <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                              <Users className="w-5 h-5 text-green-600" />
+                           </div>
+                           <div>
+                              <p className="text-sm font-bold text-slate-900">{customer.name}</p>
+                              <p className="text-xs text-slate-600">{customer.phone}</p>
+                           </div>
+                        </div>
+                        {customer.loyaltyPoints && customer.loyaltyPoints >= 100 && (
+                           <Badge variant="warning" size="sm">VIP</Badge>
+                        )}
+                     </div>
+                  </Card>
+               ))}
+               {filteredCustomers.length > 10 && (
+                  <p className="text-xs text-slate-600 text-center py-2">
+                     + {filteredCustomers.length - 10} more customers
+                  </p>
                )}
             </div>
          </div>
-
-         {/* Stats Panel */}
-         <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-               <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
-                  <Users className="w-5 h-5" />
-               </div>
-               <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Target Size</p>
-                  <p className="text-sm font-black text-slate-800">{filteredTarget.length}</p>
-               </div>
-            </div>
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-               <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
-                  <CheckCircle2 className="w-5 h-5" />
-               </div>
-               <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Reachability</p>
-                  <p className="text-sm font-black text-slate-800">100%</p>
-               </div>
-            </div>
-         </div>
       </div>
-    </div>
-  );
+   );
 };
-
-const SegmentTab: React.FC<{ active: boolean, onClick: () => void, label: string }> = ({ active, onClick, label }) => (
-  <button 
-    onClick={onClick}
-    className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${active ? 'bg-white text-blue-600 shadow-sm border border-slate-200' : 'text-slate-400'}`}
-  >
-    {label}
-  </button>
-);
 
 export default WhatsAppMarketingPage;

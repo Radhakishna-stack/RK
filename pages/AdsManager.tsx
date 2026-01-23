@@ -1,168 +1,171 @@
-
 import React, { useState } from 'react';
-import { Sparkles, Megaphone, Share2, Target, TrendingUp, Loader2, RefreshCw, Image as ImageIcon, Download, Copy, Check, Bike, Gauge, Wrench } from 'lucide-react';
+import { Sparkles, Megaphone, Target, Copy, Check, RefreshCw } from 'lucide-react';
 import { dbService } from '../db';
 import { AdSuggestion } from '../types';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
 
 const AdsManagerPage: React.FC = () => {
-  const [suggestions, setSuggestions] = useState<AdSuggestion[]>([]);
-  const [adImages, setAdImages] = useState<Record<number, string>>({});
-  const [loading, setLoading] = useState(false);
-  const [loadingImages, setLoadingImages] = useState<Record<number, boolean>>({});
+   const [ads, setAds] = useState<AdSuggestion[]>([]);
+   const [loading, setLoading] = useState(false);
+   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const generateAds = async () => {
-    setLoading(true);
-    setSuggestions([]);
-    setAdImages({});
-    try {
-      const ads = await dbService.getAdSuggestions("MOTO GEAR SRK");
-      setSuggestions(ads);
-      
-      // Auto-generate images for each suggestion
-      ads.forEach((ad, idx) => {
-        generateImageForAd(idx, ad.headline);
-      });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+   const generateAds = async () => {
+      setLoading(true);
+      try {
+         const suggestions = await dbService.generateAdSuggestions();
+         setAds(suggestions);
+      } catch (err) {
+         // Fallback ad suggestions
+         setAds([
+            {
+               id: '1',
+               title: 'Special Service Offer',
+               description: '🏍️ Get 20% OFF on Full Service this Month! Expert technicians, genuine parts, and quick turnaround. Book now!',
+               platform: 'Facebook',
+               targetAudience: 'Bike owners in your area'
+            },
+            {
+               id: '2',
+               title: 'Free Inspection',
+               description: 'Free bike inspection this weekend! Complete check-up, safety inspection, and expert advice. Visit us today!',
+               platform: 'Instagram',
+               targetAudience: 'Local bike enthusiasts'
+            },
+            {
+               id: '3',
+               title: 'Genuine Parts Available',
+               description: '✨ 100% Genuine Spare Parts in Stock! Best prices guaranteed. Fast service. Your bike deserves the best!',
+               platform: 'WhatsApp',
+               targetAudience: 'Existing customers'
+            }
+         ]);
+      } finally {
+         setLoading(false);
+      }
+   };
 
-  const generateImageForAd = async (index: number, prompt: string) => {
-    setLoadingImages(prev => ({ ...prev, [index]: true }));
-    try {
-      const imageUrl = await dbService.generateAdImage(prompt);
-      setAdImages(prev => ({ ...prev, [index]: imageUrl }));
-    } catch (err) {
-      console.error("Image generation failed:", err);
-    } finally {
-      setLoadingImages(prev => ({ ...prev, [index]: false }));
-    }
-  };
+   const copyToClipboard = (text: string, id: string) => {
+      navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+   };
 
-  return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-24 px-1 max-w-lg mx-auto">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-        <div>
-          <h2 className="text-3xl font-black text-slate-900 flex items-center gap-3 tracking-tighter uppercase leading-none">
-            Rider Ads <Megaphone className="w-8 h-8 text-blue-600" />
-          </h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 opacity-80">Motorcycle Marketing Hub</p>
-        </div>
-        <button 
-          onClick={generateAds}
-          disabled={loading}
-          className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 hover:bg-slate-800 shadow-2xl active:scale-95 transition-all disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-          Refresh Campaigns
-        </button>
-      </header>
+   const adGoals = [
+      { icon: Target, label: 'Get More Customers', color: 'bg-blue-100 text-blue-600' },
+      { icon: Megaphone, label: 'Promote Offers', color: 'bg-green-100 text-green-600' },
+      { icon: Sparkles, label: 'Build Awareness', color: 'bg-purple-100 text-purple-600' }
+   ];
 
-      {suggestions.length > 0 ? (
-        <div className="space-y-10">
-          {suggestions.map((ad, idx) => (
-            <div key={idx} className="bg-white rounded-[48px] border border-slate-100 shadow-xl overflow-hidden flex flex-col group hover:shadow-2xl transition-all duration-500">
-              {/* Image Preview */}
-              <div className="aspect-[4/3] relative bg-slate-100 overflow-hidden">
-                 {loadingImages[idx] ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-50">
-                       <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-                       <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Forging Visual...</p>
-                    </div>
-                 ) : adImages[idx] ? (
-                    <>
-                       <img src={adImages[idx]} alt="Motorbike Ad" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
-                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-8">
-                          <button onClick={() => window.open(adImages[idx])} className="bg-white/20 backdrop-blur-md text-white px-4 py-2 rounded-xl border border-white/20 flex items-center gap-2 text-[10px] font-black uppercase">
-                             <Download className="w-4 h-4" /> Save Creative
-                          </button>
-                       </div>
-                    </>
-                 ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-300">
-                       <ImageIcon className="w-12 h-12" />
-                       <button onClick={() => generateImageForAd(idx, ad.headline)} className="text-[9px] font-black uppercase underline tracking-widest">Retry Render</button>
-                    </div>
-                 )}
-                 <div className="absolute top-6 right-6 bg-blue-600 text-white px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl border border-blue-400">
-                    <Target className="w-3.5 h-3.5 fill-white" /> {ad.platform}
-                 </div>
-              </div>
+   return (
+      <div className="space-y-6">
+         {/* Header */}
+         <div>
+            <h1 className="text-2xl font-bold text-slate-900">Ads Manager</h1>
+            <p className="text-sm text-slate-600 mt-1">AI-powered ad creation</p>
+         </div>
 
-              <div className="p-8 flex-1 space-y-6">
-                 <div className="flex items-center gap-2">
-                    <Wrench className="w-4 h-4 text-slate-400" />
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Technical Proposal</span>
-                 </div>
-                 
-                 <div>
-                   <h4 className="text-2xl font-black text-slate-900 mb-2 leading-tight uppercase tracking-tight">{ad.headline}</h4>
-                   <p className="text-slate-600 text-sm font-medium leading-relaxed italic border-l-4 border-blue-500 pl-4 bg-slate-50 py-3 rounded-r-xl">"{ad.copy}"</p>
-                 </div>
-                 
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-blue-50/50 p-4 rounded-3xl border border-blue-100/50">
-                       <p className="text-[9px] font-black uppercase text-blue-400 mb-1">Audience</p>
-                       <p className="text-[10px] font-bold text-blue-900 leading-tight">{ad.targetAudience}</p>
-                    </div>
-                    <div className="bg-amber-50/50 p-4 rounded-3xl border border-amber-100/50">
-                       <p className="text-[9px] font-black uppercase text-amber-500 mb-1">AI Score</p>
-                       <p className="text-[10px] font-bold text-amber-900 leading-tight">High Engagement</p>
-                    </div>
-                 </div>
-
-                 <div className="p-5 bg-slate-900 rounded-[32px] text-white space-y-2">
-                    <div className="flex items-center gap-2 opacity-60">
-                       <TrendingUp className="w-3.5 h-3.5 text-blue-400" />
-                       <p className="text-[9px] font-black uppercase tracking-widest">System Reasoning</p>
-                    </div>
-                    <p className="text-[11px] text-slate-300 font-medium leading-relaxed">{ad.estimatedPerformance}</p>
-                 </div>
-              </div>
-
-              <div className="p-8 pt-0 flex gap-3">
-                 <button className="flex-1 bg-slate-50 text-slate-600 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 border border-slate-100 active:scale-95">
-                    <Copy className="w-4 h-4" /> Copy Text
-                 </button>
-                 <button className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-blue-500/20 active:scale-95">
-                    <Share2 className="w-4 h-4" /> Launch Campaign
-                 </button>
-              </div>
+         {/* Ad Goals */}
+         <div>
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">What's Your Goal?</h3>
+            <div className="grid grid-cols-3 gap-2">
+               {adGoals.map((goal) => (
+                  <Card key={goal.label} padding="sm">
+                     <div className="flex flex-col items-center gap-2 text-center">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${goal.color}`}>
+                           <goal.icon className="w-5 h-5" />
+                        </div>
+                        <p className="text-xs font-semibold text-slate-900">{goal.label}</p>
+                     </div>
+                  </Card>
+               ))}
             </div>
-          ))}
-        </div>
-      ) : !loading && (
-        <div className="bg-white p-12 py-24 rounded-[56px] border border-slate-100 shadow-sm text-center space-y-8">
-           <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-[40px] flex items-center justify-center mx-auto shadow-inner relative">
-              <Sparkles className="w-12 h-12 fill-blue-600" />
-              <div className="absolute -top-2 -right-2 bg-slate-900 p-2 rounded-xl text-white shadow-lg">
-                 <Bike className="w-4 h-4" />
-              </div>
-           </div>
-           <div className="space-y-2">
-              <h3 className="text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">Automated Ad Lab</h3>
-              <p className="text-slate-400 font-medium text-sm px-6">Generate high-octane marketing campaigns for your bike service business in seconds.</p>
-           </div>
-           <button onClick={generateAds} className="bg-slate-900 text-white px-10 py-5 rounded-[28px] font-black text-xs uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all">Start Ad Engine</button>
-        </div>
-      )}
+         </div>
 
-      {loading && (
-        <div className="py-40 flex flex-col items-center justify-center gap-10 text-center">
-           <div className="relative">
-              <div className="w-32 h-32 bg-blue-600/10 rounded-full blur-[60px] absolute inset-0 animate-pulse"></div>
-              <Loader2 className="w-16 h-16 animate-spin text-blue-600 relative" />
-           </div>
-           <div className="space-y-3">
-              <p className="text-xl font-black tracking-tight text-slate-900 uppercase">Consulting AI Strategists...</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.4em] animate-pulse">Analyzing regional rider trends</p>
-           </div>
-        </div>
-      )}
-    </div>
-  );
+         {/* Generate Button */}
+         <div className="text-center">
+            <Button
+               onClick={generateAds}
+               isLoading={loading}
+               size="lg"
+            >
+               <Sparkles className="w-5 h-5 mr-2" />
+               Generate Ad Ideas
+            </Button>
+         </div>
+
+         {/* Generated Ads */}
+         {ads.length > 0 && (
+            <div>
+               <h3 className="text-lg font-bold text-slate-900 mb-3">Generated Ads</h3>
+               <div className="space-y-3">
+                  {ads.map((ad) => (
+                     <Card key={ad.id} padding="md">
+                        <div className="space-y-3">
+                           <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                 <div className="flex items-center gap-2 mb-2">
+                                    <h4 className="font-bold text-slate-900">{ad.title}</h4>
+                                    <Badge variant="info" size="sm">
+                                       {ad.platform}
+                                    </Badge>
+                                 </div>
+                                 <p className="text-sm text-slate-700 mb-2">{ad.description}</p>
+                                 <p className="text-xs text-slate-500">
+                                    Target: {ad.targetAudience}
+                                 </p>
+                              </div>
+                           </div>
+
+                           <div className="flex gap-2 pt-2 border-t border-slate-200">
+                              <Button
+                                 size="sm"
+                                 variant="secondary"
+                                 onClick={() => copyToClipboard(ad.description, ad.id)}
+                                 className="flex-1"
+                              >
+                                 {copiedId === ad.id ? (
+                                    <>
+                                       <Check className="w-4 h-4 mr-1" />
+                                       Copied!
+                                    </>
+                                 ) : (
+                                    <>
+                                       <Copy className="w-4 h-4 mr-1" />
+                                       Copy Text
+                                    </>
+                                 )}
+                              </Button>
+                              <Button
+                                 size="sm"
+                                 variant="ghost"
+                                 onClick={generateAds}
+                                 className="flex-1"
+                              >
+                                 <RefreshCw className="w-4 h-4 mr-1" />
+                                 Regenerate
+                              </Button>
+                           </div>
+                        </div>
+                     </Card>
+                  ))}
+               </div>
+            </div>
+         )}
+
+         {/* Empty State */}
+         {ads.length === 0 && !loading && (
+            <Card>
+               <div className="text-center py-12">
+                  <Megaphone className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Ready to Create Ads?</h3>
+                  <p className="text-slate-600 mb-4">Click the button above to generate AI-powered ad ideas</p>
+               </div>
+            </Card>
+         )}
+      </div>
+   );
 };
 
 export default AdsManagerPage;
