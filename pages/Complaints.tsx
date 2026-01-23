@@ -26,6 +26,7 @@ const ComplaintsPage: React.FC = () => {
     bikeNumber: '',
     customerName: '',
     customerPhone: '',
+    city: '',
     details: '',
     estimatedCost: '',
     dueDate: '',
@@ -97,7 +98,8 @@ const ComplaintsPage: React.FC = () => {
       ...formData,
       bikeNumber: customer.bikeNumber,
       customerName: customer.name,
-      customerPhone: customer.phone
+      customerPhone: customer.phone,
+      city: customer.city || ''
     });
     setShowSuggestions(false);
   };
@@ -114,7 +116,7 @@ const ComplaintsPage: React.FC = () => {
       });
       await loadData();
       setIsModalOpen(false);
-      setFormData({ bikeNumber: '', customerName: '', customerPhone: '', details: '', estimatedCost: '', dueDate: '', odometerReading: '' });
+      setFormData({ bikeNumber: '', customerName: '', customerPhone: '', city: '', details: '', estimatedCost: '', dueDate: '', odometerReading: '' });
       setImages([]);
     } catch (err) {
       alert('Failed to create job. Please try again.');
@@ -281,6 +283,12 @@ const ComplaintsPage: React.FC = () => {
                         <span className="font-mono">{customer.bikeNumber}</span>
                         <span>•</span>
                         <span>{customer.phone}</span>
+                        {customer.city && (
+                          <>
+                            <span>•</span>
+                            <span>{customer.city}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </button>
@@ -328,6 +336,12 @@ const ComplaintsPage: React.FC = () => {
                           <span className="font-mono">{customer.bikeNumber}</span>
                           <span>•</span>
                           <span>{customer.phone}</span>
+                          {customer.city && (
+                            <>
+                              <span>•</span>
+                              <span>{customer.city}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </button>
@@ -336,6 +350,15 @@ const ComplaintsPage: React.FC = () => {
               )}
             </div>
           </div>
+
+          <Input
+            label="City"
+            type="text"
+            required
+            placeholder="Enter city"
+            value={formData.city}
+            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+          />
 
           <div className="space-y-1.5">
             <label className="block text-sm font-semibold text-slate-700">
