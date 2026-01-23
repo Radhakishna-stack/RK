@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Plus, Search, Bike, Phone, Receipt, Trash2, DollarSign, Calendar, Save
+  Plus, Search, Bike, Phone, Receipt, Trash2, DollarSign, Calendar, Save,
+  Printer, Eye, Share2, Download, MessageCircle, CheckCircle2
 } from 'lucide-react';
 import { dbService } from '../db';
-import { Complaint, InventoryItem, BankAccount } from '../types';
+import { Complaint, InventoryItem, BankAccount, Invoice } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -18,6 +19,8 @@ const BillingPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdInvoice, setCreatedInvoice] = useState<Invoice | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Invoice items
@@ -114,14 +117,52 @@ const BillingPage: React.FC = () => {
         docType: 'Sale'
       });
 
-      alert('Invoice created successfully!');
+      const newInvoice = await dbService.generateInvoice({
+        complaintId: selectedComplaint.id,
+        bikeNumber: selectedComplaint.bikeNumber,
+        customerName: selectedComplaint.customerName,
+        details: selectedComplaint.details,
+        items: invoiceItems,
+        estimatedCost: selectedComplaint.estimatedCost || 0,
+        finalAmount: calculateTotal(),
+        paymentStatus: paymentStatus,
+        accountId: selectedAccount,
+        paymentMode: paymentMode,
+        date: new Date().toISOString(),
+        docType: 'Sale',
+        odometerReading: selectedComplaint.odometerReading
+      });
+
+      setCreatedInvoice(newInvoice);
       setIsInvoiceModalOpen(false);
+      setShowSuccessModal(true);
       setSelectedComplaint(null);
       setInvoiceItems([]);
       loadData();
     } catch (err) {
       alert('Failed to create invoice. Please try again.');
     }
+  };
+
+  const handlePrintInvoice = () => {
+    window.print();
+  };
+
+  const handleViewInvoice = () => {
+    if (!createdInvoice) return;
+    // In a real app, this would open invoice in new tab
+    handlePrintInvoice();
+  };
+
+  const handleWhatsAppShare = () => {
+    if (!createdInvoice) return;
+    const message = `Invoice #${createdInvoice.id.slice(-8)} for ₹${createdInvoice.finalAmount.toLocaleString()}\nCustomer: ${createdInvoice.customerName}\nBike: ${createdInvoice.bikeNumber}`;
+    dbService.sendWhatsApp(createdInvoice.customerName.split(' ')[0], message);
+  };
+
+  const handleSavePDF = () => {
+    // Browser's print to PDF
+    window.print();
   };
 
   const filteredComplaints = complaints.filter(complaint =>
