@@ -398,7 +398,7 @@ const LabelStudioModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                        <h4 className="text-sm font-bold text-slate-600 uppercase tracking-widest mb-4">{textSub}</h4>
                        <div className="h-px w-12 bg-slate-200 mb-4"></div>
                        <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight leading-relaxed">{textBody}</p>
-                    </>
+                    </div>
                  )}
 
               </div>
