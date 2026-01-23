@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Plus, Search, Clock, CheckCircle, AlertCircle, Bike, Phone, Calendar, DollarSign, X
+  Plus, Search, Clock, CheckCircle, AlertCircle, Bike, Phone, Calendar, DollarSign, X,
+  Camera, Upload, FlipHorizontal, Image as ImageIcon, Trash2
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Complaint, ComplaintStatus } from '../types';
@@ -24,8 +25,17 @@ const ComplaintsPage: React.FC = () => {
     customerPhone: '',
     details: '',
     estimatedCost: '',
-    dueDate: ''
+    dueDate: '',
+    odometerReading: ''
   });
+  const [images, setImages] = useState<string[]>([]);
+
+  // Camera State
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -50,11 +60,13 @@ const ComplaintsPage: React.FC = () => {
       await dbService.addComplaint({
         ...formData,
         estimatedCost: parseInt(formData.estimatedCost) || 0,
-        photoUrls: []
+        odometerReading: parseInt(formData.odometerReading) || 0,
+        photoUrls: images
       });
       await loadData();
       setIsModalOpen(false);
-      setFormData({ bikeNumber: '', customerName: '', customerPhone: '', details: '', estimatedCost: '', dueDate: '' });
+      setFormData({ bikeNumber: '', customerName: '', customerPhone: '', details: '', estimatedCost: '', dueDate: '', odometerReading: '' });
+      setImages([]);
     } catch (err) {
       alert('Failed to create job. Please try again.');
     } finally {
@@ -246,11 +258,91 @@ const ComplaintsPage: React.FC = () => {
             />
 
             <Input
-              label="Due Date (Optional)"
-              type="date"
-              value={formData.dueDate}
-              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              icon={<Calendar className="w-5 h-5" />}
+              label="Odometer (km)"
+              type="number"
+              placeholder="12500"
+              value={formData.odometerReading}
+              onChange={(e) => setFormData({ ...formData, odometerReading: e.target.value })}
+              icon={<Clock className="w-5 h-5" />}
+            />
+          </div>
+
+          <Input
+            label="Due Date (Optional)"
+            type="date"
+            value={formData.dueDate}
+            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+            icon={<Calendar className="w-5 h-5" />}
+          />
+
+          {/* Photo Upload Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold text-slate-700">Photos</label>
+              <span className="text-xs text-slate-500">{images.length} added</span>
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              {images.map((img, idx) => (
+                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group">
+                  <img src={img} className="w-full h-full object-cover" alt="job" />
+                  <button
+                    type="button"
+                    onClick={() => setImages(prev => prev.filter((_, i) => i !== idx))}
+                    className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                    .then(stream => {
+                      setIsCameraOpen(true);
+                      if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        streamRef.current = stream;
+                      }
+                    })
+                    .catch(err => alert("Camera access denied"));
+                }}
+                className="aspect-square rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-1 text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-colors"
+              >
+                <Camera className="w-6 h-6" />
+                <span className="text-[10px] font-bold uppercase">Camera</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => galleryInputRef.current?.click()}
+                className="aspect-square rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-1 text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-colors"
+              >
+                <Upload className="w-6 h-6" />
+                <span className="text-[10px] font-bold uppercase">Upload</span>
+              </button>
+            </div>
+            <input
+              type="file"
+              ref={galleryInputRef}
+              multiple
+              accept="image/*"
+              className="hidden"
+              onChange={async (e) => {
+                const files = e.target.files;
+                if (!files) return;
+                const newPhotos: string[] = [];
+                for (let i = 0; i < files.length; i++) {
+                  const reader = new FileReader();
+                  reader.readAsDataURL(files[i]);
+                  await new Promise<void>(resolve => {
+                    reader.onloadend = () => {
+                      newPhotos.push(reader.result as string);
+                      resolve();
+                    }
+                  });
+                }
+                setImages(prev => [...prev, ...newPhotos]);
+              }}
             />
           </div>
 
@@ -273,6 +365,51 @@ const ComplaintsPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Camera Overlay */}
+      {isCameraOpen && (
+        <div className="fixed inset-0 bg-black z-[200] flex flex-col">
+          <div className="p-4 flex justify-between items-center text-white">
+            <button
+              onClick={() => {
+                streamRef.current?.getTracks().forEach(track => track.stop());
+                setIsCameraOpen(false);
+              }}
+              className="p-2"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <span className="font-bold">Take Photo</span>
+            <div className="w-8"></div>
+          </div>
+
+          <div className="flex-1 bg-black relative flex items-center justify-center">
+            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+
+          <div className="p-8 flex justify-center bg-black/80">
+            <button
+              onClick={() => {
+                if (videoRef.current && canvasRef.current) {
+                  const video = videoRef.current;
+                  const canvas = canvasRef.current;
+                  const context = canvas.getContext('2d');
+                  if (context) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    context.drawImage(video, 0, 0);
+                    setImages(prev => [...prev, canvas.toDataURL('image/jpeg')]);
+                  }
+                }
+              }}
+              className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center bg-white/20 active:scale-95 transition-transform"
+            >
+              <div className="w-16 h-16 bg-white rounded-full"></div>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -305,6 +442,9 @@ const JobCard: React.FC<{
               <Bike className="w-5 h-5 text-slate-600" />
               <h3 className="text-lg font-bold text-slate-900">{job.bikeNumber}</h3>
               {getStatusBadge(job.status)}
+              {job.photoUrls && job.photoUrls.length > 0 && (
+                <ImageIcon className="w-4 h-4 text-blue-500" />
+              )}
             </div>
             <p className="text-sm text-slate-600">{job.customerName}</p>
           </div>
