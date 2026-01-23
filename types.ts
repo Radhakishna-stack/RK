@@ -113,9 +113,10 @@ export interface InvoiceItem {
 
 export interface Invoice {
   id: string;
-  complaintId: string;
+  complaintId?: string; // Optional - direct sales don't need a complaint
   bikeNumber: string;
   customerName: string;
+  customerPhone?: string;
   details: string;
   items: InvoiceItem[];
   estimatedCost: number;
