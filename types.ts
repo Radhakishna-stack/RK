@@ -122,7 +122,7 @@ export interface Invoice {
   finalAmount: number;
   taxAmount?: number;
   subTotal?: number;
-  paymentStatus: 'Paid' | 'Unpaid';
+  paymentStatus: 'Paid' | 'Pending' | 'Unpaid';
   accountId: string; // References BankAccount.id
   paymentMode: string; // Account Name for display
   date: string;

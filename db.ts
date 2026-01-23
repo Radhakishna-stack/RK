@@ -159,7 +159,7 @@ export const dbService = {
 
     const txns = await dbService.getTransactions();
     const accountTxns = txns.filter(t => t.accountId === accountId);
-    
+
     const flow = accountTxns.reduce((sum, t) => t.type === 'IN' ? sum + t.amount : sum - t.amount, 0);
     return target.openingBalance + flow;
   },
@@ -183,9 +183,9 @@ export const dbService = {
         toolConfig: { retrievalConfig: { latLng: { latitude: lat, longitude: lng } } }
       }
     });
-    return { 
-      text: response.text || "Searching local bike databases...", 
-      grounding: response.candidates?.[0]?.groundingMetadata?.groundingChunks || [] 
+    return {
+      text: response.text || "Searching local bike databases...",
+      grounding: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     };
   },
 
@@ -212,7 +212,7 @@ export const dbService = {
           }
         }
       });
-      
+
       const result = JSON.parse(response.text || '{}');
       if (result.lat && result.lng) return result;
       return null;
@@ -257,11 +257,11 @@ export const dbService = {
     const settings = await dbService.getSettings();
     const prefix = settings.transaction.prefixes.paymentIn || 'PI-';
     const current = await dbService.getTransactions();
-    const newTxn = { 
-      ...data, 
-      id: prefix + Date.now(), 
+    const newTxn = {
+      ...data,
+      id: prefix + Date.now(),
       date: new Date().toISOString(),
-      accountId: data.accountId || 'CASH-01' 
+      accountId: data.accountId || 'CASH-01'
     };
     localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify([newTxn, ...current]));
     return newTxn;
@@ -270,18 +270,18 @@ export const dbService = {
   getCustomerBalance: async (bikeNumber: string, customerName: string): Promise<number> => {
     const invoices = await dbService.getInvoices();
     const txns = await dbService.getTransactions();
-    
-    const customerInvoices = invoices.filter(inv => 
+
+    const customerInvoices = invoices.filter(inv =>
       inv.docType === 'Sale' && (inv.bikeNumber === bikeNumber || inv.customerName === customerName)
     );
     const totalBilled = customerInvoices.reduce((sum, inv) => sum + inv.finalAmount, 0);
-    
+
     const prepaidAmount = customerInvoices
       .filter(inv => inv.paymentStatus === 'Paid')
       .reduce((sum, inv) => sum + inv.finalAmount, 0);
 
-    const manualPayments = txns.filter(t => 
-      t.type === 'IN' && t.entityId === bikeNumber 
+    const manualPayments = txns.filter(t =>
+      t.type === 'IN' && t.entityId === bikeNumber
     ).reduce((sum, t) => sum + t.amount, 0);
 
     return totalBilled - prepaidAmount - manualPayments;
@@ -344,20 +344,24 @@ export const dbService = {
     const current = await dbService.getInvoices();
     const newInv = { ...data, id: 'I' + Date.now(), date: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...current]));
-    
+
     if (data.paymentStatus === 'Paid') {
-       const settings = await dbService.getSettings();
-       const rate = settings.party.loyaltyRate || 100;
-       const earned = Math.floor(data.finalAmount / rate);
-       
-       const customers = await dbService.getCustomers();
-       const cust = customers.find(c => c.bikeNumber === data.bikeNumber || c.name === data.customerName);
-       if (cust) {
-          await dbService.updateCustomerLoyalty(cust.id, (cust.loyaltyPoints || 0) + earned);
-       }
+      const settings = await dbService.getSettings();
+      const rate = settings.party.loyaltyRate || 100;
+      const earned = Math.floor(data.finalAmount / rate);
+
+      const customers = await dbService.getCustomers();
+      const cust = customers.find(c => c.bikeNumber === data.bikeNumber || c.name === data.customerName);
+      if (cust) {
+        await dbService.updateCustomerLoyalty(cust.id, (cust.loyaltyPoints || 0) + earned);
+      }
     }
 
     return newInv;
+  },
+  updateInvoicePaymentStatus: async (id: string, status: 'Paid' | 'Pending' | 'Unpaid'): Promise<void> => {
+    const current = await dbService.getInvoices();
+    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify(current.map(i => i.id === id ? { ...i, paymentStatus: status } : i)));
   },
   deleteInvoice: async (id: string): Promise<void> => {
     const current = await dbService.getInvoices();
@@ -379,9 +383,9 @@ export const dbService = {
     const current = await dbService.getInventory();
     let updatedCount = 0;
     let createdCount = 0;
-    
+
     const updatedInventory = [...current];
-    
+
     for (const update of updates) {
       // Use itemCode as primary key for bulk updates
       const index = updatedInventory.findIndex(i => i.itemCode === update.itemCode);
@@ -406,7 +410,7 @@ export const dbService = {
         createdCount++;
       }
     }
-    
+
     localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(updatedInventory));
     return { updated: updatedCount, created: createdCount };
   },
@@ -465,14 +469,14 @@ export const dbService = {
 
   getDashboardStats: async (): Promise<DashboardStats> => {
     const [c, j, i, e, txns, accounts] = await Promise.all([
-      dbService.getCustomers(), 
-      dbService.getComplaints(), 
-      dbService.getInvoices(), 
+      dbService.getCustomers(),
+      dbService.getComplaints(),
+      dbService.getInvoices(),
       dbService.getExpenses(),
       dbService.getTransactions(),
       dbService.getBankAccounts()
     ]);
-    
+
     const totalRev = txns.filter(t => t.type === 'IN').reduce((s, t) => s + t.amount, 0);
     const pend = i.filter(inv => inv.paymentStatus === 'Unpaid').reduce((s, inv) => s + inv.finalAmount, 0);
     const exp = e.reduce((s, ex) => s + ex.amount, 0);
@@ -485,7 +489,7 @@ export const dbService = {
       if (acc.type === 'Cash') cashBal += balance;
       else bankBal += balance;
     }
-    
+
     return {
       totalCustomers: c.length,
       totalComplaints: j.length,
@@ -588,7 +592,7 @@ export const dbService = {
     const current = await dbService.getPickupBookings();
     const newBooking = { ...data, id: 'B' + Date.now(), status: PickupStatus.SCHEDULED, createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify([...current, newBooking]));
-    
+
     if (data.slotId) {
       const slots = await dbService.getPickupSlots();
       const updated = slots.map(s => s.id === data.slotId ? { ...s, bookedCount: s.bookedCount + 1 } : s);
@@ -599,7 +603,7 @@ export const dbService = {
   updatePickupStatus: async (id: string, status: PickupStatus, staffId?: string, staffName?: string): Promise<void> => {
     const current = await dbService.getPickupBookings();
     localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify(current.map(b => b.id === id ? { ...b, status, staffId, staffName } : b)));
-    
+
     if (staffId) {
       const salesmen = await dbService.getSalesmen();
       localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify(salesmen.map(s => s.id === staffId ? { ...s, status: status === PickupStatus.DELIVERED ? 'Available' : 'On Task' } : s)));
@@ -628,11 +632,11 @@ export const dbService = {
   getSalesmen: async (): Promise<Salesman[]> => JSON.parse(localStorage.getItem(LS_KEYS.SALESMEN) || '[]'),
   addSalesman: async (data: any): Promise<Salesman> => {
     const current = await dbService.getSalesmen();
-    const newStaff = { 
-      ...data, 
-      id: 'ST' + Date.now(), 
-      salesCount: 0, 
-      totalSalesValue: 0, 
+    const newStaff = {
+      ...data,
+      id: 'ST' + Date.now(),
+      salesCount: 0,
+      totalSalesValue: 0,
       joinDate: new Date().toISOString(),
       status: 'Available'
     };
@@ -656,7 +660,7 @@ export const dbService = {
 
   parseLocationFromLink: (text: string): { lat: number, lng: number, address?: string } | null => {
     if (!text) return null;
-    
+
     // Normalize input
     const cleanText = text.replace(/["']/g, '').trim();
 

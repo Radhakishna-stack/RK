@@ -4,7 +4,7 @@ import {
   Plus, Search, Bike, Phone, Receipt, Trash2, DollarSign, Calendar, Save
 } from 'lucide-react';
 import { dbService } from '../db';
-import { Complaint, InventoryItem } from '../types';
+import { Complaint, InventoryItem, BankAccount } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -14,6 +14,7 @@ import { Badge } from '../components/ui/Badge';
 const BillingPage: React.FC = () => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
@@ -30,6 +31,11 @@ const BillingPage: React.FC = () => {
   const [newItemDescription, setNewItemDescription] = useState('');
   const [newItemAmount, setNewItemAmount] = useState('');
 
+  // Payment fields
+  const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Pending' | 'Unpaid'>('Pending');
+  const [paymentMode, setPaymentMode] = useState('Cash');
+  const [selectedAccount, setSelectedAccount] = useState('CASH-01');
+
   useEffect(() => {
     loadData();
   }, []);
@@ -37,13 +43,15 @@ const BillingPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [compData, invData] = await Promise.all([
+      const [compData, invData, accData] = await Promise.all([
         dbService.getComplaints(),
-        dbService.getInventory()
+        dbService.getInventory(),
+        dbService.getBankAccounts()
       ]);
       // Only show completed complaints (ready for billing)
       setComplaints(compData.filter(c => c.status === 'Completed'));
       setInventory(invData);
+      setAccounts(accData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -59,6 +67,10 @@ const BillingPage: React.FC = () => {
       amount: complaint.estimatedCost || 0
     }]);
     setIsInvoiceModalOpen(true);
+    // Reset payment fields
+    setPaymentStatus('Pending');
+    setPaymentMode('Cash');
+    setSelectedAccount('CASH-01');
   };
 
   const handleAddItem = () => {
@@ -95,9 +107,9 @@ const BillingPage: React.FC = () => {
         items: invoiceItems,
         estimatedCost: selectedComplaint.estimatedCost || 0,
         finalAmount: calculateTotal(),
-        paymentStatus: 'Unpaid',
-        accountId: 'CASH-01',
-        paymentMode: 'Cash',
+        paymentStatus: paymentStatus,
+        accountId: selectedAccount,
+        paymentMode: paymentMode,
         date: new Date().toISOString(),
         docType: 'Sale'
       });
@@ -268,6 +280,87 @@ const BillingPage: React.FC = () => {
                   Add
                 </Button>
               </div>
+            </div>
+
+            {/* Payment Options */}
+            <div className="space-y-4 p-4 bg-slate-50 rounded-2xl">
+              <h3 className="font-semibold text-slate-900">Payment Details</h3>
+
+              {/* Payment Status */}
+              <div className="space-y-1.5">
+                <label className="block text-sm font-semibold text-slate-700">Payment Status</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['Paid', 'Pending', 'Unpaid'] as const).map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setPaymentStatus(status)}
+                      className={`
+                        p-3 rounded-xl font-semibold text-sm transition-all
+                        ${paymentStatus === status
+                          ? status === 'Paid' ? 'bg-green-600 text-white shadow-md'
+                            : status === 'Pending' ? 'bg-amber-600 text-white shadow-md'
+                              : 'bg-slate-600 text-white shadow-md'
+                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}
+                      `}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Payment Mode (only if Paid) */}
+              {paymentStatus === 'Paid' && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-semibold text-slate-700">Payment Mode</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['Cash', 'UPI', 'Card'].map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            setPaymentMode(mode);
+                            // Auto-select account based on mode
+                            if (mode === 'Cash') {
+                              const cashAcc = accounts.find(a => a.type === 'Cash');
+                              setSelectedAccount(cashAcc?.id || 'CASH-01');
+                            } else {
+                              const bankAcc = accounts.find(a => a.type !== 'Cash');
+                              setSelectedAccount(bankAcc?.id || 'BANK-01');
+                            }
+                          }}
+                          className={`
+                            p-3 rounded-xl font-semibold text-sm transition-all
+                            ${paymentMode === mode
+                              ? 'bg-blue-600 text-white shadow-md'
+                              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}
+                          `}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Account Selector */}
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-semibold text-slate-700">Account</label>
+                    <select
+                      value={selectedAccount}
+                      onChange={(e) => setSelectedAccount(e.target.value)}
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      {accounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name} ({acc.type})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Total */}

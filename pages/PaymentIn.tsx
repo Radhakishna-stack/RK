@@ -35,8 +35,8 @@ const PaymentInPage: React.FC = () => {
         dbService.getInvoices(),
         dbService.getCustomers()
       ]);
-      // Only show unpaid invoices
-      setInvoices(invData.filter(inv => inv.paymentStatus !== 'Paid'));
+      // Show Pending and Unpaid invoices
+      setInvoices(invData.filter(inv => inv.paymentStatus === 'Pending' || inv.paymentStatus === 'Unpaid'));
       setCustomers(custData);
     } catch (err) {
       console.error(err);
@@ -157,7 +157,11 @@ const PaymentInPage: React.FC = () => {
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-3">
                     <h3 className="text-lg font-bold text-slate-900">{invoice.customerName}</h3>
-                    <Badge variant="warning" size="sm">Unpaid</Badge>
+                    {invoice.paymentStatus === 'Pending' ? (
+                      <Badge variant="warning" size="sm">Pending</Badge>
+                    ) : (
+                      <Badge variant="danger" size="sm">Unpaid</Badge>
+                    )}
                   </div>
 
                   <p className="text-sm text-slate-600">Bike: {invoice.bikeNumber}</p>
