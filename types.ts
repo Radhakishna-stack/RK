@@ -128,6 +128,7 @@ export interface Invoice {
   date: string;
   odometerReading?: number;
   docType?: 'Sale' | 'Estimate';
+  serviceReminderDate?: string;
 }
 
 export interface BankAccount {

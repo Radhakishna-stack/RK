@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Plus, Search, Bike, Phone, Receipt, Trash2, DollarSign, Calendar, Save,
-  Printer, Eye, Share2, Download, MessageCircle, CheckCircle2
+  Printer, Eye, Share2, Download, MessageCircle, CheckCircle2, Edit2, Check, X
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Complaint, InventoryItem, BankAccount, Invoice } from '../types';
@@ -33,6 +33,10 @@ const BillingPage: React.FC = () => {
 
   const [newItemDescription, setNewItemDescription] = useState('');
   const [newItemAmount, setNewItemAmount] = useState('');
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editItemDescription, setEditItemDescription] = useState('');
+  const [editItemAmount, setEditItemAmount] = useState('');
+  const [serviceReminderDate, setServiceReminderDate] = useState('');
 
   // Payment fields
   const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Pending' | 'Unpaid'>('Pending');
@@ -74,6 +78,7 @@ const BillingPage: React.FC = () => {
     setPaymentStatus('Pending');
     setPaymentMode('Cash');
     setSelectedAccount('CASH-01');
+    setServiceReminderDate('');
   };
 
   const handleAddItem = () => {
@@ -92,6 +97,32 @@ const BillingPage: React.FC = () => {
 
   const handleRemoveItem = (id: string) => {
     setInvoiceItems(invoiceItems.filter(item => item.id !== id));
+  };
+
+  const handleEditItem = (item: any) => {
+    setEditingItemId(item.id);
+    setEditItemDescription(item.description);
+    setEditItemAmount(item.amount.toString());
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingItemId || !editItemDescription || !editItemAmount) return;
+
+    setInvoiceItems(invoiceItems.map(item =>
+      item.id === editingItemId
+        ? { ...item, description: editItemDescription, amount: parseFloat(editItemAmount) }
+        : item
+    ));
+
+    setEditingItemId(null);
+    setEditItemDescription('');
+    setEditItemAmount('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setEditItemDescription('');
+    setEditItemAmount('');
   };
 
   const calculateTotal = () => {
@@ -130,7 +161,8 @@ const BillingPage: React.FC = () => {
         paymentMode: paymentMode,
         date: new Date().toISOString(),
         docType: 'Sale',
-        odometerReading: selectedComplaint.odometerReading
+        odometerReading: selectedComplaint.odometerReading,
+        serviceReminderDate: serviceReminderDate || undefined
       });
 
       setCreatedInvoice(newInvoice);
@@ -402,6 +434,19 @@ const BillingPage: React.FC = () => {
                   </div>
                 </>
               )}
+            </div>
+
+            {/* Service Reminder */}
+            <div className="space-y-1.5">
+              <label className="block text-sm font-semibold text-slate-700">Service Reminder (Optional)</label>
+              <Input
+                type="date"
+                value={serviceReminderDate}
+                onChange={(e) => setServiceReminderDate(e.target.value)}
+                icon={<Calendar className="w-5 h-5" />}
+                placeholder="Set reminder date"
+              />
+              <p className="text-xs text-slate-500">Set a date to remind the customer for next service</p>
             </div>
 
             {/* Total */}
