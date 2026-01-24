@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Search, Send, Bike, User, Phone, Calculator } from 'lucide-react';
+import { FileText, Search, Send, Bike, User, Phone, Calculator, Plus } from 'lucide-react';
 import { dbService } from '../db';
 import { Complaint, InventoryItem } from '../types';
 import { Card } from '../components/ui/Card';
@@ -7,7 +7,11 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 
-const EstimatePage: React.FC = () => {
+interface EstimatePageProps {
+  onNavigate?: (tab: string) => void;
+}
+
+const EstimatePage: React.FC<EstimatePageProps> = ({ onNavigate }) => {
   const [jobs, setJobs] = useState<Complaint[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,7 +29,7 @@ const EstimatePage: React.FC = () => {
         dbService.getComplaints(),
         dbService.getInventory()
       ]);
-      setJobs(jobsData.filter(j => j.status !== 'completed'));
+      setJobs(jobsData.filter(j => j.status !== 'Completed'));
       setInventory(inventoryData);
     } catch (err) {
       console.error(err);
@@ -40,8 +44,8 @@ const EstimatePage: React.FC = () => {
   );
 
   const sendEstimate = (job: Complaint) => {
-    const message = `Estimate for ${job.bikeNumber}:\nService: ${job.complaint}\nEstimated Cost: ₹${job.estimatedCost || 0}\n\nThank you! - SRK Bike Service`;
-    const whatsappUrl = `https://wa.me/${job.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+    const message = `Estimate for ${job.bikeNumber}:\nService: ${job.details}\nEstimated Cost: ₹${job.estimatedCost || 0}\n\nThank you! - SRK Bike Service`;
+    const whatsappUrl = `https://wa.me/${job.customerPhone?.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
 
@@ -58,9 +62,17 @@ const EstimatePage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Estimates</h1>
-        <p className="text-sm text-slate-600 mt-1">Create and send job estimates</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Estimates</h1>
+          <p className="text-sm text-slate-600 mt-1">Create and send job estimates</p>
+        </div>
+        {onNavigate && (
+          <Button onClick={() => onNavigate('new_estimate')}>
+            <Plus className="w-5 h-5 mr-2" />
+            New Estimate
+          </Button>
+        )}
       </div>
 
       <Input
@@ -97,13 +109,13 @@ const EstimatePage: React.FC = () => {
                         <User className="w-4 h-4" />
                         <span>{job.customerName}</span>
                       </div>
-                      {job.phone && (
+                      {job.customerPhone && (
                         <div className="flex items-center gap-2">
                           <Phone className="w-4 h-4" />
-                          <span>{job.phone}</span>
+                          <span>{job.customerPhone}</span>
                         </div>
                       )}
-                      <p className="text-slate-700 mt-2">{job.complaint}</p>
+                      <p className="text-slate-700 mt-2">{job.details}</p>
                     </div>
                   </div>
                 </div>

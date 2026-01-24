@@ -172,7 +172,8 @@ const App: React.FC = () => {
       case 'party_statement': return <PartyStatementPage onNavigate={handleNavigate} />;
       case 'sales': return <SalesListPage onNavigate={handleNavigate} />;
       case 'billing': return canAccessRoute(userRole, 'billing') ? <BillingPage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
-      case 'estimate': return <EstimatePage />;
+      case 'new_estimate': return <BillingPage onNavigate={handleNavigate} defaultDocType="Estimate" />;
+      case 'estimate': return <EstimatePage onNavigate={handleNavigate} />;
       case 'purchase': return canAccessRoute(userRole, 'purchase') ? <PurchasePage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
       case 'customers': return canAccessRoute(userRole, 'customers') ? <CustomersPage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
       case 'visitors': return <VisitorsPage onNavigate={handleNavigate} />;

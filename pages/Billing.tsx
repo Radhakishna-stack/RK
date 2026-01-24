@@ -14,9 +14,10 @@ import { AutocompleteDropdown } from '../components/AutocompleteDropdown';
 
 interface BillingPageProps {
   onNavigate: (tab: string) => void;
+  defaultDocType?: 'Sale' | 'Estimate';
 }
 
-const BillingPage: React.FC<BillingPageProps> = ({ onNavigate }) => {
+const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 'Sale' }) => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -117,7 +118,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate }) => {
         }
       } else {
         // Generate invoice number for new invoice
-        const prefix = settings.transaction.prefixes.sale || 'INV-';
+        const prefix = settings.transaction.prefixes[defaultDocType === 'Estimate' ? 'estimate' : 'sale'] || (defaultDocType === 'Estimate' ? 'EST-' : 'INV-');
         setInvoiceNumber(prefix + Date.now());
       }
     } catch (err) {
@@ -286,7 +287,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate }) => {
         accountId: 'CASH-01', // Default account
         paymentMode: cash > 0 && upi > 0 ? 'Cash+UPI' : cash > 0 ? 'Cash' : upi > 0 ? 'UPI' : 'None',
         date: invoiceDate,
-        docType: 'Sale' as const,
+        docType: defaultDocType,
         odometerReading: odometerReading ? parseInt(odometerReading) : undefined,
         serviceReminderDate: serviceReminderDate || undefined,
         paymentCollections: { cash, upi }
@@ -308,10 +309,10 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate }) => {
 
         // Generate new invoice number
         const settings = await dbService.getSettings();
-        const prefix = settings.transaction.prefixes.sale || 'INV-';
+        const prefix = settings.transaction.prefixes[defaultDocType === 'Estimate' ? 'estimate' : 'sale'] || (defaultDocType === 'Estimate' ? 'EST-' : 'INV-');
         setInvoiceNumber(prefix + Date.now());
 
-        alert('Invoice saved! Ready for next sale.');
+        alert(`${defaultDocType} saved! Ready for next.`);
       } else {
         // Show preview
         setSavedInvoice(newInvoice);
@@ -357,7 +358,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate }) => {
 
             // Generate new invoice number
             dbService.getSettings().then(settings => {
-              const prefix = settings.transaction.prefixes.sale || 'INV-';
+              const prefix = settings.transaction.prefixes[defaultDocType === 'Estimate' ? 'estimate' : 'sale'] || (defaultDocType === 'Estimate' ? 'EST-' : 'INV-');
               setInvoiceNumber(prefix + Date.now());
             });
 
@@ -373,10 +374,12 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate }) => {
           {/* Header */}
           <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
             <div className="px-4 py-4 flex items-center gap-3">
-              <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+              <button onClick={() => onNavigate(defaultDocType === 'Estimate' ? 'estimate' : 'home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
                 <ArrowLeft className="w-6 h-6" />
               </button>
-              <h1 className="text-2xl font-bold text-slate-900">Add New Sale</h1>
+              <h1 className="text-2xl font-bold text-slate-900">
+                {defaultDocType === 'Estimate' ? 'Create Estimate' : 'Add New Sale'}
+              </h1>
             </div>
           </div>
 
