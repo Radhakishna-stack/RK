@@ -1,6 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Calendar, Download, TrendingUp, DollarSign, Users, FileText, Filter } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Calendar, Download, TrendingUp, DollarSign, Users, FileText, Filter, ChevronDown, FileSpreadsheet, Printer } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { dbService } from '../db';
 import { Invoice } from '../types';
 import { Card } from '../components/ui/Card';
@@ -16,6 +18,8 @@ const SaleReportPage: React.FC<SaleReportPageProps> = ({ onNavigate }) => {
    const [endDate, setEndDate] = useState('');
    const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'month'>('month');
    const [statusFilter, setStatusFilter] = useState<'all' | 'Paid' | 'Pending' | 'Unpaid'>('all');
+   const [showExportMenu, setShowExportMenu] = useState(false);
+   const exportMenuRef = useRef<HTMLDivElement>(null);
 
    useEffect(() => {
       loadData();
@@ -112,7 +116,121 @@ const SaleReportPage: React.FC<SaleReportPageProps> = ({ onNavigate }) => {
 
    const handlePrint = () => {
       window.print();
+      setShowExportMenu(false);
    };
+
+   const handleExcelExport = () => {
+      const csvHeaders = ['Invoice ID', 'Date', 'Customer Name', 'Bike Number', 'Amount', 'Payment Status', 'Payment Mode'];
+      const csvRows = filteredInvoices.map(inv => [
+         inv.id,
+         new Date(inv.date).toLocaleDateString('en-IN'),
+         inv.customerName,
+         inv.bikeNumber,
+         inv.finalAmount || 0,
+         inv.paymentStatus,
+         inv.paymentMode || 'N/A'
+      ]);
+
+      const csvContent = [
+         csvHeaders.join(','),
+         ...csvRows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `sales_report_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      setShowExportMenu(false);
+   };
+
+   const handlePDFExport = () => {
+      const doc = new jsPDF();
+
+      // Title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Sales Report', 14, 20);
+
+      // Date range
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const dateRange = startDate && endDate
+         ? `${new Date(startDate).toLocaleDateString('en-IN')} to ${new Date(endDate).toLocaleDateString('en-IN')}`
+         : 'All Time';
+      doc.text(`Period: ${dateRange}`, 14, 28);
+
+      // Summary stats box
+      doc.setFillColor(240, 240, 240);
+      doc.rect(14, 35, 180, 30, 'F');
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Summary', 16, 42);
+
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Revenue: ₹${totalRevenue.toLocaleString('en-IN')}`, 16, 48);
+      doc.text(`Collected: ₹${paidAmount.toLocaleString('en-IN')}`, 16, 54);
+      doc.text(`Pending: ₹${pendingAmount.toLocaleString('en-IN')}`, 16, 60);
+      doc.text(`Total Customers: ${totalCustomers}`, 110, 48);
+      doc.text(`Total Invoices: ${filteredInvoices.length}`, 110, 54);
+
+      // Transaction table
+      autoTable(doc, {
+         startY: 72,
+         head: [['Invoice ID', 'Date', 'Customer', 'Bike No.', 'Amount', 'Status']],
+         body: filteredInvoices.map(inv => [
+            inv.id,
+            new Date(inv.date).toLocaleDateString('en-IN'),
+            inv.customerName,
+            inv.bikeNumber,
+            `₹${inv.finalAmount?.toLocaleString('en-IN')}`,
+            inv.paymentStatus
+         ]),
+         headStyles: {
+            fillColor: [59, 130, 246],
+            fontSize: 9,
+            fontStyle: 'bold'
+         },
+         bodyStyles: {
+            fontSize: 8
+         },
+         alternateRowStyles: {
+            fillColor: [248, 250, 252]
+         },
+         margin: { top: 72 }
+      });
+
+      // Footer
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      for (let i = 1; i <= pageCount; i++) {
+         doc.setPage(i);
+         doc.text(
+            `Generated on ${new Date().toLocaleDateString('en-IN')} - Page ${i} of ${pageCount}`,
+            14,
+            doc.internal.pageSize.height - 10
+         );
+      }
+
+      doc.save(`sales_report_${new Date().toISOString().split('T')[0]}.pdf`);
+      setShowExportMenu(false);
+   };
+
+   // Close export menu when clicking outside
+   useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+         if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+            setShowExportMenu(false);
+         }
+      };
+
+      if (showExportMenu) {
+         document.addEventListener('mousedown', handleClickOutside);
+         return () => document.removeEventListener('mousedown', handleClickOutside);
+      }
+   }, [showExportMenu]);
 
    return (
       <div className="min-h-screen bg-slate-50 pb-6">
@@ -125,13 +243,42 @@ const SaleReportPage: React.FC<SaleReportPageProps> = ({ onNavigate }) => {
                   </button>
                   <h1 className="text-xl font-bold text-slate-900">Sales Report</h1>
                </div>
-               <button
-                  onClick={handlePrint}
-                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium shadow-md hover:bg-blue-700 transition-colors"
-               >
-                  <Download className="w-4 h-4" />
-                  Export
-               </button>
+               <div className="relative" ref={exportMenuRef}>
+                  <button
+                     onClick={() => setShowExportMenu(!showExportMenu)}
+                     className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium shadow-md hover:bg-blue-700 transition-colors"
+                  >
+                     <Download className="w-4 h-4" />
+                     Export
+                     <ChevronDown className="w-4 h-4" />
+                  </button>
+
+                  {showExportMenu && (
+                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-20">
+                        <button
+                           onClick={handleExcelExport}
+                           className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-100 transition-colors"
+                        >
+                           <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                           <span className="text-sm font-medium text-slate-900">Excel (CSV)</span>
+                        </button>
+                        <button
+                           onClick={handlePDFExport}
+                           className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 border-b border-slate-100 transition-colors"
+                        >
+                           <FileText className="w-4 h-4 text-red-600" />
+                           <span className="text-sm font-medium text-slate-900">PDF</span>
+                        </button>
+                        <button
+                           onClick={handlePrint}
+                           className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                        >
+                           <Printer className="w-4 h-4 text-slate-600" />
+                           <span className="text-sm font-medium text-slate-900">Print</span>
+                        </button>
+                     </div>
+                  )}
+               </div>
             </div>
 
             {/* Filters */}
@@ -143,8 +290,8 @@ const SaleReportPage: React.FC<SaleReportPageProps> = ({ onNavigate }) => {
                         key={period}
                         onClick={() => setQuickFilter(period)}
                         className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${filter === period
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                           ? 'bg-blue-600 text-white'
+                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                            }`}
                      >
                         {period === 'all' ? 'All Time' : period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month'}
@@ -182,8 +329,8 @@ const SaleReportPage: React.FC<SaleReportPageProps> = ({ onNavigate }) => {
                         key={status}
                         onClick={() => setStatusFilter(status)}
                         className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${statusFilter === status
-                              ? 'bg-slate-900 text-white'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                           ? 'bg-slate-900 text-white'
+                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                            }`}
                      >
                         {status === 'all' ? 'All Status' : status}
@@ -303,8 +450,8 @@ const SaleReportPage: React.FC<SaleReportPageProps> = ({ onNavigate }) => {
                                  <div className="text-right">
                                     <p className="text-sm font-semibold text-slate-900">₹{invoice.finalAmount?.toLocaleString()}</p>
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${invoice.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
-                                          invoice.paymentStatus === 'Pending' ? 'bg-amber-100 text-amber-700' :
-                                             'bg-red-100 text-red-700'
+                                       invoice.paymentStatus === 'Pending' ? 'bg-amber-100 text-amber-700' :
+                                          'bg-red-100 text-red-700'
                                        }`}>
                                        {invoice.paymentStatus}
                                     </span>
