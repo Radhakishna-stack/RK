@@ -9,6 +9,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { InvoicePreview } from '../components/InvoicePreview';
+import { AutocompleteDropdown } from '../components/AutocompleteDropdown';
 
 const BillingPage: React.FC = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -309,7 +310,7 @@ const BillingPage: React.FC = () => {
                 </h2>
 
                 <div className="space-y-3">
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Customer Name *</label>
                     <Input
                       type="text"
@@ -318,9 +319,15 @@ const BillingPage: React.FC = () => {
                       placeholder="Enter customer name"
                       icon={<User className="w-5 h-5" />}
                     />
+                    <AutocompleteDropdown
+                      show={showNameDropdown}
+                      customers={filteredCustomers}
+                      onSelect={selectCustomer}
+                      displayField="name"
+                    />
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Bike Number *</label>
                     <Input
                       type="text"
@@ -329,9 +336,15 @@ const BillingPage: React.FC = () => {
                       placeholder="MH12AB1234"
                       icon={<Bike className="w-5 h-5" />}
                     />
+                    <AutocompleteDropdown
+                      show={showBikeDropdown}
+                      customers={filteredCustomers}
+                      onSelect={selectCustomer}
+                      displayField="bikeNumber"
+                    />
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
                     <Input
                       type="tel"
@@ -339,6 +352,12 @@ const BillingPage: React.FC = () => {
                       onChange={(e) => handlePhoneChange(e.target.value)}
                       placeholder="9876543210"
                       icon={<Phone className="w-5 h-5" />}
+                    />
+                    <AutocompleteDropdown
+                      show={showPhoneDropdown}
+                      customers={filteredCustomers}
+                      onSelect={selectCustomer}
+                      displayField="phone"
                     />
                   </div>
 
