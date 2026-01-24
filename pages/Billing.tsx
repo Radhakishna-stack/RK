@@ -13,6 +13,7 @@ import { InvoicePreview } from '../components/InvoicePreview';
 const BillingPage: React.FC = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Invoice form fields
@@ -52,13 +53,15 @@ const BillingPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [invData, accData, settings] = await Promise.all([
+      const [invData, accData, custData, settings] = await Promise.all([
         dbService.getInventory(),
         dbService.getBankAccounts(),
+        dbService.getCustomers(),
         dbService.getSettings()
       ]);
       setInventory(invData);
       setAccounts(accData);
+      setCustomers(custData);
 
       // Set company info for invoice preview
       setCompanyName(settings.transaction.prefixes.firmName || 'Your Business');
@@ -105,6 +108,38 @@ const BillingPage: React.FC = () => {
 
   const getRemainingBalance = () => {
     return calculateTotal() - calculateTotalCollected();
+  };
+
+  // Auto-fill customer details based on bike number
+  const handleBikeNumberChange = (value: string) => {
+    setBikeNumber(value.toUpperCase());
+    const customer = customers.find(c => c.bikeNumber === value.toUpperCase());
+    if (customer) {
+      setCustomerName(customer.name);
+      setCustomerPhone(customer.phone || '');
+    }
+  };
+
+  // Auto-fill customer details based on customer name
+  const handleCustomerNameChange = (value: string) => {
+    setCustomerName(value);
+    const customer = customers.find(c => c.name.toLowerCase() === value.toLowerCase());
+    if (customer) {
+      setBikeNumber(customer.bikeNumber);
+      setCustomerPhone(customer.phone || '');
+    }
+  };
+
+  // Auto-fill customer details based on phone
+  const handlePhoneChange = (value: string) => {
+    setCustomerPhone(value);
+    if (value.length >= 10) {
+      const customer = customers.find(c => c.phone === value);
+      if (customer) {
+        setCustomerName(customer.name);
+        setBikeNumber(customer.bikeNumber);
+      }
+    }
   };
 
   const handleSave = async (saveAndNew: boolean = false) => {
@@ -279,7 +314,7 @@ const BillingPage: React.FC = () => {
                     <Input
                       type="text"
                       value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
+                      onChange={(e) => handleCustomerNameChange(e.target.value)}
                       placeholder="Enter customer name"
                       icon={<User className="w-5 h-5" />}
                     />
@@ -290,7 +325,7 @@ const BillingPage: React.FC = () => {
                     <Input
                       type="text"
                       value={bikeNumber}
-                      onChange={(e) => setBikeNumber(e.target.value.toUpperCase())}
+                      onChange={(e) => handleBikeNumberChange(e.target.value)}
                       placeholder="MH12AB1234"
                       icon={<Bike className="w-5 h-5" />}
                     />
@@ -301,7 +336,7 @@ const BillingPage: React.FC = () => {
                     <Input
                       type="tel"
                       value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
                       placeholder="9876543210"
                       icon={<Phone className="w-5 h-5" />}
                     />
