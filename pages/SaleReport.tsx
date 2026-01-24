@@ -1,123 +1,335 @@
 
-import React, { useState } from 'react';
-import { ArrowLeft, Calendar, Filter, Share2, ChevronDown, Download } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Calendar, Download, TrendingUp, DollarSign, Users, FileText, Filter } from 'lucide-react';
+import { dbService } from '../db';
+import { Invoice } from '../types';
+import { Card } from '../components/ui/Card';
 
 interface SaleReportPageProps {
-  onNavigate: (tab: string) => void;
+   onNavigate: (tab: string) => void;
 }
 
 const SaleReportPage: React.FC<SaleReportPageProps> = ({ onNavigate }) => {
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+   const [invoices, setInvoices] = useState<Invoice[]>([]);
+   const [loading, setLoading] = useState(true);
+   const [startDate, setStartDate] = useState('');
+   const [endDate, setEndDate] = useState('');
+   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'month'>('month');
+   const [statusFilter, setStatusFilter] = useState<'all' | 'Paid' | 'Pending' | 'Unpaid'>('all');
 
-  return (
-    <div className="flex flex-col h-screen bg-[#F1F7FF] overflow-hidden -mx-4">
-      {/* Header */}
-      <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm z-10 no-print">
-         <div className="flex items-center gap-3">
-            <button onClick={() => onNavigate('home')} className="text-slate-700">
-               <ArrowLeft className="w-6 h-6" />
-            </button>
-            <h1 className="text-lg font-bold text-slate-800">Sale Report</h1>
-         </div>
-         <div className="flex items-center gap-3">
-            <button className="relative w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center">
-               <Share2 className="w-4 h-4 text-white" />
-               <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></div>
-            </button>
-            <button 
-              onClick={() => window.print()}
-              className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center text-white text-[10px] font-bold shadow-md active:scale-95 transition-all"
-            >
-               Pdf
-            </button>
-            <button 
-              onClick={() => window.print()}
-              className="w-8 h-8 bg-green-600 rounded-md flex items-center justify-center text-white text-[10px] font-bold shadow-md active:scale-95 transition-all"
-            >
-               xls
-            </button>
-         </div>
-      </div>
-      
-      {/* Date Filter */}
-      <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-slate-100 no-print">
-         <div className="flex items-center gap-1 text-slate-600 font-bold text-[10px] uppercase">
-            <span>Filter Period</span>
-         </div>
-         <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-               <Calendar className="w-3.5 h-3.5 text-blue-500" />
-               <input 
-                 type="date" 
-                 className="text-[10px] font-bold text-slate-600 bg-slate-50 p-1 rounded border border-slate-100 outline-none"
-                 value={startDate}
-                 onChange={e => setStartDate(e.target.value)}
-               />
-            </div>
-            <span className="text-[10px] font-medium text-slate-400">TO</span>
-            <div className="flex items-center gap-2">
-               <Calendar className="w-3.5 h-3.5 text-blue-500" />
-               <input 
-                 type="date" 
-                 className="text-[10px] font-bold text-slate-600 bg-slate-50 p-1 rounded border border-slate-100 outline-none"
-                 value={endDate}
-                 onChange={e => setEndDate(e.target.value)}
-               />
-            </div>
-         </div>
-      </div>
+   useEffect(() => {
+      loadData();
+   }, []);
 
-      {/* Filters Bar */}
-      <div className="bg-white px-4 py-3 border-t border-slate-100 shadow-sm no-print">
-         <div className="flex justify-between items-center mb-3">
-            <span className="text-sm text-slate-600">Filters Applied:</span>
-            <button className="flex items-center gap-1 border border-blue-200 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">
-               <Filter className="w-3 h-3" /> Filters
-            </button>
-         </div>
-         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-             <FilterChip label="URP User - All Users" />
-             <FilterChip label="Txns Type - Sale & Cr. Note" />
-             <FilterChip label="Party - All Party" />
-         </div>
-      </div>
+   const loadData = async () => {
+      try {
+         const data = await dbService.getInvoices();
+         setInvoices(data);
 
-      {/* Body / Empty State */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#EBF5FF]">
-         <div className="mb-6 relative">
-            <div className="w-24 h-32 bg-white rounded-xl border-2 border-blue-100 transform -rotate-12 absolute -left-6 top-2"></div>
-            <div className="w-24 h-32 bg-white rounded-xl border-2 border-blue-100 transform -rotate-6 absolute -left-2 top-0"></div>
-            <div className="w-24 h-32 bg-white rounded-xl border-2 border-blue-200 relative z-10 flex flex-col p-4 gap-3 shadow-sm">
-               <div className="h-1.5 w-full bg-blue-50 rounded-full"></div>
-               <div className="h-1.5 w-3/4 bg-blue-50 rounded-full"></div>
-               <div className="h-1.5 w-full bg-blue-50 rounded-full"></div>
-               <div className="h-1.5 w-full bg-blue-50 rounded-full"></div>
-               <div className="mt-auto self-end w-4 h-1.5 bg-blue-500 rounded-full"></div>
+         // Set default date range to current month
+         const now = new Date();
+         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+         setStartDate(firstDay.toISOString().split('T')[0]);
+         setEndDate(now.toISOString().split('T')[0]);
+      } catch (error) {
+         console.error('Error loading invoices:', error);
+      } finally {
+         setLoading(false);
+      }
+   };
+
+   const getFilteredInvoices = () => {
+      let filtered = invoices;
+
+      // Apply date filter
+      if (startDate || endDate) {
+         filtered = filtered.filter(inv => {
+            const invDate = new Date(inv.date);
+            const start = startDate ? new Date(startDate) : new Date(0);
+            const end = endDate ? new Date(endDate) : new Date();
+            end.setHours(23, 59, 59, 999);
+
+            return invDate >= start && invDate <= end;
+         });
+      }
+
+      // Apply status filter
+      if (statusFilter !== 'all') {
+         filtered = filtered.filter(inv => inv.paymentStatus === statusFilter);
+      }
+
+      return filtered;
+   };
+
+   const setQuickFilter = (period: 'all' | 'today' | 'week' | 'month') => {
+      setFilter(period);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      switch (period) {
+         case 'today':
+            setStartDate(today.toISOString().split('T')[0]);
+            setEndDate(now.toISOString().split('T')[0]);
+            break;
+         case 'week':
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            setStartDate(weekAgo.toISOString().split('T')[0]);
+            setEndDate(now.toISOString().split('T')[0]);
+            break;
+         case 'month':
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+            setStartDate(firstDay.toISOString().split('T')[0]);
+            setEndDate(now.toISOString().split('T')[0]);
+            break;
+         case 'all':
+            setStartDate('');
+            setEndDate('');
+            break;
+      }
+   };
+
+   const filteredInvoices = getFilteredInvoices();
+
+   // Calculate statistics
+   const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + (inv.finalAmount || 0), 0);
+   const paidAmount = filteredInvoices
+      .filter(inv => inv.paymentStatus === 'Paid')
+      .reduce((sum, inv) => sum + (inv.finalAmount || 0), 0);
+   const pendingAmount = filteredInvoices
+      .filter(inv => inv.paymentStatus === 'Pending' || inv.paymentStatus === 'Unpaid')
+      .reduce((sum, inv) => sum + (inv.finalAmount || 0), 0);
+   const totalCustomers = new Set(filteredInvoices.map(inv => inv.bikeNumber)).size;
+
+   const paidCount = filteredInvoices.filter(inv => inv.paymentStatus === 'Paid').length;
+   const pendingCount = filteredInvoices.filter(inv => inv.paymentStatus === 'Pending').length;
+   const unpaidCount = filteredInvoices.filter(inv => inv.paymentStatus === 'Unpaid').length;
+
+   const formatDate = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+   };
+
+   const handlePrint = () => {
+      window.print();
+   };
+
+   return (
+      <div className="min-h-screen bg-slate-50 pb-6">
+         {/* Header */}
+         <div className="bg-white shadow-sm sticky top-0 z-10 no-print">
+            <div className="flex items-center justify-between p-4">
+               <div className="flex items-center gap-3">
+                  <button onClick={() => onNavigate('home')} className="text-slate-700">
+                     <ArrowLeft className="w-6 h-6" />
+                  </button>
+                  <h1 className="text-xl font-bold text-slate-900">Sales Report</h1>
+               </div>
+               <button
+                  onClick={handlePrint}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium shadow-md hover:bg-blue-700 transition-colors"
+               >
+                  <Download className="w-4 h-4" />
+                  Export
+               </button>
+            </div>
+
+            {/* Filters */}
+            <div className="px-4 pb-3 space-y-3">
+               {/* Quick Filters */}
+               <div className="flex gap-2 overflow-x-auto">
+                  {(['all', 'today', 'week', 'month'] as const).map((period) => (
+                     <button
+                        key={period}
+                        onClick={() => setQuickFilter(period)}
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${filter === period
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                           }`}
+                     >
+                        {period === 'all' ? 'All Time' : period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month'}
+                     </button>
+                  ))}
+               </div>
+
+               {/* Date Range */}
+               <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 flex-1">
+                     <Calendar className="w-4 h-4 text-slate-500" />
+                     <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="flex-1 text-sm px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                     />
+                  </div>
+                  <span className="text-slate-400">to</span>
+                  <div className="flex items-center gap-2 flex-1">
+                     <Calendar className="w-4 h-4 text-slate-500" />
+                     <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="flex-1 text-sm px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                     />
+                  </div>
+               </div>
+
+               {/* Status Filter */}
+               <div className="flex gap-2 overflow-x-auto">
+                  {(['all', 'Paid', 'Pending', 'Unpaid'] as const).map((status) => (
+                     <button
+                        key={status}
+                        onClick={() => setStatusFilter(status)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${statusFilter === status
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                           }`}
+                     >
+                        {status === 'all' ? 'All Status' : status}
+                     </button>
+                  ))}
+               </div>
             </div>
          </div>
-         <h2 className="text-lg font-bold text-slate-700 mb-2 uppercase tracking-tighter">Sale Summary Table</h2>
-         <p className="text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest max-w-xs leading-relaxed">
-           Data Range: {startDate || 'Beginning'} - {endDate || 'Today'}.
-         </p>
-         
-         <div className="mt-8 flex gap-4 no-print">
-            <button 
-              onClick={() => window.print()}
-              className="px-6 py-3 bg-red-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-red-500/20 active:scale-95 transition-all"
-            >
-              <Download className="w-4 h-4" /> Download PDF Report
-            </button>
+
+         {/* Content */}
+         <div className="p-4 space-y-4">
+            {loading ? (
+               <div className="text-center py-12">
+                  <p className="text-slate-500">Loading report data...</p>
+               </div>
+            ) : (
+               <>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                     <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                        <div className="flex items-center gap-3">
+                           <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                              <TrendingUp className="w-6 h-6" />
+                           </div>
+                           <div>
+                              <p className="text-xs text-blue-100 mb-1">Total Revenue</p>
+                              <p className="text-2xl font-bold">₹{totalRevenue.toLocaleString()}</p>
+                           </div>
+                        </div>
+                     </Card>
+
+                     <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
+                        <div className="flex items-center gap-3">
+                           <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                              <DollarSign className="w-6 h-6" />
+                           </div>
+                           <div>
+                              <p className="text-xs text-green-100 mb-1">Collected</p>
+                              <p className="text-2xl font-bold">₹{paidAmount.toLocaleString()}</p>
+                           </div>
+                        </div>
+                     </Card>
+
+                     <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white">
+                        <div className="flex items-center gap-3">
+                           <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                              <FileText className="w-6 h-6" />
+                           </div>
+                           <div>
+                              <p className="text-xs text-amber-100 mb-1">Pending</p>
+                              <p className="text-2xl font-bold">₹{pendingAmount.toLocaleString()}</p>
+                           </div>
+                        </div>
+                     </Card>
+
+                     <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+                        <div className="flex items-center gap-3">
+                           <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                              <Users className="w-6 h-6" />
+                           </div>
+                           <div>
+                              <p className="text-xs text-purple-100 mb-1">Customers</p>
+                              <p className="text-2xl font-bold">{totalCustomers}</p>
+                           </div>
+                        </div>
+                     </Card>
+                  </div>
+
+                  {/* Payment Status Breakdown */}
+                  <Card>
+                     <h3 className="font-bold text-slate-900 mb-3">Payment Status</h3>
+                     <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              <span className="text-sm text-slate-600">Paid</span>
+                           </div>
+                           <div className="text-right">
+                              <p className="text-sm font-semibold text-slate-900">{paidCount} invoices</p>
+                              <p className="text-xs text-green-600">₹{paidAmount.toLocaleString()}</p>
+                           </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                              <span className="text-sm text-slate-600">Pending</span>
+                           </div>
+                           <div className="text-right">
+                              <p className="text-sm font-semibold text-slate-900">{pendingCount} invoices</p>
+                           </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                              <span className="text-sm text-slate-600">Unpaid</span>
+                           </div>
+                           <div className="text-right">
+                              <p className="text-sm font-semibold text-slate-900">{unpaidCount} invoices</p>
+                           </div>
+                        </div>
+                     </div>
+                  </Card>
+
+                  {/* Recent Transactions */}
+                  <Card>
+                     <h3 className="font-bold text-slate-900 mb-3">Recent Transactions ({filteredInvoices.length})</h3>
+                     <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {filteredInvoices.length === 0 ? (
+                           <p className="text-center text-slate-500 py-4">No transactions found for selected period</p>
+                        ) : (
+                           filteredInvoices.slice(0, 50).map((invoice) => (
+                              <div key={invoice.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                                 <div className="flex-1">
+                                    <p className="text-sm font-medium text-slate-900">{invoice.customerName}</p>
+                                    <p className="text-xs text-slate-500">{invoice.bikeNumber} • {formatDate(invoice.date)}</p>
+                                 </div>
+                                 <div className="text-right">
+                                    <p className="text-sm font-semibold text-slate-900">₹{invoice.finalAmount?.toLocaleString()}</p>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${invoice.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
+                                          invoice.paymentStatus === 'Pending' ? 'bg-amber-100 text-amber-700' :
+                                             'bg-red-100 text-red-700'
+                                       }`}>
+                                       {invoice.paymentStatus}
+                                    </span>
+                                 </div>
+                              </div>
+                           ))
+                        )}
+                     </div>
+                  </Card>
+               </>
+            )}
          </div>
+
+         {/* Print Styles */}
+         <style>
+            {`
+          @media print {
+            .no-print {
+              display: none !important;
+            }
+          }
+        `}
+         </style>
       </div>
-    </div>
-  );
+   );
 };
-
-const FilterChip = ({ label }: { label: string }) => (
-  <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap">
-    {label}
-  </span>
-);
 
 export default SaleReportPage;
