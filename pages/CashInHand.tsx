@@ -7,7 +7,11 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 
-const CashInHandPage: React.FC = () => {
+interface CashInHandPageProps {
+   onNavigate: (tab: string) => void;
+}
+
+const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
    const [transactions, setTransactions] = useState<Transaction[]>([]);
    const [loading, setLoading] = useState(true);
    const [isModalOpen, setIsModalOpen] = useState(false);

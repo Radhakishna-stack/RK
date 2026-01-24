@@ -187,6 +187,7 @@ const App: React.FC = () => {
       case 'recycle_bin': return <RecycleBinPage onNavigate={handleNavigate} />;
       case 'salesmen': return <SalesmanTrackingPage onNavigate={handleNavigate} />;
       case 'employee_panel': return <EmployeePanel onNavigate={handleNavigate} userRole={userRole} />;
+      case 'money':
       case 'bank_accounts': return <BankAccountsPage onNavigate={handleNavigate} />;
       case 'cash_in_hand': return <CashInHandPage onNavigate={handleNavigate} />;
       case 'cheques': return <ChequesPage onNavigate={handleNavigate} />;

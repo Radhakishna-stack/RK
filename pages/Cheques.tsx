@@ -8,7 +8,11 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 
-const ChequesPage: React.FC = () => {
+interface ChequesPageProps {
+   onNavigate: (tab: string) => void;
+}
+
+const ChequesPage: React.FC<ChequesPageProps> = ({ onNavigate }) => {
    const [cheques, setCheques] = useState<Transaction[]>([]);
    const [loading, setLoading] = useState(true);
    const [searchTerm, setSearchTerm] = useState('');

@@ -315,6 +315,15 @@ export const dbService = {
     return newTxn;
   },
 
+  updateTransaction: async (id: string, updates: Partial<Transaction>): Promise<void> => {
+    const transactions = await dbService.getTransactions();
+    const index = transactions.findIndex(t => t.id === id);
+    if (index !== -1) {
+      transactions[index] = { ...transactions[index], ...updates };
+      localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(transactions));
+    }
+  },
+
   getCustomerBalance: async (bikeNumber: string, customerName: string): Promise<number> => {
     const invoices = await dbService.getInvoices();
     const txns = await dbService.getTransactions();
