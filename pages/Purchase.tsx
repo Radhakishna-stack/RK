@@ -20,12 +20,22 @@ interface PurchasePageProps {
 
 const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
    const [inventory, setInventory] = useState<InventoryItem[]>([]);
+   // Suppliers are Customers in reusing the type, but might be just names manually
    const [suppliers, setSuppliers] = useState<Customer[]>([]);
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [loading, setLoading] = useState(true);
-   const [selectedSupplier, setSelectedSupplier] = useState('');
+
+   // Form State
+   const [supplierName, setSupplierName] = useState('');
+   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+   const [filteredSuppliers, setFilteredSuppliers] = useState<Customer[]>([]);
+
    const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
-   const [selectedItem, setSelectedItem] = useState('');
+
+   // Item Selection State
+   const [selectedItemId, setSelectedItemId] = useState('');
+   const [manualItem, setManualItem] = useState({ name: '', price: '', quantity: '1' });
+   const [useManualItem, setUseManualItem] = useState(false);
 
    useEffect(() => {
       loadData();
@@ -47,18 +57,45 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
       }
    };
 
-   const addItem = () => {
-      if (!selectedItem) return;
-      const item = inventory.find(i => i.id === selectedItem);
-      if (!item) return;
+   const handleSupplierSearch = (val: string) => {
+      setSupplierName(val);
+      if (val.trim()) {
+         const filtered = suppliers.filter(s => s.name.toLowerCase().includes(val.toLowerCase()));
+         setFilteredSuppliers(filtered);
+         setShowSupplierDropdown(filtered.length > 0);
+      } else {
+         setShowSupplierDropdown(false);
+      }
+   };
 
-      setPurchaseItems([...purchaseItems, {
-         itemId: item.id,
-         name: item.name,
-         quantity: 1,
-         purchasePrice: item.purchasePrice || 0
-      }]);
-      setSelectedItem('');
+   const selectSupplier = (supplier: Customer) => {
+      setSupplierName(supplier.name);
+      setShowSupplierDropdown(false);
+   };
+
+   const addItem = () => {
+      if (useManualItem) {
+         if (!manualItem.name || !manualItem.price) return;
+         setPurchaseItems([...purchaseItems, {
+            itemId: 'MANUAL-' + Date.now(),
+            name: manualItem.name,
+            quantity: parseInt(manualItem.quantity) || 1,
+            purchasePrice: parseFloat(manualItem.price) || 0
+         }]);
+         setManualItem({ name: '', price: '', quantity: '1' });
+      } else {
+         if (!selectedItemId) return;
+         const item = inventory.find(i => i.id === selectedItemId);
+         if (!item) return;
+
+         setPurchaseItems([...purchaseItems, {
+            itemId: item.id,
+            name: item.name,
+            quantity: 1,
+            purchasePrice: item.purchasePrice || 0
+         }]);
+         setSelectedItemId('');
+      }
    };
 
    const updateQuantity = (index: number, quantity: number) => {
@@ -80,32 +117,40 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
    const totalAmount = purchaseItems.reduce((sum, item) => sum + (item.quantity * item.purchasePrice), 0);
 
    const completePurchase = async () => {
-      if (!selectedSupplier || purchaseItems.length === 0) {
-         alert('Please select supplier and add items');
+      if (!supplierName || purchaseItems.length === 0) {
+         alert('Please enter supplier and add items');
          return;
       }
 
       try {
-         // Update inventory quantities
+         // Update inventory quantities ONLY for existing items
          for (const item of purchaseItems) {
-            const inventoryItem = inventory.find(i => i.id === item.itemId);
-            if (inventoryItem) {
-               await dbService.updateStock(item.itemId, item.quantity, 'Purchase');
+            // Check if it's a real inventory item (not manual)
+            // We assume manual items start with MANUAL-
+            if (!item.itemId.startsWith('MANUAL-')) {
+               const inventoryItem = inventory.find(i => i.id === item.itemId);
+               // Double check
+               if (inventoryItem) {
+                  await dbService.updateStock(item.itemId, item.quantity, 'Purchase');
+               }
             }
          }
+
+         // Construct detailed description
+         const itemDetails = purchaseItems.map(i => `${i.name} (${i.quantity} x ${i.purchasePrice})`).join(', ');
 
          // Record transaction
          await dbService.addTransaction({
             type: 'purchase',
             amount: totalAmount,
             category: 'Inventory Purchase',
-            description: `Purchase from ${suppliers.find(s => s.id === selectedSupplier)?.name}`,
+            description: `Purchase from ${supplierName}: ${itemDetails}`,
             date: new Date().toISOString()
          });
 
          alert('Purchase recorded successfully!');
          setPurchaseItems([]);
-         setSelectedSupplier('');
+         setSupplierName('');
          setIsModalOpen(false);
          loadData();
       } catch (err) {
@@ -136,7 +181,11 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
                   <p className="text-sm text-slate-600 mt-1">Record stock purchases</p>
                </div>
             </div>
-            <Button onClick={() => setIsModalOpen(true)}>
+            <Button onClick={() => {
+               setIsModalOpen(true);
+               setSupplierName('');
+               setPurchaseItems([]);
+            }}>
                <Plus className="w-5 h-5 mr-2" />
                New Purchase
             </Button>
@@ -157,37 +206,89 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
             size="md"
          >
             <div className="space-y-4">
-               <div className="space-y-1.5">
+               <div className="space-y-1.5 relative">
                   <label className="block text-sm font-semibold text-slate-700">Supplier</label>
-                  <select
-                     value={selectedSupplier}
-                     onChange={(e) => setSelectedSupplier(e.target.value)}
-                     className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                     <option value="">Select supplier</option>
-                     {suppliers.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                     ))}
-                  </select>
+                  <Input
+                     type="text"
+                     placeholder="Search or Enter Supplier Name..."
+                     value={supplierName}
+                     onChange={(e) => handleSupplierSearch(e.target.value)}
+                  />
+                  {/* Using custom render for Suppliers since they reuse Customer type but logic handles string input */}
+                  {showSupplierDropdown && (
+                     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {filteredSuppliers.map(s => (
+                           <div
+                              key={s.id}
+                              onClick={() => selectSupplier(s)}
+                              className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                           >
+                              {s.name}
+                           </div>
+                        ))}
+                     </div>
+                  )}
                </div>
 
-               <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">Add Items</label>
-                  <div className="flex gap-2">
-                     <select
-                        value={selectedItem}
-                        onChange={(e) => setSelectedItem(e.target.value)}
-                        className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+               <div className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div className="flex justify-between items-center mb-2">
+                     <label className="block text-sm font-semibold text-slate-700">Add Items</label>
+                     <button
+                        onClick={() => setUseManualItem(!useManualItem)}
+                        className="text-xs text-blue-600 font-bold hover:underline"
                      >
-                        <option value="">Select item</option>
-                        {inventory.map(item => (
-                           <option key={item.id} value={item.id}>{item.name}</option>
-                        ))}
-                     </select>
-                     <Button onClick={addItem} disabled={!selectedItem}>
-                        <Plus className="w-5 h-5" />
-                     </Button>
+                        {useManualItem ? 'Switch to Inventory Item' : 'Add Manual Item'}
+                     </button>
                   </div>
+
+                  {useManualItem ? (
+                     <div className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-5">
+                           <Input
+                              placeholder="Item Name"
+                              value={manualItem.name}
+                              onChange={(e) => setManualItem({ ...manualItem, name: e.target.value })}
+                           />
+                        </div>
+                        <div className="col-span-3">
+                           <Input
+                              type="number"
+                              placeholder="Price"
+                              value={manualItem.price}
+                              onChange={(e) => setManualItem({ ...manualItem, price: e.target.value })}
+                           />
+                        </div>
+                        <div className="col-span-2">
+                           <Input
+                              type="number"
+                              placeholder="Qty"
+                              value={manualItem.quantity}
+                              onChange={(e) => setManualItem({ ...manualItem, quantity: e.target.value })}
+                           />
+                        </div>
+                        <div className="col-span-2">
+                           <Button onClick={addItem} className="w-full">
+                              <Plus className="w-5 h-5" />
+                           </Button>
+                        </div>
+                     </div>
+                  ) : (
+                     <div className="flex gap-2">
+                        <select
+                           value={selectedItemId}
+                           onChange={(e) => setSelectedItemId(e.target.value)}
+                           className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                           <option value="">Select inventory item...</option>
+                           {inventory.map(item => (
+                              <option key={item.id} value={item.id}>{item.name} - (Stock: {item.stock})</option>
+                           ))}
+                        </select>
+                        <Button onClick={addItem} disabled={!selectedItemId}>
+                           <Plus className="w-5 h-5" />
+                        </Button>
+                     </div>
+                  )}
                </div>
 
                {purchaseItems.length > 0 && (
@@ -242,7 +343,7 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
                   </Button>
                   <Button
                      onClick={completePurchase}
-                     disabled={!selectedSupplier || purchaseItems.length === 0}
+                     disabled={!supplierName || purchaseItems.length === 0}
                      className="flex-1"
                   >
                      <Check className="w-4 h-4 mr-1" />
