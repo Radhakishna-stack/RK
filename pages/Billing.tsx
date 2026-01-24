@@ -54,6 +54,10 @@ const BillingPage: React.FC = () => {
   const [showPhoneDropdown, setShowPhoneDropdown] = useState(false);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
 
+  // UX state
+  const [isSaving, setIsSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
+
   useEffect(() => {
     loadData();
   }, []);
@@ -201,10 +205,21 @@ const BillingPage: React.FC = () => {
   }, []);
 
   const handleSave = async (saveAndNew: boolean = false) => {
+    // Validate required fields
     if (!customerName || !bikeNumber || invoiceItems.length === 0) {
+      setValidationErrors({
+        customerName: !customerName ? 'Required' : '',
+        bikeNumber: !bikeNumber ? 'Required' : '',
+        items: invoiceItems.length === 0 ? 'Add at least one item' : ''
+      });
       alert('Please fill in customer details and add at least one item');
       return;
     }
+
+    // Prevent double submission
+    if (isSaving) return;
+
+    setIsSaving(true);
 
     try {
       // Use memoized values instead of calling functions
@@ -268,6 +283,8 @@ const BillingPage: React.FC = () => {
     } catch (err) {
       console.error(err);
       alert('Failed to save invoice. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -578,19 +595,19 @@ const BillingPage: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={() => handleSave(true)}
-                  disabled={!customerName || !bikeNumber || invoiceItems.length === 0}
+                  disabled={!customerName || !bikeNumber || invoiceItems.length === 0 || isSaving}
                   className="w-full"
                 >
                   <Save className="w-4 h-4 mr-2" />
-                  Save & New
+                  {isSaving ? 'Saving...' : 'Save & New'}
                 </Button>
                 <Button
                   onClick={() => handleSave(false)}
-                  disabled={!customerName || !bikeNumber || invoiceItems.length === 0}
+                  disabled={!customerName || !bikeNumber || invoiceItems.length === 0 || isSaving}
                   className="w-full"
                 >
                   <Save className="w-4 h-4 mr-2" />
-                  Save
+                  {isSaving ? 'Saving...' : 'Save'}
                 </Button>
               </div>
             </div>

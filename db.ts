@@ -117,6 +117,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   accounting: { enabled: false, allowJournalEntries: false }
 };
 
+// Helper function to generate unique IDs with random component
+const generateUniqueId = (prefix: string): string => {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return `${prefix}${timestamp}${random}`;
+};
+
 // Helper function to create or update customer records
 const upsertCustomer = async (customerData: {
   customerName: string;
@@ -140,7 +147,7 @@ const upsertCustomer = async (customerData: {
   } else {
     // Create new customer record
     currentCustomers.push({
-      id: 'C' + Date.now(),
+      id: generateUniqueId('C'),
       name: customerData.customerName,
       bikeNumber: customerData.bikeNumber.toUpperCase(),
       phone: customerData.customerPhone || '',
