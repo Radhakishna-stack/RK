@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Building, Phone, Calculator, Check, ArrowLeft, Edit2, AlertTriangle, Save } from 'lucide-react';
+import { Plus, Package, Building, Phone, Calculator, Check, ArrowLeft, Edit2, AlertTriangle, Save, Trash2 } from 'lucide-react';
 import { dbService } from '../db';
 import { InventoryItem, Customer, Transaction } from '../types';
 import { Card } from '../components/ui/Card';
@@ -194,6 +194,17 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
       }
    };
 
+   const handleDeleteTransaction = async (id: string) => {
+      if (confirm('Are you sure you want to delete this purchase record? Note: This will NOT revert stock changes.')) {
+         try {
+            await dbService.deleteTransaction(id);
+            loadData();
+         } catch (err) {
+            alert('Failed to delete transaction');
+         }
+      }
+   };
+
    if (loading) {
       return (
          <div className="flex items-center justify-center min-h-screen">
@@ -263,6 +274,12 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
                                     className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded flex items-center gap-1"
                                  >
                                     <Edit2 className="w-3 h-3" /> Edit
+                                 </button>
+                                 <button
+                                    onClick={() => handleDeleteTransaction(txn.id)}
+                                    className="text-xs text-red-600 hover:bg-red-50 px-2 py-1 rounded flex items-center gap-1"
+                                 >
+                                    <Trash2 className="w-3 h-3" /> Delete
                                  </button>
                               </div>
                            </div>
