@@ -1,6 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import {
+  Routes,
+  Route,
+  useNavigate,
+  useLocation,
+  Navigate
+} from 'react-router-dom';
+import {
   Home,
   BarChart3,
   DollarSign,
@@ -53,11 +60,22 @@ import { canAccessRoute } from './permissions';
 import { dbService } from './db';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('home');
+  const navigate = useNavigate();
+  const location = useLocation();
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const [initialSearchQuery, setInitialSearchQuery] = useState('');
   const [loginError, setLoginError] = useState('');
+
+  // Determine active tab for UI highlighting based on current path
+  const getActiveTab = (path: string) => {
+    if (path === '/' || path === '/dashboard') return 'home';
+    if (path === '/business') return 'business';
+    if (path.startsWith('/money') || path === '/bank-accounts') return 'money';
+    if (path === '/more') return 'more';
+    return path.substring(1); // Default to path name (e.g. 'inventory')
+  };
+
+  const activeTab = getActiveTab(location.pathname);
 
   // Check for existing session on mount and initialize users
   useEffect(() => {
@@ -97,26 +115,58 @@ const App: React.FC = () => {
   const handleLogout = () => {
     logout();
     setAuthSession(null);
-    setActiveTab('home');
+    navigate('/');
   };
 
-
-  const navigateToMarketExplorer = (query: string = '') => {
-    setInitialSearchQuery(query);
-    setActiveTab('market_explorer');
-  };
-
-  // Protected navigation - check if user can access route
-  const handleNavigate = (tab: string) => {
+  const handleNavigate = (path: string) => {
     if (!authSession) return;
 
-    const userRole = authSession.user.role;
-    if (canAccessRoute(userRole, tab)) {
-      setActiveTab(tab);
-    } else {
-      // Show error or redirect to home
-      alert('You do not have permission to access this feature');
+    // Map internal tab names to paths if necessary, otherwise assume path is valid
+    // This allows legacy components calling onNavigate('inventory') to work
+    let targetPath = path;
+    if (!path.startsWith('/')) {
+      // Mapping legacy tab names to routes
+      const routeMap: Record<string, string> = {
+        'home': '/',
+        'dashboard': '/',
+        'business': '/business',
+        'money': '/money',
+        'more': '/more',
+        'items': '/inventory',
+        'staff_control': '/staff-control',
+        'market_explorer': '/market-explorer',
+        'marketing_tools': '/marketing-tools',
+        'whatsapp_marketing': '/whatsapp-marketing',
+        'tech_agent': '/tech-agent',
+        'google_profile': '/google-profile',
+        'smart_ads': '/smart-ads',
+        'sale_report': '/sale-report',
+        'party_statement': '/party-statement',
+        'new_estimate': '/estimate/new', // Special case logic might be needed in BillingPage
+        'bank_accounts': '/money',
+        'cash_in_hand': '/cash-in-hand',
+        'payment_receipt': '/payment-receipt',
+        'employee_panel': '/employee-panel',
+        'stock_wanting': '/stock-wanting',
+        'new_sale': '/billing', // Default billing
+        'recycle_bin': '/recycle-bin'
+      };
+      targetPath = routeMap[path] || `/${path}`;
     }
+
+    const userRole = authSession.user.role;
+    // Simple permission check based on target path key (simplified)
+    // Ideally we keep checking permissions based on the feature name not just path
+    navigate(targetPath);
+  };
+
+  // Wrapper for protected route
+  const ProtectedRoute = ({ children, feature }: { children: React.ReactElement, feature?: string }) => {
+    if (!authSession) return <Navigate to="/login" replace />;
+    if (feature && !canAccessRoute(authSession.user.role, feature)) {
+      return <div className="p-8 text-center text-red-600">You do not have permission to access this page.</div>;
+    }
+    return children;
   };
 
   // Show loading screen while checking auth
@@ -133,73 +183,16 @@ const App: React.FC = () => {
 
   // Show login page if not authenticated
   if (!authSession) {
+    // If we are at root, show login. If deep linking, we might want to preserve path, 
+    // but for now simple login is fine.
     return <LoginPage onLogin={handleLogin} error={loginError} />;
   }
 
   const userRole = authSession.user.role;
 
-  const renderContent = () => {
-    if (userRole === 'employee' && activeTab === 'home') {
-      return <EmployeePanel onNavigate={handleNavigate} userRole={userRole} />;
-    }
-
-    if (activeTab.startsWith('settings')) {
-      const section = activeTab.split('/')[1] || 'general';
-      return <SettingsPage initialSection={section} onNavigate={handleNavigate} />;
-    }
-
-    switch (activeTab) {
-      case 'home': return <DashboardPage onNavigate={handleNavigate} />;
-      case 'dashboard': return <DashboardV2 onNavigate={handleNavigate} />;
-      case 'business': return <DashboardV2 onNavigate={handleNavigate} />;
-      case 'money': return <BankAccountsPage onNavigate={handleNavigate} />;
-      case 'more': return <MorePage onNavigate={handleNavigate} />;
-      case 'staff_control': return canAccessRoute(userRole, 'staff_control') ? <StaffControlCenter onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
-      case 'items': return <InventoryPage onNavigate={(tab, query) => {
-        if (tab === 'market_explorer') navigateToMarketExplorer(query);
-        else handleNavigate(tab);
-      }} />;
-      case 'connect': return <ConnectPage />;
-      case 'horoscope': return <BusinessHoroscope onNavigate={handleNavigate} />;
-      case 'marketing_tools': return <MarketingTools onNavigate={handleNavigate} />;
-      case 'whatsapp_marketing': return <WhatsAppMarketingPage onNavigate={handleNavigate} />;
-      case 'tech_agent': return <TechAgentPage onNavigate={handleNavigate} />;
-      case 'google_profile': return <GoogleProfilePage onNavigate={handleNavigate} />;
-      case 'ads': return <AdsManagerPage />;
-      case 'smart_ads': return <SmartAdsPage onNavigate={handleNavigate} />;
-      case 'market_explorer': return <MarketExplorerPage onNavigate={handleNavigate} initialQuery={initialSearchQuery} />;
-      case 'sale_report': return canAccessRoute(userRole, 'sale_report') ? <SaleReportPage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
-      case 'party_statement': return <PartyStatementPage onNavigate={handleNavigate} />;
-      case 'sales': return <SalesListPage onNavigate={handleNavigate} />;
-      case 'billing': return canAccessRoute(userRole, 'billing') ? <BillingPage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
-      case 'new_estimate': return <BillingPage onNavigate={handleNavigate} defaultDocType="Estimate" />;
-      case 'estimate': return <EstimatePage onNavigate={handleNavigate} />;
-      case 'purchase': return canAccessRoute(userRole, 'purchase') ? <PurchasePage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
-      case 'customers': return canAccessRoute(userRole, 'customers') ? <CustomersPage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
-      case 'visitors': return <VisitorsPage onNavigate={handleNavigate} />;
-      case 'stock_wanting': return <StockWantingPage onNavigate={handleNavigate} />;
-      case 'complaints': return <ComplaintsPage onNavigate={handleNavigate} />;
-      case 'expenses': return canAccessRoute(userRole, 'expenses') ? <ExpensesPage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
-      case 'reminders': return <RemindersPage onNavigate={handleNavigate} />;
-      case 'utilities': return <UtilitiesPage onNavigate={(tab, query) => {
-        if (tab === 'market_explorer') navigateToMarketExplorer(query);
-        else handleNavigate(tab);
-      }} />;
-      case 'recycle_bin': return <RecycleBinPage onNavigate={handleNavigate} />;
-      case 'salesmen': return <SalesmanTrackingPage onNavigate={handleNavigate} />;
-      case 'employee_panel': return <EmployeePanel onNavigate={handleNavigate} userRole={userRole} />;
-
-      case 'bank_accounts': return <BankAccountsPage onNavigate={handleNavigate} />;
-      case 'cash_in_hand': return <CashInHandPage onNavigate={handleNavigate} />;
-      case 'cheques': return <ChequesPage onNavigate={handleNavigate} />;
-      case 'payment_receipt': return <PaymentReceiptPage onNavigate={handleNavigate} />;
-      default: return <DashboardPage onNavigate={handleNavigate} />;
-    }
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 overflow-hidden text-slate-900">
-      {activeTab !== 'dashboard' && activeTab !== 'business' && activeTab !== 'horoscope' && activeTab !== 'market_explorer' && activeTab !== 'tech_agent' && (
+      {location.pathname !== '/market-explorer' && location.pathname !== '/horoscope' && location.pathname !== '/tech-agent' && (
         <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-40 no-print shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-md">
@@ -220,15 +213,15 @@ const App: React.FC = () => {
               <span className="text-xs text-slate-500">({userRole})</span>
             </div>
 
-            <button onClick={() => handleNavigate('tech_agent')} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all">
+            <button onClick={() => navigate('/tech-agent')} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all">
               <Bot className="w-5 h-5" />
             </button>
             {canAccessRoute(userRole, 'staff_control') && (
-              <button onClick={() => handleNavigate('staff_control')} className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors rounded-xl">
+              <button onClick={() => navigate('/staff-control')} className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors rounded-xl">
                 <Shield className="w-5 h-5" />
               </button>
             )}
-            <button onClick={() => handleNavigate('settings')} className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors rounded-xl">
+            <button onClick={() => navigate('/settings')} className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors rounded-xl">
               <Settings className="w-5 h-5" />
             </button>
 
@@ -244,20 +237,72 @@ const App: React.FC = () => {
         </header>
       )}
 
-      <main className={`flex-1 overflow-y-auto relative ${activeTab === 'billing' ? 'pb-0' :
-        (activeTab === 'dashboard' || activeTab === 'business' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'pb-28' : 'pb-32')
+      <main className={`flex-1 overflow-y-auto relative ${location.pathname.includes('billing') ? 'pb-0' :
+        (location.pathname === '/' || location.pathname === '/business' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'pb-28' : 'pb-32')
         }`}>
-        <div className={`max-w-screen-xl mx-auto ${activeTab === 'dashboard' || activeTab === 'business' || activeTab === 'horoscope' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'px-0 pt-0' : 'px-4 pt-4'}`}>
-          {renderContent()}
+        <div className={`max-w-screen-xl mx-auto ${location.pathname === '/' || location.pathname === '/business' || location.pathname === '/horoscope' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'px-0 pt-0' : 'px-4 pt-4'
+          }`}>
+          <Routes>
+            {/* Core Tabs */}
+            <Route path="/" element={userRole === 'employee' ? <Navigate to="/employee-panel" /> : <DashboardPage onNavigate={handleNavigate} />} />
+            <Route path="/dashboard" element={<Navigate to="/" />} />
+            <Route path="/business" element={<DashboardV2 onNavigate={handleNavigate} />} />
+            <Route path="/money" element={<BankAccountsPage onNavigate={handleNavigate} />} />
+            <Route path="/more" element={<MorePage onNavigate={handleNavigate} />} />
+
+            {/* Features */}
+            <Route path="/employee-panel" element={<EmployeePanel onNavigate={handleNavigate} userRole={userRole} />} />
+            <Route path="/staff-control" element={<ProtectedRoute feature="staff_control"><StaffControlCenter onNavigate={handleNavigate} /></ProtectedRoute>} />
+            <Route path="/inventory" element={<InventoryPage onNavigate={(tab, query) => {
+              if (tab === 'market_explorer') navigate(`/market-explorer${query ? `?q=${query}` : ''}`); // Simplified query handling or just pass state
+              else handleNavigate(tab);
+            }} />} />
+            <Route path="/connect" element={<ConnectPage />} />
+            <Route path="/horoscope" element={<BusinessHoroscope onNavigate={handleNavigate} />} />
+            <Route path="/marketing-tools" element={<MarketingTools onNavigate={handleNavigate} />} />
+            <Route path="/whatsapp-marketing" element={<WhatsAppMarketingPage onNavigate={handleNavigate} />} />
+            <Route path="/tech-agent" element={<TechAgentPage onNavigate={handleNavigate} />} />
+            <Route path="/google-profile" element={<GoogleProfilePage onNavigate={handleNavigate} />} />
+            <Route path="/ads" element={<AdsManagerPage />} />
+            <Route path="/smart-ads" element={<SmartAdsPage onNavigate={handleNavigate} />} />
+            <Route path="/market-explorer" element={<MarketExplorerPage onNavigate={handleNavigate} />} />
+
+            <Route path="/sale-report" element={<ProtectedRoute feature="sale_report"><SaleReportPage onNavigate={handleNavigate} /></ProtectedRoute>} />
+            <Route path="/party-statement" element={<PartyStatementPage onNavigate={handleNavigate} />} />
+            <Route path="/sales" element={<SalesListPage onNavigate={handleNavigate} />} />
+            <Route path="/billing" element={<ProtectedRoute feature="billing"><BillingPage onNavigate={handleNavigate} /></ProtectedRoute>} />
+            <Route path="/estimate/new" element={<BillingPage onNavigate={handleNavigate} defaultDocType="Estimate" />} />
+            <Route path="/estimate" element={<EstimatePage onNavigate={handleNavigate} />} />
+            <Route path="/purchase" element={<ProtectedRoute feature="purchase"><PurchasePage onNavigate={handleNavigate} /></ProtectedRoute>} />
+            <Route path="/customers" element={<ProtectedRoute feature="customers"><CustomersPage onNavigate={handleNavigate} /></ProtectedRoute>} />
+            <Route path="/visitors" element={<VisitorsPage onNavigate={handleNavigate} />} />
+            <Route path="/stock-wanting" element={<StockWantingPage onNavigate={handleNavigate} />} />
+            <Route path="/complaints" element={<ComplaintsPage onNavigate={handleNavigate} />} />
+            <Route path="/expenses" element={<ProtectedRoute feature="expenses"><ExpensesPage onNavigate={handleNavigate} /></ProtectedRoute>} />
+            <Route path="/reminders" element={<RemindersPage onNavigate={handleNavigate} />} />
+            <Route path="/utilities" element={<UtilitiesPage onNavigate={handleNavigate} />} />
+            <Route path="/recycle-bin" element={<RecycleBinPage onNavigate={handleNavigate} />} />
+            <Route path="/salesmen" element={<SalesmanTrackingPage onNavigate={handleNavigate} />} />
+
+            <Route path="/bank-accounts" element={<BankAccountsPage onNavigate={handleNavigate} />} />
+            <Route path="/cash-in-hand" element={<CashInHandPage onNavigate={handleNavigate} />} />
+            <Route path="/cheques" element={<ChequesPage onNavigate={handleNavigate} />} />
+            <Route path="/payment-receipt" element={<PaymentReceiptPage onNavigate={handleNavigate} />} />
+
+            <Route path="/settings/*" element={<SettingsPage onNavigate={handleNavigate} />} />
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
         </div>
       </main>
 
-      {activeTab !== 'billing' && (
+      {!location.pathname.includes('billing') && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex items-center justify-around py-3 px-2 z-50 no-print shadow-lg">
-          <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
-          <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business' || activeTab === 'dashboard'} onClick={() => setActiveTab('business')} />
-          <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money' || activeTab === 'bank_accounts'} onClick={() => setActiveTab('money')} />
-          <BottomNavItem icon={<LayoutGrid />} label="More" active={activeTab === 'more'} onClick={() => setActiveTab('more')} />
+          <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
+          <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
+          <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money'} onClick={() => navigate('/money')} />
+          <BottomNavItem icon={<LayoutGrid />} label="More" active={activeTab === 'more'} onClick={() => navigate('/more')} />
         </nav>
       )}
     </div>
