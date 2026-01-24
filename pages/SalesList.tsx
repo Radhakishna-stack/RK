@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Search, Filter, Eye, Edit, Calendar } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Filter, Eye, Edit, Calendar, X } from 'lucide-react';
 import { dbService } from '../db';
 import { Invoice } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { InvoicePreview } from '../components/InvoicePreview';
 
 interface SalesListPageProps {
     onNavigate: (tab: string) => void;
@@ -16,6 +17,13 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
+    // View invoice modal state
+    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+    const [showPreview, setShowPreview] = useState(false);
+    const [companyName, setCompanyName] = useState('');
+    const [companyAddress, setCompanyAddress] = useState('');
+    const [companyPhone, setCompanyPhone] = useState('');
+
     useEffect(() => {
         loadInvoices();
     }, []);
@@ -24,11 +32,29 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
         try {
             const data = await dbService.getInvoices();
             setInvoices(data);
+
+            // Load company settings for invoice preview
+            const settings = await dbService.getSettings();
+            setCompanyName(settings.general.firmName);
+            setCompanyAddress(settings.general.businessAddress);
+            setCompanyPhone(settings.general.businessPhone);
         } catch (error) {
             console.error('Error loading invoices:', error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleViewInvoice = (invoice: Invoice) => {
+        setSelectedInvoice(invoice);
+        setShowPreview(true);
+    };
+
+    const handleEditInvoice = (invoice: Invoice) => {
+        // For now, just navigate to billing - in future we can pass invoice ID for editing
+        alert('Edit functionality coming soon! For now, you can create a new sale.');
+        // TODO: Navigate to billing with invoice data pre-filled
+        // onNavigate('billing', { invoiceId: invoice.id });
     };
 
     const getFilteredInvoices = () => {
@@ -212,11 +238,17 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
 
                             {/* Actions */}
                             <div className="flex gap-2 pt-3 border-t border-slate-100">
-                                <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
+                                <button
+                                    onClick={() => handleViewInvoice(invoice)}
+                                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+                                >
                                     <Eye className="w-4 h-4" />
                                     View
                                 </button>
-                                <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                                <button
+                                    onClick={() => handleEditInvoice(invoice)}
+                                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                >
                                     <Edit className="w-4 h-4" />
                                     Edit
                                 </button>
@@ -246,6 +278,29 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
                                 {filteredInvoices.filter(inv => inv.paymentStatus === 'Paid').length}
                             </p>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Invoice Preview Modal */}
+            {showPreview && selectedInvoice && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto">
+                        <InvoicePreview
+                            invoice={selectedInvoice}
+                            onClose={() => {
+                                setShowPreview(false);
+                                setSelectedInvoice(null);
+                            }}
+                            onNewSale={() => {
+                                setShowPreview(false);
+                                setSelectedInvoice(null);
+                                onNavigate('billing');
+                            }}
+                            companyName={companyName}
+                            companyAddress={companyAddress}
+                            companyPhone={companyPhone}
+                        />
                     </div>
                 </div>
             )}
