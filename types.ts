@@ -403,3 +403,42 @@ export interface AppSettings {
     allowJournalEntries: boolean;
   };
 }
+
+// Authentication & Authorization Types
+export type UserRole = 'admin' | 'employee' | 'manager';
+
+export interface User {
+  id: string;
+  username: string;
+  password: string;
+  role: UserRole;
+  name: string;
+  phone?: string;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface AuthSession {
+  user: Omit<User, 'password'>;
+  loginTime: string;
+}
+
+export interface RolePermissions {
+  canViewSales: boolean;
+  canCreateSales: boolean;
+  canEditSales: boolean;
+  canDeleteSales: boolean;
+  canViewReports: boolean;
+  canManageInventory: boolean;
+  canManageCustomers: boolean;
+  canManageExpenses: boolean;
+  canViewSettings: boolean;
+  canManageSettings: boolean;
+  canManageStaff: boolean;
+  canManageUsers: boolean;
+  canViewComplaints: boolean;
+  canEditComplaints: boolean;
+  canAccessBilling: boolean;
+  canAccessPurchase: boolean;
+  canAccessAnalytics: boolean;
+}

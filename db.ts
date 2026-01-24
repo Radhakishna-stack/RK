@@ -1,6 +1,7 @@
 
-import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, PickupBooking, PickupSlot, StaffLocation, PickupStatus, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount } from './types';
+import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, PickupBooking, PickupSlot, StaffLocation, PickupStatus, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
+import { encryptPassword } from './auth';
 
 const LS_KEYS = {
   CUSTOMERS: 'mg_customers',
@@ -20,7 +21,8 @@ const LS_KEYS = {
   WA_STATUS: 'mg_wa_status',
   STAFF_LOCS: 'mg_staff_locs',
   RECYCLE_BIN: 'mg_recycle_bin',
-  BANK_ACCOUNTS: 'mg_bank_accounts'
+  BANK_ACCOUNTS: 'mg_bank_accounts',
+  USERS: 'mg_users'
 };
 
 const DEFAULT_BANK: BankAccount = {
@@ -861,5 +863,93 @@ export const dbService = {
 
   emptyRecycleBin: async (): Promise<void> => {
     localStorage.setItem(LS_KEYS.RECYCLE_BIN, JSON.stringify([]));
+  },
+
+  // User Management Functions
+  initializeDefaultUsers: async (): Promise<void> => {
+    const users = await dbService.getUsers();
+    if (users.length === 0) {
+      // Create default admin user
+      const defaultAdmin: User = {
+        id: generateUniqueId('U'),
+        username: 'admin',
+        password: encryptPassword('admin123'),
+        role: 'admin',
+        name: 'Administrator',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+      localStorage.setItem(LS_KEYS.USERS, JSON.stringify([defaultAdmin]));
+    }
+  },
+
+  getUsers: async (): Promise<User[]> => {
+    const users = JSON.parse(localStorage.getItem(LS_KEYS.USERS) || '[]');
+    return users;
+  },
+
+  getUserByUsername: async (username: string): Promise<User | null> => {
+    const users = await dbService.getUsers();
+    return users.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
+  },
+
+  addUser: async (data: Omit<User, 'id' | 'createdAt'>): Promise<User> => {
+    const users = await dbService.getUsers();
+
+    // Check if username already exists
+    const existing = users.find(u => u.username.toLowerCase() === data.username.toLowerCase());
+    if (existing) {
+      throw new Error('Username already exists');
+    }
+
+    const newUser: User = {
+      ...data,
+      id: generateUniqueId('U'),
+      password: encryptPassword(data.password),
+      createdAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(LS_KEYS.USERS, JSON.stringify([...users, newUser]));
+    return newUser;
+  },
+
+  updateUser: async (id: string, updates: Partial<Omit<User, 'id' | 'createdAt'>>): Promise<void> => {
+    const users = await dbService.getUsers();
+    const updatedUsers = users.map(u => {
+      if (u.id === id) {
+        const user = { ...u, ...updates };
+        // If password is being updated, encrypt it
+        if (updates.password) {
+          user.password = encryptPassword(updates.password);
+        }
+        return user;
+      }
+      return u;
+    });
+    localStorage.setItem(LS_KEYS.USERS, JSON.stringify(updatedUsers));
+  },
+
+  deleteUser: async (id: string): Promise<void> => {
+    const users = await dbService.getUsers();
+    // Prevent deleting the last admin
+    const admins = users.filter(u => u.role === 'admin');
+    const userToDelete = users.find(u => u.id === id);
+
+    if (userToDelete?.role === 'admin' && admins.length === 1) {
+      throw new Error('Cannot delete the last admin user');
+    }
+
+    localStorage.setItem(LS_KEYS.USERS, JSON.stringify(users.filter(u => u.id !== id)));
+  },
+
+  toggleUserStatus: async (id: string): Promise<void> => {
+    const users = await dbService.getUsers();
+    const updatedUsers = users.map(u => {
+      if (u.id === id) {
+        return { ...u, isActive: !u.isActive };
+      }
+      return u;
+    });
+    localStorage.setItem(LS_KEYS.USERS, JSON.stringify(updatedUsers));
   }
 };
