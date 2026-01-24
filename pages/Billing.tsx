@@ -1,5 +1,6 @@
 ﻿
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus, Trash2, Save, Calendar, Bike, Phone, User, FileText, Receipt, Wallet, Banknote
 } from 'lucide-react';
@@ -99,26 +100,27 @@ const BillingPage: React.FC = () => {
     setNewItemAmount('');
   };
 
-  const handleRemoveItem = (id: string) => {
+  const handleRemoveItem = useCallback((id: string) => {
     setInvoiceItems(invoiceItems.filter(item => item.id !== id));
-  };
+  }, [invoiceItems]);
 
-  const calculateTotal = () => {
+  // Memoize calculated values to avoid repeated computations
+  const totalAmount = useMemo(() => {
     return invoiceItems.reduce((sum, item) => sum + item.amount, 0);
-  };
+  }, [invoiceItems]);
 
-  const calculateTotalCollected = () => {
+  const totalCollected = useMemo(() => {
     const cash = parseFloat(cashAmount) || 0;
     const upi = parseFloat(upiAmount) || 0;
     return cash + upi;
-  };
+  }, [cashAmount, upiAmount]);
 
-  const getRemainingBalance = () => {
-    return calculateTotal() - calculateTotalCollected();
-  };
+  const remainingBalance = useMemo(() => {
+    return totalAmount - totalCollected;
+  }, [totalAmount, totalCollected]);
 
   // Auto-fill customer details based on bike number
-  const handleBikeNumberChange = (value: string) => {
+  const handleBikeNumberChange = useCallback((value: string) => {
     setBikeNumber(value.toUpperCase());
 
     // Filter for autocomplete
@@ -138,10 +140,10 @@ const BillingPage: React.FC = () => {
       setCustomerPhone(customer.phone || '');
       setShowBikeDropdown(false);
     }
-  };
+  }, [customers]);
 
   // Auto-fill customer details based on customer name
-  const handleCustomerNameChange = (value: string) => {
+  const handleCustomerNameChange = useCallback((value: string) => {
     setCustomerName(value);
 
     // Filter for autocomplete
@@ -161,10 +163,10 @@ const BillingPage: React.FC = () => {
       setCustomerPhone(customer.phone || '');
       setShowNameDropdown(false);
     }
-  };
+  }, [customers]);
 
   // Auto-fill customer details based on phone
-  const handlePhoneChange = (value: string) => {
+  const handlePhoneChange = useCallback((value: string) => {
     setCustomerPhone(value);
 
     // Filter for autocomplete
@@ -186,17 +188,17 @@ const BillingPage: React.FC = () => {
         setShowPhoneDropdown(false);
       }
     }
-  };
+  }, [customers]);
 
   // Select customer from dropdown
-  const selectCustomer = (customer: any) => {
+  const selectCustomer = useCallback((customer: Customer) => {
     setCustomerName(customer.name);
     setBikeNumber(customer.bikeNumber);
     setCustomerPhone(customer.phone || '');
     setShowNameDropdown(false);
     setShowBikeDropdown(false);
     setShowPhoneDropdown(false);
-  };
+  }, []);
 
   const handleSave = async (saveAndNew: boolean = false) => {
     if (!customerName || !bikeNumber || invoiceItems.length === 0) {
@@ -205,14 +207,13 @@ const BillingPage: React.FC = () => {
     }
 
     try {
-      const totalAmount = calculateTotal();
-      const collectedAmount = calculateTotalCollected();
+      // Use memoized values instead of calling functions
 
       // Determine payment status based on collected amount
       let paymentStatus: 'Paid' | 'Pending' | 'Unpaid';
-      if (collectedAmount >= totalAmount) {
+      if (totalCollected >= totalAmount) {
         paymentStatus = 'Paid';
-      } else if (collectedAmount > 0) {
+      } else if (totalCollected > 0) {
         paymentStatus = 'Pending';
       } else {
         paymentStatus = 'Unpaid';
@@ -540,22 +541,22 @@ const BillingPage: React.FC = () => {
                 <div className="pt-3 border-t border-slate-200">
                   <div className="flex justify-between mb-2">
                     <span className="text-sm text-slate-600">Invoice Total:</span>
-                    <span className="text-sm font-semibold text-slate-900">₹{calculateTotal().toLocaleString()}</span>
+                    <span className="text-sm font-semibold text-slate-900">₹{totalAmount.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between mb-2">
                     <span className="text-sm text-slate-600">Total Collected:</span>
-                    <span className="text-sm font-semibold text-blue-600">₹{calculateTotalCollected().toLocaleString()}</span>
+                    <span className="text-sm font-semibold text-blue-600">₹{totalCollected.toLocaleString()}</span>
                   </div>
-                  {getRemainingBalance() > 0 && (
+                  {remainingBalance > 0 && (
                     <div className="flex justify-between">
                       <span className="text-sm text-amber-600">Remaining Balance:</span>
-                      <span className="text-sm font-bold text-amber-600">₹{getRemainingBalance().toLocaleString()}</span>
+                      <span className="text-sm font-bold text-amber-600">₹{remainingBalance.toLocaleString()}</span>
                     </div>
                   )}
-                  {getRemainingBalance() < 0 && (
+                  {remainingBalance < 0 && (
                     <div className="flex justify-between">
                       <span className="text-sm text-red-600">Excess Amount:</span>
-                      <span className="text-sm font-bold text-red-600">₹{Math.abs(getRemainingBalance()).toLocaleString()}</span>
+                      <span className="text-sm font-bold text-red-600">₹{Math.abs(remainingBalance).toLocaleString()}</span>
                     </div>
                   )}
                 </div>
@@ -569,7 +570,7 @@ const BillingPage: React.FC = () => {
               {/* Total Display */}
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-slate-900">Total Amount</h3>
-                <p className="text-3xl font-bold text-blue-600">₹{calculateTotal().toLocaleString()}</p>
+                <p className="text-3xl font-bold text-blue-600">₹{totalAmount.toLocaleString()}</p>
               </div>
 
               {/* Action Buttons */}
