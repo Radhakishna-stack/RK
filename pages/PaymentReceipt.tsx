@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Search, Calendar, DollarSign, Smartphone, Save, History, Printer, CreditCard } from 'lucide-react';
+import { ArrowLeft, Search, Calendar, DollarSign, Smartphone, Save, History, Printer, CreditCard, MessageCircle } from 'lucide-react';
 import { dbService } from '../db';
 import { Customer, PaymentReceipt } from '../types';
 import { Card } from '../components/ui/Card';
@@ -104,6 +104,23 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const handleShare = (receipt: PaymentReceipt) => {
+        const message = `*PAYMENT RECEIPT*\n\n` +
+            `Receipt No: ${receipt.receiptNumber}\n` +
+            `Date: ${new Date(receipt.date).toLocaleDateString('en-IN')}\n` +
+            `Customer: ${receipt.customerName}\n\n` +
+            `*Amount Received: ₹${receipt.totalAmount.toLocaleString('en-IN')}*\n` +
+            (receipt.cashAmount > 0 ? `Cash: ₹${receipt.cashAmount.toLocaleString('en-IN')}\n` : '') +
+            (receipt.upiAmount > 0 ? `UPI: ₹${receipt.upiAmount.toLocaleString('en-IN')}\n` : '') +
+            (receipt.description ? `\nNote: ${receipt.description}\n` : '') +
+            `\nThank you for your business!`;
+
+        const phone = receipt.customerPhone.replace(/\D/g, '');
+        const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+
+        window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
     };
 
     const handlePrint = (receipt: PaymentReceipt) => {
@@ -333,8 +350,8 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                                     onClick={handleSave}
                                     disabled={submitting || (!selectedCustomer)}
                                     className={`w-full py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${submitting || !selectedCustomer
-                                            ? 'bg-slate-400 cursor-not-allowed'
-                                            : 'bg-blue-600 hover:bg-blue-700 hover:shadow-xl hover:-translate-y-1'
+                                        ? 'bg-slate-400 cursor-not-allowed'
+                                        : 'bg-blue-600 hover:bg-blue-700 hover:shadow-xl hover:-translate-y-1'
                                         }`}
                                 >
                                     {submitting ? (
@@ -412,13 +429,22 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
 
                                         <div className="flex flex-col items-end gap-2">
                                             <span className="font-bold text-slate-900">₹{receipt.totalAmount.toLocaleString('en-IN')}</span>
-                                            <button
-                                                onClick={() => handlePrint(receipt)}
-                                                className="text-slate-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="Print Receipt"
-                                            >
-                                                <Printer className="w-4 h-4" />
-                                            </button>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => handleShare(receipt)}
+                                                    className="text-slate-400 hover:text-green-600 p-1.5 hover:bg-green-50 rounded-lg transition-colors"
+                                                    title="Share on WhatsApp"
+                                                >
+                                                    <MessageCircle className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handlePrint(receipt)}
+                                                    className="text-slate-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="Print Receipt"
+                                                >
+                                                    <Printer className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </Card>
