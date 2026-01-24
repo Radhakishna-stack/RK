@@ -17,7 +17,6 @@ import StockWantingPage from './pages/StockWanting';
 import ComplaintsPage from './pages/Complaints';
 import BillingPage from './pages/Billing';
 import EstimatePage from './pages/Estimate';
-import PaymentInPage from './pages/PaymentIn';
 import PurchasePage from './pages/Purchase';
 import InventoryPage from './pages/Inventory';
 import ExpensesPage from './pages/Expenses';
@@ -88,7 +87,6 @@ const App: React.FC = () => {
       case 'party_statement': return <PartyStatementPage onNavigate={setActiveTab} />;
       case 'billing': return <BillingPage />;
       case 'estimate': return <EstimatePage />;
-      case 'payment_in': return <PaymentInPage />;
       case 'purchase': return <PurchasePage />;
       case 'customers': return <CustomersPage />;
       case 'visitors': return <VisitorsPage />;
@@ -140,7 +138,7 @@ const App: React.FC = () => {
       )}
 
       <main className={`flex-1 overflow-y-auto relative ${activeTab === 'billing' ? 'pb-0' :
-          (activeTab === 'dashboard' || activeTab === 'business' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'pb-28' : 'pb-32')
+        (activeTab === 'dashboard' || activeTab === 'business' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'pb-28' : 'pb-32')
         }`}>
         <div className={`max-w-screen-xl mx-auto ${activeTab === 'dashboard' || activeTab === 'business' || activeTab === 'horoscope' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'px-0 pt-0' : 'px-4 pt-4'}`}>
           {renderContent()}
