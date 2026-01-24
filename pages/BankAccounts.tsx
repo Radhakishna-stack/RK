@@ -13,7 +13,8 @@ interface BankAccountsPageProps {
 }
 
 const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
-   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+   // Extend BankAccount to include computed balance for display
+   const [accounts, setAccounts] = useState<(BankAccount & { balance: number })[]>([]);
    const [loading, setLoading] = useState(true);
    const [searchTerm, setSearchTerm] = useState('');
    const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,7 +39,14 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
       setLoading(true);
       try {
          const data = await dbService.getBankAccounts();
-         setAccounts(data);
+
+         // Calculate live balances for each account
+         const accountsWithBalance = await Promise.all(data.map(async (acc) => {
+            const balance = await dbService.getAccountBalance(acc.id);
+            return { ...acc, balance };
+         }));
+
+         setAccounts(accountsWithBalance);
 
          // Fetch transactions for summary
          const transactions = await dbService.getTransactions();
@@ -70,9 +78,11 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
       setIsSubmitting(true);
       try {
          await dbService.addBankAccount({
-            ...formData,
-            balance: parseFloat(formData.balance)
-         });
+            name: formData.bankName,
+            type: formData.accountType as any,
+            openingBalance: parseFloat(formData.balance) || 0,
+            accountNumber: formData.accountNumber
+         } as any);
 
          await loadData();
          setIsModalOpen(false);
