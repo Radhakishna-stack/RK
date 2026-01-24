@@ -139,18 +139,22 @@ const App: React.FC = () => {
         </header>
       )}
 
-      <main className={`flex-1 overflow-y-auto relative ${activeTab === 'dashboard' || activeTab === 'business' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'pb-28' : 'pb-32'}`}>
+      <main className={`flex-1 overflow-y-auto relative ${activeTab === 'billing' ? 'pb-0' :
+          (activeTab === 'dashboard' || activeTab === 'business' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'pb-28' : 'pb-32')
+        }`}>
         <div className={`max-w-screen-xl mx-auto ${activeTab === 'dashboard' || activeTab === 'business' || activeTab === 'horoscope' || activeTab === 'market_explorer' || activeTab === 'tech_agent' ? 'px-0 pt-0' : 'px-4 pt-4'}`}>
           {renderContent()}
         </div>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex items-center justify-around py-3 px-2 z-50 no-print shadow-lg">
-        <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
-        <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business' || activeTab === 'dashboard'} onClick={() => setActiveTab('business')} />
-        <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money' || activeTab === 'bank_accounts'} onClick={() => setActiveTab('money')} />
-        <BottomNavItem icon={<LayoutGrid />} label="More" active={activeTab === 'more'} onClick={() => setActiveTab('more')} />
-      </nav>
+      {activeTab !== 'billing' && (
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex items-center justify-around py-3 px-2 z-50 no-print shadow-lg">
+          <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+          <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business' || activeTab === 'dashboard'} onClick={() => setActiveTab('business')} />
+          <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money' || activeTab === 'bank_accounts'} onClick={() => setActiveTab('money')} />
+          <BottomNavItem icon={<LayoutGrid />} label="More" active={activeTab === 'more'} onClick={() => setActiveTab('more')} />
+        </nav>
+      )}
     </div>
   );
 };

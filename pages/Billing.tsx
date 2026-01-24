@@ -282,7 +282,7 @@ const BillingPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-32">
+    <div className="min-h-screen bg-slate-50 pb-40">
       {/* Show preview if invoice saved */}
       {showPreview && savedInvoice ? (
         <InvoicePreview

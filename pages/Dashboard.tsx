@@ -62,7 +62,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="p-4 pb-32 space-y-6">
+    <div className="p-4 space-y-6">
       {/* Welcome Header */}
       <div className="space-y-2">
         <h1 className="text-2xl font-bold text-slate-900">Welcome Back!</h1>
