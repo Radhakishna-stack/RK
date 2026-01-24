@@ -142,7 +142,7 @@ export interface Invoice {
 export interface BankAccount {
   id: string;
   name: string;
-  type: 'Cash' | 'Savings' | 'Current' | 'UPI/Wallet';
+  type: 'Cash' | 'Savings' | 'Current' | 'UPI/Wallet' | 'UPI' | 'Wallet';
   openingBalance: number;
   createdAt: string;
 }

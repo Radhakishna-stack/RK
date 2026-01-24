@@ -448,7 +448,14 @@ export const dbService = {
 
       // Create UPI transaction if UPI amount > 0
       if (upi > 0) {
-        const upiAccount = accounts.find(a => a.type === 'UPI/Wallet') || accounts.find(a => a.type !== 'Cash');
+        // Use selected account OR fallback to finding one
+        let upiAccount = accounts.find(a => a.id === data.paymentCollections.upiAccountId);
+
+        // Fallback: Find UPI/Wallet or any non-cash
+        if (!upiAccount) {
+          upiAccount = accounts.find(a => a.type === 'UPI' || a.type === 'Wallet') || accounts.find(a => a.type !== 'Cash');
+        }
+
         if (upiAccount) {
           await dbService.addTransaction({
             entityId: data.bikeNumber,

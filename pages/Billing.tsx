@@ -35,6 +35,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
   // Payment collection fields
   const [cashAmount, setCashAmount] = useState('');
   const [upiAmount, setUpiAmount] = useState('');
+  const [selectedUpiAccount, setSelectedUpiAccount] = useState('');
 
   // Invoice items
   const [invoiceItems, setInvoiceItems] = useState<Array<{
@@ -120,6 +121,9 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
         // Generate invoice number for new invoice
         const prefix = settings.transaction.prefixes[defaultDocType === 'Estimate' ? 'estimate' : 'sale'] || (defaultDocType === 'Estimate' ? 'EST-' : 'INV-');
         setInvoiceNumber(prefix + Date.now());
+        // Default to first non-cash account
+        const firstBank = accData.find(a => a.type !== 'Cash');
+        if (firstBank) setSelectedUpiAccount(firstBank.id);
       }
     } catch (err) {
       console.error(err);
@@ -290,7 +294,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
         docType: defaultDocType,
         odometerReading: odometerReading ? parseInt(odometerReading) : undefined,
         serviceReminderDate: serviceReminderDate || undefined,
-        paymentCollections: { cash, upi }
+        paymentCollections: { cash, upi, upiAccountId: selectedUpiAccount }
       };
 
       const newInvoice = await dbService.generateInvoice(invoiceData);

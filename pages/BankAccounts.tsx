@@ -284,7 +284,7 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
                      Account Type
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                     {['Savings', 'Current'].map((type) => (
+                     {['Savings', 'Current', 'UPI', 'Wallet'].map((type) => (
                         <button
                            key={type}
                            type="button"
