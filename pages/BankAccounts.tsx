@@ -173,7 +173,7 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
                <Card className="bg-gradient-to-br from-amber-500 to-amber-600 border-0 text-white shadow-lg h-full">
                   <div>
                      <div className="flex items-center gap-2 mb-2 text-amber-100">
-                        <Clock className="w-5 h-5" /> // Note: Clock import needed if not present
+                        <Clock className="w-5 h-5" />
                         <p className="text-sm font-medium">Pending Cheques</p>
                      </div>
                      <h2 className="text-3xl font-bold">₹{pendingCheques.toLocaleString()}</h2>
