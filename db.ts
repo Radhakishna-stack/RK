@@ -209,7 +209,7 @@ export const dbService = {
     const accountTxns = txns.filter(t => t.accountId === accountId);
 
     const flow = accountTxns.reduce((sum, t) => t.type === 'IN' ? sum + t.amount : sum - t.amount, 0);
-    return target.openingBalance + flow;
+    return (target.openingBalance || 0) + flow;
   },
 
   getBusinessHoroscope: async (businessName: string): Promise<string> => {
