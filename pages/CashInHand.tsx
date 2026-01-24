@@ -16,7 +16,7 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
    const [loading, setLoading] = useState(true);
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [isSubmitting, setIsSubmitting] = useState(false);
-   const [transactionType, setTransactionType] = useState<'cash-in' | 'cash-out'>('cash-in');
+   const [transactionType, setTransactionType] = useState<'IN' | 'OUT'>('IN');
 
    const [formData, setFormData] = useState({
       description: '',
@@ -32,8 +32,9 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
       setLoading(true);
       try {
          const allTransactions = await dbService.getTransactions();
+         // Filter for Cash Account transactions OR legacy manually added cash transactions
          const cashTransactions = allTransactions.filter(
-            t => t.type === 'cash-in' || t.type === 'cash-out'
+            t => t.accountId === 'CASH-01' || t.type === 'cash-in' || t.type === 'cash-out'
          );
          setTransactions(cashTransactions);
       } catch (err) {
@@ -51,7 +52,10 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
             ...formData,
             amount: parseFloat(formData.amount),
             type: transactionType,
-            category: transactionType === 'cash-in' ? 'Cash Received' : 'Cash Paid'
+            accountId: 'CASH-01', // Explicitly link to Central Cash Account
+            paymentMode: 'Cash',
+            category: transactionType === 'IN' ? 'Cash Received' : 'Cash Paid',
+            entityId: 'MANUAL'
          });
 
          await loadData();
@@ -64,21 +68,33 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
       }
    };
 
-   const openModal = (type: 'cash-in' | 'cash-out') => {
+   const openModal = (type: 'IN' | 'OUT') => {
       setTransactionType(type);
       setIsModalOpen(true);
    };
 
    // Calculate cash balance
+   // Standardize types for calculation: IN/cash-in are positive, OUT/cash-out are negative
    const cashIn = transactions
-      .filter(t => t.type === 'cash-in')
+      .filter(t => t.type === 'IN' || t.type === 'cash-in' || t.type === 'cheque-received')
       .reduce((sum, t) => sum + t.amount, 0);
 
    const cashOut = transactions
-      .filter(t => t.type === 'cash-out')
+      .filter(t => t.type === 'OUT' || t.type === 'cash-out' || t.type === 'cheque-issued')
       .reduce((sum, t) => sum + t.amount, 0);
 
    const balance = cashIn - cashOut;
+
+   // Helper to display transaction type styling
+   const getTransactionTypeStyle = (type: string) => {
+      const isIn = type === 'IN' || type === 'cash-in' || type === 'cheque-received';
+      return {
+         color: isIn ? 'text-green-600' : 'text-red-600',
+         bg: isIn ? 'bg-green-100' : 'bg-red-100',
+         icon: isIn ? ArrowUpCircle : ArrowDownCircle,
+         sign: isIn ? '+' : '-'
+      };
+   };
 
    if (loading) {
       return (
@@ -115,14 +131,14 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
          {/* Quick Actions */}
          <div className="grid grid-cols-2 gap-3">
             <Button
-               onClick={() => openModal('cash-in')}
+               onClick={() => openModal('IN')}
                className="bg-green-600 hover:bg-green-700 h-auto py-4"
             >
                <Plus className="w-5 h-5 mr-2" />
                Cash In
             </Button>
             <Button
-               onClick={() => openModal('cash-out')}
+               onClick={() => openModal('OUT')}
                variant="danger"
                className="h-auto py-4"
             >
@@ -136,7 +152,7 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
             <Card className="bg-green-50 border-green-200">
                <div className="flex items-center gap-2 mb-2">
                   <ArrowUpCircle className="w-5 h-5 text-green-600" />
-                  <span className="text-sm font-semibold text-green-900">Cash In</span>
+                  <span className="text-sm font-semibold text-green-900">Total In</span>
                </div>
                <p className="text-2xl font-bold text-green-600">₹{cashIn.toLocaleString()}</p>
             </Card>
@@ -144,7 +160,7 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
             <Card className="bg-red-50 border-red-200">
                <div className="flex items-center gap-2 mb-2">
                   <ArrowDownCircle className="w-5 h-5 text-red-600" />
-                  <span className="text-sm font-semibold text-red-900">Cash Out</span>
+                  <span className="text-sm font-semibold text-red-900">Total Out</span>
                </div>
                <p className="text-2xl font-bold text-red-600">₹{cashOut.toLocaleString()}</p>
             </Card>
@@ -161,7 +177,7 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
                      <h3 className="text-lg font-semibold text-slate-900 mb-2">No cash transactions</h3>
                      <p className="text-slate-600 mb-4">Start tracking your cash flow</p>
                      <div className="flex gap-3 justify-center">
-                        <Button onClick={() => openModal('cash-in')}>
+                        <Button onClick={() => openModal('IN')}>
                            <Plus className="w-5 h-5 mr-2" />
                            Cash In
                         </Button>
@@ -171,43 +187,47 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
             ) : (
                transactions
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .map((transaction) => (
-                     <Card key={transaction.id} padding="md">
-                        <div className="flex items-start gap-3">
-                           <div className={`
-                    w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
-                    ${transaction.type === 'cash-in'
-                                 ? 'bg-green-100'
-                                 : 'bg-red-100'}
-                  `}>
-                              {transaction.type === 'cash-in' ? (
-                                 <ArrowUpCircle className="w-6 h-6 text-green-600" />
-                              ) : (
-                                 <ArrowDownCircle className="w-6 h-6 text-red-600" />
-                              )}
-                           </div>
+                  .map((transaction) => {
+                     const style = getTransactionTypeStyle(transaction.type);
+                     const Icon = style.icon;
 
-                           <div className="flex-1">
-                              <h3 className="text-base font-bold text-slate-900">
-                                 {transaction.description || transaction.category}
-                              </h3>
-                              <div className="flex items-center gap-1 text-sm text-slate-600 mt-1">
-                                 <Clock className="w-4 h-4" />
-                                 <span>{new Date(transaction.date).toLocaleDateString()}</span>
+                     return (
+                        <Card key={transaction.id} padding="md">
+                           <div className="flex items-start gap-3">
+                              <div className={`
+                                 w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
+                                 ${style.bg}
+                              `}>
+                                 <Icon className={`w-6 h-6 ${style.color}`} />
+                              </div>
+
+                              <div className="flex-1">
+                                 <h3 className="text-base font-bold text-slate-900">
+                                    {transaction.description || transaction.category || 'Transaction'}
+                                 </h3>
+                                 <div className="flex items-center gap-1 text-sm text-slate-600 mt-1">
+                                    <Clock className="w-4 h-4" />
+                                    <span>{new Date(transaction.date).toLocaleDateString()}</span>
+                                    {transaction.paymentMode && (
+                                       <span className="px-1.5 py-0.5 bg-slate-100 rounded text-xs ml-2">
+                                          {transaction.paymentMode}
+                                       </span>
+                                    )}
+                                 </div>
+                              </div>
+
+                              <div className="text-right">
+                                 <p className={`
+                                    text-xl font-bold
+                                    ${style.color}
+                                 `}>
+                                    {style.sign}₹{transaction.amount.toLocaleString()}
+                                 </p>
                               </div>
                            </div>
-
-                           <div className="text-right">
-                              <p className={`
-                      text-xl font-bold
-                      ${transaction.type === 'cash-in' ? 'text-green-600' : 'text-red-600'}
-                    `}>
-                                 {transaction.type === 'cash-in' ? '+' : '-'}₹{transaction.amount.toLocaleString()}
-                              </p>
-                           </div>
-                        </div>
-                     </Card>
-                  ))
+                        </Card>
+                     );
+                  })
             )}
          </div>
 
@@ -215,7 +235,7 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
          <Modal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
-            title={transactionType === 'cash-in' ? 'Cash In' : 'Cash Out'}
+            title={transactionType === 'IN' ? 'Cash In' : 'Cash Out'}
             size="md"
          >
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -223,7 +243,7 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
                   label="Description"
                   type="text"
                   required
-                  placeholder={transactionType === 'cash-in' ? 'Money received from...' : 'Money paid for...'}
+                  placeholder={transactionType === 'IN' ? 'Money received from...' : 'Money paid for...'}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                />
@@ -259,7 +279,7 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
                      isLoading={isSubmitting}
                      className="flex-1"
                   >
-                     {transactionType === 'cash-in' ? 'Add Cash In' : 'Add Cash Out'}
+                     {transactionType === 'IN' ? 'Add Cash In' : 'Add Cash Out'}
                   </Button>
                </div>
             </form>
@@ -269,3 +289,4 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
 };
 
 export default CashInHandPage;
+
