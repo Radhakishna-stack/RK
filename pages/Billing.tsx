@@ -47,6 +47,12 @@ const BillingPage: React.FC = () => {
   const [companyAddress, setCompanyAddress] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
 
+  // Autocomplete state
+  const [showNameDropdown, setShowNameDropdown] = useState(false);
+  const [showBikeDropdown, setShowBikeDropdown] = useState(false);
+  const [showPhoneDropdown, setShowPhoneDropdown] = useState(false);
+  const [filteredCustomers, setFilteredCustomers] = useState<any[]>([]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -114,33 +120,82 @@ const BillingPage: React.FC = () => {
   // Auto-fill customer details based on bike number
   const handleBikeNumberChange = (value: string) => {
     setBikeNumber(value.toUpperCase());
+
+    // Filter for autocomplete
+    if (value.trim()) {
+      const filtered = customers.filter(c =>
+        c.bikeNumber.toUpperCase().includes(value.toUpperCase())
+      );
+      setFilteredCustomers(filtered);
+      setShowBikeDropdown(filtered.length > 0);
+    } else {
+      setShowBikeDropdown(false);
+    }
+
     const customer = customers.find(c => c.bikeNumber === value.toUpperCase());
     if (customer) {
       setCustomerName(customer.name);
       setCustomerPhone(customer.phone || '');
+      setShowBikeDropdown(false);
     }
   };
 
   // Auto-fill customer details based on customer name
   const handleCustomerNameChange = (value: string) => {
     setCustomerName(value);
+
+    // Filter for autocomplete
+    if (value.trim()) {
+      const filtered = customers.filter(c =>
+        c.name.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredCustomers(filtered);
+      setShowNameDropdown(filtered.length > 0);
+    } else {
+      setShowNameDropdown(false);
+    }
+
     const customer = customers.find(c => c.name.toLowerCase() === value.toLowerCase());
     if (customer) {
       setBikeNumber(customer.bikeNumber);
       setCustomerPhone(customer.phone || '');
+      setShowNameDropdown(false);
     }
   };
 
   // Auto-fill customer details based on phone
   const handlePhoneChange = (value: string) => {
     setCustomerPhone(value);
+
+    // Filter for autocomplete
+    if (value.trim() && value.length >= 3) {
+      const filtered = customers.filter(c =>
+        c.phone && c.phone.includes(value)
+      );
+      setFilteredCustomers(filtered);
+      setShowPhoneDropdown(filtered.length > 0);
+    } else {
+      setShowPhoneDropdown(false);
+    }
+
     if (value.length >= 10) {
       const customer = customers.find(c => c.phone === value);
       if (customer) {
         setCustomerName(customer.name);
         setBikeNumber(customer.bikeNumber);
+        setShowPhoneDropdown(false);
       }
     }
+  };
+
+  // Select customer from dropdown
+  const selectCustomer = (customer: any) => {
+    setCustomerName(customer.name);
+    setBikeNumber(customer.bikeNumber);
+    setCustomerPhone(customer.phone || '');
+    setShowNameDropdown(false);
+    setShowBikeDropdown(false);
+    setShowPhoneDropdown(false);
   };
 
   const handleSave = async (saveAndNew: boolean = false) => {
@@ -401,7 +456,7 @@ const BillingPage: React.FC = () => {
                         <p className="font-medium text-slate-900">{item.description}</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <p className="font-bold text-slate-900">Γé╣{item.amount.toLocaleString()}</p>
+                        <p className="font-bold text-slate-900">₹{item.amount.toLocaleString()}</p>
                         <button
                           onClick={() => handleRemoveItem(item.id)}
                           className="p-1 text-slate-400 hover:text-red-600 transition-colors"
@@ -485,22 +540,22 @@ const BillingPage: React.FC = () => {
                 <div className="pt-3 border-t border-slate-200">
                   <div className="flex justify-between mb-2">
                     <span className="text-sm text-slate-600">Invoice Total:</span>
-                    <span className="text-sm font-semibold text-slate-900">Γé╣{calculateTotal().toLocaleString()}</span>
+                    <span className="text-sm font-semibold text-slate-900">₹{calculateTotal().toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between mb-2">
                     <span className="text-sm text-slate-600">Total Collected:</span>
-                    <span className="text-sm font-semibold text-blue-600">Γé╣{calculateTotalCollected().toLocaleString()}</span>
+                    <span className="text-sm font-semibold text-blue-600">₹{calculateTotalCollected().toLocaleString()}</span>
                   </div>
                   {getRemainingBalance() > 0 && (
                     <div className="flex justify-between">
                       <span className="text-sm text-amber-600">Remaining Balance:</span>
-                      <span className="text-sm font-bold text-amber-600">Γé╣{getRemainingBalance().toLocaleString()}</span>
+                      <span className="text-sm font-bold text-amber-600">₹{getRemainingBalance().toLocaleString()}</span>
                     </div>
                   )}
                   {getRemainingBalance() < 0 && (
                     <div className="flex justify-between">
                       <span className="text-sm text-red-600">Excess Amount:</span>
-                      <span className="text-sm font-bold text-red-600">Γé╣{Math.abs(getRemainingBalance()).toLocaleString()}</span>
+                      <span className="text-sm font-bold text-red-600">₹{Math.abs(getRemainingBalance()).toLocaleString()}</span>
                     </div>
                   )}
                 </div>
@@ -514,7 +569,7 @@ const BillingPage: React.FC = () => {
               {/* Total Display */}
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-slate-900">Total Amount</h3>
-                <p className="text-3xl font-bold text-blue-600">Γé╣{calculateTotal().toLocaleString()}</p>
+                <p className="text-3xl font-bold text-blue-600">₹{calculateTotal().toLocaleString()}</p>
               </div>
 
               {/* Action Buttons */}
