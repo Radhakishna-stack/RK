@@ -51,10 +51,10 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
     };
 
     const handleEditInvoice = (invoice: Invoice) => {
-        // For now, just navigate to billing - in future we can pass invoice ID for editing
-        alert('Edit functionality coming soon! For now, you can create a new sale.');
-        // TODO: Navigate to billing with invoice data pre-filled
-        // onNavigate('billing', { invoiceId: invoice.id });
+        // Store invoice in localStorage for editing
+        localStorage.setItem('editingInvoice', JSON.stringify(invoice));
+        // Navigate to billing page which will load the invoice for editing
+        onNavigate('billing');
     };
 
     const getFilteredInvoices = () => {
@@ -155,8 +155,8 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
                     <button
                         onClick={() => setFilter('all')}
                         className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'all'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                             }`}
                     >
                         All
@@ -164,8 +164,8 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
                     <button
                         onClick={() => setFilter('today')}
                         className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'today'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                             }`}
                     >
                         Today
@@ -173,8 +173,8 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
                     <button
                         onClick={() => setFilter('week')}
                         className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'week'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                             }`}
                     >
                         This Week
@@ -182,8 +182,8 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
                     <button
                         onClick={() => setFilter('month')}
                         className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'month'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                             }`}
                     >
                         This Month

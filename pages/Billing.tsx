@@ -80,9 +80,42 @@ const BillingPage: React.FC = () => {
       setCompanyAddress(settings.general.businessAddress || '');
       setCompanyPhone(settings.general.businessPhone || '');
 
-      // Generate invoice number
-      const prefix = settings.transaction.prefixes.sale || 'INV-';
-      setInvoiceNumber(prefix + Date.now());
+      // Check if editing an existing invoice
+      const editingInvoiceStr = localStorage.getItem('editingInvoice');
+      if (editingInvoiceStr) {
+        try {
+          const editingInvoice: Invoice = JSON.parse(editingInvoiceStr);
+
+          // Pre-fill form with invoice data
+          setCustomerName(editingInvoice.customerName || '');
+          setBikeNumber(editingInvoice.bikeNumber || '');
+          setCustomerPhone(editingInvoice.customerPhone || '');
+          setOdometerReading(editingInvoice.odometerReading?.toString() || '');
+          setServiceReminderDate(editingInvoice.serviceReminderDate || '');
+          setInvoiceDate(editingInvoice.date || new Date().toISOString().split('T')[0]);
+
+          // Load invoice items
+          if (editingInvoice.items && Array.isArray(editingInvoice.items)) {
+            setInvoiceItems(editingInvoice.items);
+          }
+
+          // Load payment collections
+          if (editingInvoice.paymentCollections) {
+            setCashAmount(editingInvoice.paymentCollections.cash?.toString() || '');
+            setUpiAmount(editingInvoice.paymentCollections.upi?.toString() || '');
+          }
+
+          // Clear the editing invoice from storage
+          localStorage.removeItem('editingInvoice');
+        } catch (error) {
+          console.error('Error loading invoice for editing:', error);
+          localStorage.removeItem('editingInvoice');
+        }
+      } else {
+        // Generate invoice number for new invoice
+        const prefix = settings.transaction.prefixes.sale || 'INV-';
+        setInvoiceNumber(prefix + Date.now());
+      }
     } catch (err) {
       console.error(err);
     } finally {
