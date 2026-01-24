@@ -87,7 +87,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         <h2 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-3 gap-3">
           <QuickAction icon={<ClipboardCheck />} label="New Job" onClick={() => onNavigate('complaints')} />
-          <QuickAction icon={<Receipt />} label="New Sale" onClick={() => onNavigate('billing')} />
+          <QuickAction icon={<Receipt />} label="New Sale" onClick={() => onNavigate('sales')} />
           <QuickAction icon={<Package />} label="Stock" onClick={() => onNavigate('items')} />
           <QuickAction icon={<TrendingUp />} label="Reports" onClick={() => onNavigate('sale_report')} />
         </div>

@@ -16,6 +16,7 @@ import VisitorsPage from './pages/Visitors';
 import StockWantingPage from './pages/StockWanting';
 import ComplaintsPage from './pages/Complaints';
 import BillingPage from './pages/Billing';
+import SalesListPage from './pages/SalesList';
 import EstimatePage from './pages/Estimate';
 import PurchasePage from './pages/Purchase';
 import InventoryPage from './pages/Inventory';
@@ -85,6 +86,7 @@ const App: React.FC = () => {
       case 'market_explorer': return <MarketExplorerPage onNavigate={setActiveTab} initialQuery={initialSearchQuery} />;
       case 'sale_report': return <SaleReportPage onNavigate={setActiveTab} />;
       case 'party_statement': return <PartyStatementPage onNavigate={setActiveTab} />;
+      case 'sales': return <SalesListPage onNavigate={setActiveTab} />;
       case 'billing': return <BillingPage />;
       case 'estimate': return <EstimatePage />;
       case 'purchase': return <PurchasePage />;
