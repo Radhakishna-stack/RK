@@ -606,6 +606,10 @@ export const dbService = {
       localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(current.filter(e => e.id !== id)));
     }
   },
+  updateExpense: async (id: string, updates: Partial<Expense>): Promise<void> => {
+    const current = await dbService.getExpenses();
+    localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(current.map(e => e.id === id ? { ...e, ...updates } : e)));
+  },
 
   getReminders: async (): Promise<ServiceReminder[]> => JSON.parse(localStorage.getItem(LS_KEYS.REMINDERS) || '[]'),
   addReminder: async (data: any): Promise<ServiceReminder> => {
@@ -617,6 +621,10 @@ export const dbService = {
   updateReminderStatus: async (id: string, status: 'Pending' | 'Sent'): Promise<void> => {
     const current = await dbService.getReminders();
     localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify(current.map(r => r.id === id ? { ...r, status, lastNotified: new Date().toISOString() } : r)));
+  },
+  updateReminder: async (id: string, updates: Partial<ServiceReminder>): Promise<void> => {
+    const current = await dbService.getReminders();
+    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify(current.map(r => r.id === id ? { ...r, ...updates } : r)));
   },
   deleteReminder: async (id: string): Promise<void> => {
     const current = await dbService.getReminders();
@@ -1051,5 +1059,53 @@ export const dbService = {
   deletePaymentReceipt: async (id: string): Promise<void> => {
     const receipts = await dbService.getPaymentReceipts();
     localStorage.setItem(LS_KEYS.PAYMENT_RECEIPTS, JSON.stringify(receipts.filter(r => r.id !== id)));
+  },
+
+  updatePaymentReceipt: async (id: string, updates: Partial<PaymentReceipt>): Promise<void> => {
+    const receipts = await dbService.getPaymentReceipts();
+    const updatedReceipts = receipts.map(r => r.id === id ? { ...r, ...updates } : r);
+    localStorage.setItem(LS_KEYS.PAYMENT_RECEIPTS, JSON.stringify(updatedReceipts));
+
+    // Also try to update linked transactions if amount changed
+    // This is a best-effort attempt to keep ledgers in sync
+    const originalReceipt = receipts.find(r => r.id === id);
+    if (originalReceipt) {
+      const txns = await dbService.getTransactions();
+      // Find transactions with matching description pattern
+      const receiptNum = originalReceipt.receiptNumber;
+
+      let updatedTxns = [...txns];
+      let changed = false;
+
+      // Update Cash Transaction
+      if ((updates.cashAmount !== undefined && updates.cashAmount !== originalReceipt.cashAmount) || updates.date) {
+        const cashTxnIndex = updatedTxns.findIndex(t => t.description.includes(receiptNum) && t.paymentMode === 'Cash');
+        if (cashTxnIndex !== -1) {
+          updatedTxns[cashTxnIndex] = {
+            ...updatedTxns[cashTxnIndex],
+            amount: updates.cashAmount !== undefined ? updates.cashAmount : updatedTxns[cashTxnIndex].amount,
+            date: updates.date || updatedTxns[cashTxnIndex].date
+          };
+          changed = true;
+        }
+      }
+
+      // Update UPI Transaction
+      if ((updates.upiAmount !== undefined && updates.upiAmount !== originalReceipt.upiAmount) || updates.date) {
+        const upiTxnIndex = updatedTxns.findIndex(t => t.description.includes(receiptNum) && t.paymentMode === 'UPI');
+        if (upiTxnIndex !== -1) {
+          updatedTxns[upiTxnIndex] = {
+            ...updatedTxns[upiTxnIndex],
+            amount: updates.upiAmount !== undefined ? updates.upiAmount : updatedTxns[upiTxnIndex].amount,
+            date: updates.date || updatedTxns[upiTxnIndex].date
+          };
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(updatedTxns));
+      }
+    }
   }
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Plus, Send, User, Bike, Calendar, MessageCircle, ArrowLeft, Search, Filter } from 'lucide-react';
+import { Bell, Plus, Send, User, Bike, Calendar, MessageCircle, ArrowLeft, Search, Filter, Edit2, Trash2 } from 'lucide-react';
 import { dbService } from '../db';
 import { ServiceReminder, Customer } from '../types';
 import { Card } from '../components/ui/Card';
@@ -18,6 +18,9 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [loading, setLoading] = useState(true);
    const [customers, setCustomers] = useState<Customer[]>([]);
+
+   // Edit Mode
+   const [editingId, setEditingId] = useState<string | null>(null);
 
    // Filter state
    const [filterType, setFilterType] = useState<'all' | 'thisMonth' | 'nextMonth' | 'custom'>('all');
@@ -60,18 +63,52 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       try {
-         await dbService.addReminder(formData);
+         if (editingId) {
+            await dbService.updateReminder(editingId, conversationFormDataToReminderPoints(formData));
+         } else {
+            await dbService.addReminder(formData);
+         }
          await loadData();
-         setIsModalOpen(false);
-         setFormData({
-            customerName: '',
-            phone: '',
-            bikeNumber: '',
-            serviceDate: new Date().toISOString().split('T')[0],
-            message: ''
-         });
+         resetForm();
       } catch (err) {
-         alert('Failed to add reminder. Please try again.');
+         alert('Failed to save reminder. Please try again.');
+      }
+   };
+
+   // Helper for type safety if needed, or just spread
+   const conversationFormDataToReminderPoints = (data: typeof formData) => ({
+      ...data,
+      reminderDate: data.serviceDate // Mapping serviceDate back to reminderDate logic if needed
+   });
+
+   const resetForm = () => {
+      setIsModalOpen(false);
+      setEditingId(null);
+      setFormData({
+         customerName: '',
+         phone: '',
+         bikeNumber: '',
+         serviceDate: new Date().toISOString().split('T')[0],
+         message: ''
+      });
+   };
+
+   const handleEdit = (reminder: ServiceReminder) => {
+      setEditingId(reminder.id);
+      setFormData({
+         customerName: reminder.customerName,
+         phone: reminder.phone,
+         bikeNumber: reminder.bikeNumber,
+         serviceDate: reminder.serviceDate || reminder.reminderDate,
+         message: reminder.message || ''
+      });
+      setIsModalOpen(true);
+   };
+
+   const handleDelete = async (id: string) => {
+      if (confirm('Are you sure you want to delete this reminder?')) {
+         await dbService.deleteReminder(id);
+         loadData();
       }
    };
 
@@ -88,7 +125,9 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
       const currentYear = now.getFullYear();
 
       return reminders.filter(r => {
-         const rDate = new Date(r.serviceDate);
+         // Handle both field names just in case
+         const rDateStr = r.serviceDate || r.reminderDate;
+         const rDate = new Date(rDateStr);
 
          if (filterType === 'thisMonth') {
             return rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear;
@@ -104,7 +143,7 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
             return rDate >= start && rDate <= end;
          }
          return true;
-      }).sort((a, b) => new Date(a.serviceDate).getTime() - new Date(b.serviceDate).getTime());
+      }).sort((a, b) => new Date(a.serviceDate || a.reminderDate).getTime() - new Date(b.serviceDate || b.reminderDate).getTime());
    };
 
    // Autocomplete Handlers
@@ -155,7 +194,10 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
                   <p className="text-sm text-slate-600 mt-1">{filteredReminders.length} reminders found</p>
                </div>
             </div>
-            <Button onClick={() => setIsModalOpen(true)}>
+            <Button onClick={() => {
+               resetForm();
+               setIsModalOpen(true);
+            }}>
                <Plus className="w-5 h-5 mr-2" />
                Add Reminder
             </Button>
@@ -246,7 +288,7 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
                                  </div>
                                  <div className="flex items-center gap-2">
                                     <Calendar className="w-4 h-4" />
-                                    <span>Service due: {new Date(reminder.serviceDate).toLocaleDateString()}</span>
+                                    <span>Service due: {new Date(reminder.serviceDate || reminder.reminderDate).toLocaleDateString()}</span>
                                  </div>
                                  {reminder.message && (
                                     <div className="flex items-start gap-2 mt-2">
@@ -256,9 +298,27 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
                                  )}
                               </div>
                            </div>
-                           <Badge variant="warning" size="sm">
-                              Pending
-                           </Badge>
+                           <div className="flex flex-col gap-2 items-end">
+                              <Badge variant="warning" size="sm">
+                                 {reminder.status || 'Pending'}
+                              </Badge>
+                              <div className="flex items-center gap-1">
+                                 <button
+                                    onClick={() => handleEdit(reminder)}
+                                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Edit"
+                                 >
+                                    <Edit2 className="w-4 h-4" />
+                                 </button>
+                                 <button
+                                    onClick={() => handleDelete(reminder.id)}
+                                    className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Delete"
+                                 >
+                                    <Trash2 className="w-4 h-4" />
+                                 </button>
+                              </div>
+                           </div>
                         </div>
 
                         <Button
@@ -278,7 +338,7 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
          <Modal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
-            title="Add Service Reminder"
+            title={editingId ? "Edit Service Reminder" : "Add Service Reminder"}
             size="md"
          >
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -341,11 +401,11 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
                </div>
 
                <div className="border-t border-slate-200 pt-4 flex gap-3">
-                  <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="flex-1">
+                  <Button type="button" variant="ghost" onClick={resetForm} className="flex-1">
                      Cancel
                   </Button>
                   <Button type="submit" className="flex-1">
-                     Add Reminder
+                     {editingId ? 'Update Reminder' : 'Add Reminder'}
                   </Button>
                </div>
             </form>

@@ -187,12 +187,15 @@ export interface InventoryItem {
 
 export interface Expense {
   id: string;
-  title: string;
+  description: string; // Used in UI
   amount: number;
+  category: string;
   date: string;
-  notes: string;
-  accountId: string;
   paymentMode: string;
+  // Legacy or unused fields kept optional just in case
+  title?: string;
+  notes?: string;
+  accountId?: string;
 }
 
 export interface Salesman {

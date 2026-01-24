@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Search, Calendar, DollarSign, Smartphone, Save, History, Printer, CreditCard, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Search, Calendar, DollarSign, Smartphone, Save, History, Printer, CreditCard, MessageCircle, Edit2, Trash2 } from 'lucide-react';
 import { dbService } from '../db';
 import { Customer, PaymentReceipt } from '../types';
 import { Card } from '../components/ui/Card';
@@ -24,6 +24,9 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
     const [recentReceipts, setRecentReceipts] = useState<PaymentReceipt[]>([]);
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+
+    // Edit Mode State
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
@@ -55,6 +58,62 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
         setShowCustomerList(false);
     };
 
+    const handleEdit = (receipt: PaymentReceipt) => {
+        // Find customer
+        const customer = customers.find(c => c.id === receipt.customerId);
+        if (customer) {
+            setSelectedCustomer(customer);
+            setSearchTerm(customer.name);
+        } else {
+            // Fallback object if customer deleted (display only)
+            setSelectedCustomer({
+                id: receipt.customerId,
+                name: receipt.customerName,
+                phone: receipt.customerPhone,
+                bikeNumber: receipt.bikeNumber || '',
+                loyaltyPoints: 0,
+                createdAt: '',
+                email: '',
+                city: '',
+                address: ''
+            });
+            setSearchTerm(receipt.customerName);
+        }
+
+        setEditingId(receipt.id);
+        setDate(receipt.date);
+        setCashAmount(receipt.cashAmount > 0 ? receipt.cashAmount.toString() : '');
+        setUpiAmount(receipt.upiAmount > 0 ? receipt.upiAmount.toString() : '');
+        setDescription(receipt.description || '');
+
+        // Scroll to form (top)
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDelete = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent card click
+        if (confirm('Are you sure you want to delete this receipt? Linked transactions will be removed.')) {
+            try {
+                await dbService.deletePaymentReceipt(id);
+                // Refresh list
+                const receiptsData = await dbService.getPaymentReceipts();
+                setRecentReceipts(receiptsData.slice(0, 10));
+            } catch (err) {
+                alert('Failed to delete receipt');
+            }
+        }
+    };
+
+    const resetForm = () => {
+        setEditingId(null);
+        setSelectedCustomer(null);
+        setSearchTerm('');
+        setCashAmount('');
+        setUpiAmount('');
+        setDescription('');
+        setDate(new Date().toISOString().split('T')[0]);
+    };
+
     const handleSave = async () => {
         if (!selectedCustomer) {
             alert('Please select a customer');
@@ -72,31 +131,39 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
 
         setSubmitting(true);
         try {
-            await dbService.addPaymentReceipt({
-                customerId: selectedCustomer.id,
-                customerName: selectedCustomer.name,
-                customerPhone: selectedCustomer.phone,
-                bikeNumber: selectedCustomer.bikeNumber,
-                cashAmount: cash,
-                upiAmount: upi,
-                totalAmount: total,
-                date: date,
-                description: description
-            });
+            if (editingId) {
+                await dbService.updatePaymentReceipt(editingId, {
+                    customerId: selectedCustomer.id,
+                    customerName: selectedCustomer.name,
+                    customerPhone: selectedCustomer.phone,
+                    bikeNumber: selectedCustomer.bikeNumber,
+                    cashAmount: cash,
+                    upiAmount: upi,
+                    totalAmount: total,
+                    date: date,
+                    description: description
+                });
+                alert('Receipt Updated Successfully!');
+            } else {
+                await dbService.addPaymentReceipt({
+                    customerId: selectedCustomer.id,
+                    customerName: selectedCustomer.name,
+                    customerPhone: selectedCustomer.phone,
+                    bikeNumber: selectedCustomer.bikeNumber,
+                    cashAmount: cash,
+                    upiAmount: upi,
+                    totalAmount: total,
+                    date: date,
+                    description: description
+                });
+                alert('Payment Receipt Saved Successfully!');
+            }
 
-            // Reset form
-            setSelectedCustomer(null);
-            setSearchTerm('');
-            setCashAmount('');
-            setUpiAmount('');
-            setDescription('');
-            setDate(new Date().toISOString().split('T')[0]);
+            resetForm();
 
             // Reload receipts
             const receiptsData = await dbService.getPaymentReceipts();
             setRecentReceipts(receiptsData.slice(0, 10));
-
-            alert('Payment Receipt Saved Successfully!');
 
         } catch (error) {
             console.error('Error saving receipt:', error);
@@ -228,7 +295,9 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                 <div className="space-y-6">
                     <Card>
                         <div className="space-y-4">
-                            <h2 className="font-semibold text-lg text-slate-900 border-b pb-2 mb-4">New Payment</h2>
+                            <h2 className="font-semibold text-lg text-slate-900 border-b pb-2 mb-4">
+                                {editingId ? 'Edit Payment Receipt' : 'New Payment'}
+                            </h2>
 
                             {/* Date Selection */}
                             <div>
@@ -256,7 +325,12 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                                         onChange={(e) => {
                                             setSearchTerm(e.target.value);
                                             setShowCustomerList(true);
-                                            if (selectedCustomer) setSelectedCustomer(null);
+                                            // Only clear selectedCustomer if user initiates typing to search NEW one
+                                            // In edit mode we want to keep it until they change it.
+                                            // But if they type, it implies change. We'll handle this carefully.
+                                            if (searchTerm !== e.target.value) {
+                                                setSelectedCustomer(null);
+                                            }
                                         }}
                                         onFocus={() => setShowCustomerList(true)}
                                         className={`w-full pl-10 pr-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 ${!selectedCustomer && searchTerm && filteredCustomers.length === 0 ? 'border-red-300' : 'border-slate-200'
@@ -345,11 +419,19 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="pt-4">
+                            <div className="pt-4 flex gap-3">
+                                {editingId && (
+                                    <button
+                                        onClick={resetForm}
+                                        className="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all"
+                                    >
+                                        Cancel Edit
+                                    </button>
+                                )}
                                 <button
                                     onClick={handleSave}
                                     disabled={submitting || (!selectedCustomer)}
-                                    className={`w-full py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${submitting || !selectedCustomer
+                                    className={`flex-[2] py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${submitting || !selectedCustomer
                                         ? 'bg-slate-400 cursor-not-allowed'
                                         : 'bg-blue-600 hover:bg-blue-700 hover:shadow-xl hover:-translate-y-1'
                                         }`}
@@ -359,7 +441,7 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                                     ) : (
                                         <>
                                             <Save className="w-5 h-5" />
-                                            Save Receipt
+                                            {editingId ? 'Update Receipt' : 'Save Receipt'}
                                         </>
                                     )}
                                 </button>
@@ -400,7 +482,7 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                             </div>
                         ) : (
                             recentReceipts.map((receipt) => (
-                                <Card key={receipt.id} padding="sm" className="hover:shadow-md transition-shadow">
+                                <Card key={receipt.id} padding="sm" className={`hover:shadow-md transition-shadow ${editingId === receipt.id ? 'ring-2 ring-blue-500' : ''}`}>
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
@@ -443,6 +525,20 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                                                     title="Print Receipt"
                                                 >
                                                     <Printer className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleEdit(receipt)}
+                                                    className="text-slate-400 hover:text-amber-600 p-1.5 hover:bg-amber-50 rounded-lg transition-colors"
+                                                    title="Edit Receipt"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleDelete(receipt.id, e)}
+                                                    className="text-slate-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Delete Receipt"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         </div>

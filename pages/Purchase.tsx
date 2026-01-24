@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Building, Phone, Calculator, Check, ArrowLeft } from 'lucide-react';
+import { Plus, Package, Building, Phone, Calculator, Check, ArrowLeft, Edit2, AlertTriangle, Save } from 'lucide-react';
 import { dbService } from '../db';
 import { InventoryItem, Customer, Transaction } from '../types';
 import { Card } from '../components/ui/Card';
@@ -37,6 +37,14 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
    const [manualItem, setManualItem] = useState({ name: '', price: '', quantity: '1' });
    const [useManualItem, setUseManualItem] = useState(false);
    const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+   // Edit Transaction State
+   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+   const [editForm, setEditForm] = useState({
+      date: '',
+      amount: '',
+      description: ''
+   });
 
    useEffect(() => {
       loadData();
@@ -161,6 +169,31 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
       }
    };
 
+   const openEditModal = (txn: Transaction) => {
+      setEditingTransaction(txn);
+      setEditForm({
+         date: txn.date,
+         amount: txn.amount.toString(),
+         description: txn.description
+      });
+   };
+
+   const handleUpdateTransaction = async () => {
+      if (!editingTransaction) return;
+
+      try {
+         await dbService.updateTransaction(editingTransaction.id, {
+            date: editForm.date,
+            amount: parseFloat(editForm.amount),
+            description: editForm.description
+         });
+         setEditingTransaction(null);
+         loadData();
+      } catch (err) {
+         alert('Failed to update transaction');
+      }
+   };
+
    if (loading) {
       return (
          <div className="flex items-center justify-center min-h-screen">
@@ -221,8 +254,16 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
                            </div>
                            <div className="text-right pl-4">
                               <div className="text-lg font-bold text-red-600">-₹{txn.amount.toLocaleString()}</div>
-                              <div className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block mt-1">
-                                 Purchase
+                              <div className="flex flex-col items-end gap-1 mt-1">
+                                 <div className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block">
+                                    Purchase
+                                 </div>
+                                 <button
+                                    onClick={() => openEditModal(txn)}
+                                    className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded flex items-center gap-1"
+                                 >
+                                    <Edit2 className="w-3 h-3" /> Edit
+                                 </button>
                               </div>
                            </div>
                         </div>
@@ -387,7 +428,52 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
                </div>
             </div>
          </Modal>
-      </div>
+         <Modal
+            isOpen={!!editingTransaction}
+            onClose={() => setEditingTransaction(null)}
+            title="Edit Purchase Transaction"
+         >
+            <div className="space-y-4">
+               <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-sm flex gap-2">
+                  <AlertTriangle className="w-10 h-10 shrink-0" />
+                  <p>
+                     <strong>Warning:</strong> Updating this record will only change the financial ledger (Amount/Date).
+                     It will NOT automatically adjust inventory stock. If you need to correct stock, please do so manually in the Inventory tab.
+                  </p>
+               </div>
+
+               <Input
+                  label="Date"
+                  type="date"
+                  value={editForm.date ? new Date(editForm.date).toISOString().split('T')[0] : ''}
+                  onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+               />
+
+               <Input
+                  label="Total Amount"
+                  type="number"
+                  value={editForm.amount}
+                  onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+               />
+
+               <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700">Description / Details</label>
+                  <textarea
+                     className="w-full border border-slate-300 rounded-lg p-2 h-24 focus:ring-2 focus:ring-blue-500 outline-none"
+                     value={editForm.description}
+                     onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  />
+               </div>
+
+               <div className="flex justify-end gap-3 pt-2">
+                  <Button variant="ghost" onClick={() => setEditingTransaction(null)}>Cancel</Button>
+                  <Button onClick={handleUpdateTransaction}>
+                     <Save className="w-4 h-4 mr-2" /> Save Changes
+                  </Button>
+               </div>
+            </div>
+         </Modal>
+      </div >
    );
 };
 
