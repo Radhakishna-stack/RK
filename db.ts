@@ -317,10 +317,47 @@ export const dbService = {
 
   getComplaints: async (): Promise<Complaint[]> => JSON.parse(localStorage.getItem(LS_KEYS.COMPLAINTS) || '[]'),
   addComplaint: async (data: any): Promise<Complaint> => {
-    const current = await dbService.getComplaints();
-    const newComp = { ...data, id: 'J' + Date.now(), status: ComplaintStatus.PENDING, createdAt: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify([newComp, ...current]));
-    return newComp;
+    const currentComplaints = await dbService.getComplaints();
+    const newComplaint = {
+      ...data,
+      id: 'B' + Date.now(),
+      status: ComplaintStatus.PENDING,
+      createdAt: new Date().toISOString()
+    };
+
+    // Auto-save/update customer details
+    const currentCustomers = await dbService.getCustomers();
+    const existingCustIndex = currentCustomers.findIndex(c =>
+      c.bikeNumber.toUpperCase() === data.bikeNumber.toUpperCase()
+    );
+
+    if (existingCustIndex !== -1) {
+      // Update existing customer details (name and phone)
+      currentCustomers[existingCustIndex] = {
+        ...currentCustomers[existingCustIndex],
+        name: data.customerName,
+        phone: data.customerPhone || currentCustomers[existingCustIndex].phone,
+        city: data.city || currentCustomers[existingCustIndex].city
+      };
+    } else {
+      // Create new customer record
+      currentCustomers.push({
+        id: 'C' + Date.now(),
+        name: data.customerName,
+        bikeNumber: data.bikeNumber.toUpperCase(),
+        phone: data.customerPhone || '',
+        city: data.city || '',
+        loyaltyPoints: 0,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    // Save updated customers list
+    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(currentCustomers));
+
+    // Save complaint
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify([newComplaint, ...currentComplaints]));
+    return newComplaint;
   },
   updateComplaintStatus: async (id: string, status: ComplaintStatus): Promise<void> => {
     const current = await dbService.getComplaints();
@@ -341,12 +378,40 @@ export const dbService = {
 
   getInvoices: async (): Promise<Invoice[]> => JSON.parse(localStorage.getItem(LS_KEYS.INVOICES) || '[]'),
   generateInvoice: async (data: any): Promise<Invoice> => {
-    const current = await dbService.getInvoices();
+    const currentInvoices = await dbService.getInvoices();
     const accounts = await dbService.getBankAccounts();
+    const currentCustomers = await dbService.getCustomers();
 
-    // Create invoice
-    const newInv = { ...data, id: 'I' + Date.now(), date: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...current]));
+    // Auto-save/update customer details
+    const existingCustIndex = currentCustomers.findIndex(c =>
+      c.bikeNumber.toUpperCase() === data.bikeNumber.toUpperCase()
+    );
+
+    if (existingCustIndex !== -1) {
+      // Update existing customer details (name and phone)
+      currentCustomers[existingCustIndex] = {
+        ...currentCustomers[existingCustIndex],
+        name: data.customerName,
+        phone: data.customerPhone || currentCustomers[existingCustIndex].phone
+      };
+    } else {
+      // Create new customer record
+      currentCustomers.push({
+        id: 'C' + Date.now(),
+        name: data.customerName,
+        bikeNumber: data.bikeNumber.toUpperCase(),
+        phone: data.customerPhone || '',
+        loyaltyPoints: 0,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    // Persist updated customer list
+    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(currentCustomers));
+
+    // Handle Invoice creation
+    const newInv = { ...data, id: 'I' + Date.now(), date: data.date || new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...currentInvoices]));
 
     // Handle payment collections (Cash and UPI)
     if (data.paymentCollections) {
@@ -396,8 +461,8 @@ export const dbService = {
 
       const earned = Math.floor(paidAmount / rate);
 
-      const customers = await dbService.getCustomers();
-      const cust = customers.find(c => c.bikeNumber === data.bikeNumber || c.name === data.customerName);
+      // We use the updated currentCustomers list we prepared earlier
+      const cust = currentCustomers.find(c => c.bikeNumber.toUpperCase() === data.bikeNumber.toUpperCase());
       if (cust && earned > 0) {
         await dbService.updateCustomerLoyalty(cust.id, (cust.loyaltyPoints || 0) + earned);
       }
