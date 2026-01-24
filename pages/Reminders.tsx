@@ -174,25 +174,53 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
          </Card>
 
          {/* Filter Section */}
-         <div className="flex gap-2 overflow-x-auto pb-2">
-            <button
-               onClick={() => setFilterType('all')}
-               className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${filterType === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
-            >
-               All
-            </button>
-            <button
-               onClick={() => setFilterType('thisMonth')}
-               className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${filterType === 'thisMonth' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
-            >
-               This Month
-            </button>
-            <button
-               onClick={() => setFilterType('nextMonth')}
-               className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${filterType === 'nextMonth' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
-            >
-               Next Month
-            </button>
+         <div className="space-y-3">
+            <div className="flex gap-2 overflow-x-auto pb-2">
+               <button
+                  onClick={() => setFilterType('all')}
+                  className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${filterType === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
+               >
+                  All
+               </button>
+               <button
+                  onClick={() => setFilterType('thisMonth')}
+                  className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${filterType === 'thisMonth' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
+               >
+                  This Month
+               </button>
+               <button
+                  onClick={() => setFilterType('nextMonth')}
+                  className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${filterType === 'nextMonth' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
+               >
+                  Next Month
+               </button>
+               <button
+                  onClick={() => setFilterType('custom')}
+                  className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${filterType === 'custom' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
+               >
+                  Custom Date
+               </button>
+            </div>
+
+            {filterType === 'custom' && (
+               <div className="flex gap-2 items-center bg-white p-3 rounded-xl border border-slate-200 overflow-x-auto">
+                  <input
+                     type="date"
+                     value={customDate.start}
+                     onChange={(e) => setCustomDate({ ...customDate, start: e.target.value })}
+                     className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                     placeholder="Start Date"
+                  />
+                  <span className="text-slate-400 font-medium">to</span>
+                  <input
+                     type="date"
+                     value={customDate.end}
+                     onChange={(e) => setCustomDate({ ...customDate, end: e.target.value })}
+                     className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                     placeholder="End Date"
+                  />
+               </div>
+            )}
          </div>
 
          <div className="space-y-3">
