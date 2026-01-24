@@ -4,7 +4,7 @@ import {
   Plus, Trash2, Save, Calendar, Bike, Phone, User, FileText, Receipt, Wallet, Banknote
 } from 'lucide-react';
 import { dbService } from '../db';
-import { InventoryItem, BankAccount, Invoice } from '../types';
+import { InventoryItem, BankAccount, Invoice, Customer } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -14,7 +14,7 @@ import { AutocompleteDropdown } from '../components/AutocompleteDropdown';
 const BillingPage: React.FC = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Invoice form fields
@@ -51,7 +51,7 @@ const BillingPage: React.FC = () => {
   const [showNameDropdown, setShowNameDropdown] = useState(false);
   const [showBikeDropdown, setShowBikeDropdown] = useState(false);
   const [showPhoneDropdown, setShowPhoneDropdown] = useState(false);
-  const [filteredCustomers, setFilteredCustomers] = useState<any[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
 
   useEffect(() => {
     loadData();

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Plus, Clock, TrendingUp, Receipt, AlertCircle,
-  ClipboardCheck, Users, Package, DollarSign, Bike, Phone
+  ClipboardCheck, Users, Package, Bike, Phone, Wallet
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Invoice, Customer, DashboardStats, Complaint, ComplaintStatus } from '../types';
@@ -77,7 +77,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             <h2 className="text-4xl font-bold">₹{(stats?.totalReceived || 0).toLocaleString()}</h2>
           </div>
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
-            <DollarSign className="w-8 h-8" />
+            <Wallet className="w-8 h-8" />
           </div>
         </div>
       </Card>
@@ -204,13 +204,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         <MiniStat
           label="Cash Balance"
           value={`₹${(stats?.cashInHand || 0).toLocaleString()}`}
-          icon={<DollarSign className="w-5 h-5" />}
+          icon={<Wallet className="w-5 h-5" />}
           onClick={() => onNavigate('cash_in_hand')}
         />
         <MiniStat
           label="Bank Balance"
           value={`₹${(stats?.bankBalance || 0).toLocaleString()}`}
-          icon={<DollarSign className="w-5 h-5" />}
+          icon={<Wallet className="w-5 h-5" />}
           onClick={() => onNavigate('bank_accounts')}
         />
       </div>

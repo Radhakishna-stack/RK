@@ -117,6 +117,43 @@ const DEFAULT_SETTINGS: AppSettings = {
   accounting: { enabled: false, allowJournalEntries: false }
 };
 
+// Helper function to create or update customer records
+const upsertCustomer = async (customerData: {
+  customerName: string;
+  bikeNumber: string;
+  customerPhone?: string;
+  city?: string;
+}): Promise<void> => {
+  const currentCustomers = await dbService.getCustomers();
+  const existingCustIndex = currentCustomers.findIndex(c =>
+    c.bikeNumber.toUpperCase() === customerData.bikeNumber.toUpperCase()
+  );
+
+  if (existingCustIndex !== -1) {
+    // Update existing customer details
+    currentCustomers[existingCustIndex] = {
+      ...currentCustomers[existingCustIndex],
+      name: customerData.customerName,
+      phone: customerData.customerPhone || currentCustomers[existingCustIndex].phone,
+      city: customerData.city || currentCustomers[existingCustIndex].city
+    };
+  } else {
+    // Create new customer record
+    currentCustomers.push({
+      id: 'C' + Date.now(),
+      name: customerData.customerName,
+      bikeNumber: customerData.bikeNumber.toUpperCase(),
+      phone: customerData.customerPhone || '',
+      city: customerData.city || '',
+      loyaltyPoints: 0,
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  // Persist updated customer list
+  localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(currentCustomers));
+};
+
 export const dbService = {
   getConnectionStatus: () => 'connected',
 
@@ -325,35 +362,13 @@ export const dbService = {
       createdAt: new Date().toISOString()
     };
 
-    // Auto-save/update customer details
-    const currentCustomers = await dbService.getCustomers();
-    const existingCustIndex = currentCustomers.findIndex(c =>
-      c.bikeNumber.toUpperCase() === data.bikeNumber.toUpperCase()
-    );
-
-    if (existingCustIndex !== -1) {
-      // Update existing customer details (name and phone)
-      currentCustomers[existingCustIndex] = {
-        ...currentCustomers[existingCustIndex],
-        name: data.customerName,
-        phone: data.customerPhone || currentCustomers[existingCustIndex].phone,
-        city: data.city || currentCustomers[existingCustIndex].city
-      };
-    } else {
-      // Create new customer record
-      currentCustomers.push({
-        id: 'C' + Date.now(),
-        name: data.customerName,
-        bikeNumber: data.bikeNumber.toUpperCase(),
-        phone: data.customerPhone || '',
-        city: data.city || '',
-        loyaltyPoints: 0,
-        createdAt: new Date().toISOString()
-      });
-    }
-
-    // Save updated customers list
-    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(currentCustomers));
+    // Auto-save/update customer details using helper
+    await upsertCustomer({
+      customerName: data.customerName,
+      bikeNumber: data.bikeNumber,
+      customerPhone: data.customerPhone,
+      city: data.city
+    });
 
     // Save complaint
     localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify([newComplaint, ...currentComplaints]));
@@ -380,34 +395,13 @@ export const dbService = {
   generateInvoice: async (data: any): Promise<Invoice> => {
     const currentInvoices = await dbService.getInvoices();
     const accounts = await dbService.getBankAccounts();
-    const currentCustomers = await dbService.getCustomers();
 
-    // Auto-save/update customer details
-    const existingCustIndex = currentCustomers.findIndex(c =>
-      c.bikeNumber.toUpperCase() === data.bikeNumber.toUpperCase()
-    );
-
-    if (existingCustIndex !== -1) {
-      // Update existing customer details (name and phone)
-      currentCustomers[existingCustIndex] = {
-        ...currentCustomers[existingCustIndex],
-        name: data.customerName,
-        phone: data.customerPhone || currentCustomers[existingCustIndex].phone
-      };
-    } else {
-      // Create new customer record
-      currentCustomers.push({
-        id: 'C' + Date.now(),
-        name: data.customerName,
-        bikeNumber: data.bikeNumber.toUpperCase(),
-        phone: data.customerPhone || '',
-        loyaltyPoints: 0,
-        createdAt: new Date().toISOString()
-      });
-    }
-
-    // Persist updated customer list
-    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(currentCustomers));
+    // Auto-save/update customer details using helper
+    await upsertCustomer({
+      customerName: data.customerName,
+      bikeNumber: data.bikeNumber,
+      customerPhone: data.customerPhone
+    });
 
     // Handle Invoice creation
     const newInv = { ...data, id: 'I' + Date.now(), date: data.date || new Date().toISOString() };
@@ -461,8 +455,9 @@ export const dbService = {
 
       const earned = Math.floor(paidAmount / rate);
 
-      // We use the updated currentCustomers list we prepared earlier
-      const cust = currentCustomers.find(c => c.bikeNumber.toUpperCase() === data.bikeNumber.toUpperCase());
+      // Fetch customer after upsert to get the latest data
+      const updatedCustomers = await dbService.getCustomers();
+      const cust = updatedCustomers.find(c => c.bikeNumber.toUpperCase() === data.bikeNumber.toUpperCase());
       if (cust && earned > 0) {
         await dbService.updateCustomerLoyalty(cust.id, (cust.loyaltyPoints || 0) + earned);
       }
