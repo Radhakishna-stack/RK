@@ -342,17 +342,63 @@ export const dbService = {
   getInvoices: async (): Promise<Invoice[]> => JSON.parse(localStorage.getItem(LS_KEYS.INVOICES) || '[]'),
   generateInvoice: async (data: any): Promise<Invoice> => {
     const current = await dbService.getInvoices();
+    const accounts = await dbService.getBankAccounts();
+
+    // Create invoice
     const newInv = { ...data, id: 'I' + Date.now(), date: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...current]));
 
-    if (data.paymentStatus === 'Paid') {
+    // Handle payment collections (Cash and UPI)
+    if (data.paymentCollections) {
+      const { cash, upi } = data.paymentCollections;
+
+      // Create Cash transaction if cash amount > 0
+      if (cash > 0) {
+        const cashAccount = accounts.find(a => a.type === 'Cash');
+        if (cashAccount) {
+          await dbService.addTransaction({
+            entityId: data.bikeNumber,
+            accountId: cashAccount.id,
+            type: 'IN',
+            amount: cash,
+            paymentMode: 'Cash',
+            description: `Payment for Invoice ${newInv.id} - ${data.customerName}`
+          });
+        }
+      }
+
+      // Create UPI transaction if UPI amount > 0
+      if (upi > 0) {
+        const upiAccount = accounts.find(a => a.type === 'UPI/Wallet') || accounts.find(a => a.type !== 'Cash');
+        if (upiAccount) {
+          await dbService.addTransaction({
+            entityId: data.bikeNumber,
+            accountId: upiAccount.id,
+            type: 'IN',
+            amount: upi,
+            paymentMode: 'UPI',
+            description: `Payment for Invoice ${newInv.id} - ${data.customerName}`
+          });
+        }
+      }
+    }
+
+    // Update loyalty points if payment is made
+    if (data.paymentStatus === 'Paid' || data.paymentStatus === 'Pending') {
       const settings = await dbService.getSettings();
       const rate = settings.party.loyaltyRate || 100;
-      const earned = Math.floor(data.finalAmount / rate);
+
+      // Calculate loyalty points based on amount paid, not total invoice amount
+      let paidAmount = data.finalAmount;
+      if (data.paymentCollections && data.paymentStatus === 'Pending') {
+        paidAmount = (data.paymentCollections.cash || 0) + (data.paymentCollections.upi || 0);
+      }
+
+      const earned = Math.floor(paidAmount / rate);
 
       const customers = await dbService.getCustomers();
       const cust = customers.find(c => c.bikeNumber === data.bikeNumber || c.name === data.customerName);
-      if (cust) {
+      if (cust && earned > 0) {
         await dbService.updateCustomerLoyalty(cust.id, (cust.loyaltyPoints || 0) + earned);
       }
     }

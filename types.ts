@@ -111,6 +111,12 @@ export interface InvoiceItem {
   inventoryItemId?: string;
 }
 
+export interface PaymentCollection {
+  cash: number;
+  upi: number;
+  total: number;
+}
+
 export interface Invoice {
   id: string;
   complaintId?: string; // Optional - direct sales don't need a complaint
@@ -130,6 +136,7 @@ export interface Invoice {
   odometerReading?: number;
   docType?: 'Sale' | 'Estimate';
   serviceReminderDate?: string;
+  paymentCollections?: { cash: number; upi: number }; // Track split payment amounts
 }
 
 export interface BankAccount {
