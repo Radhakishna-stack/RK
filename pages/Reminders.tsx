@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Plus, Send, User, Bike, Calendar, MessageCircle, ArrowLeft } from 'lucide-react';
+import { Bell, Plus, Send, User, Bike, Calendar, MessageCircle, ArrowLeft, Search, Filter } from 'lucide-react';
 import { dbService } from '../db';
-import { ServiceReminder } from '../types';
+import { ServiceReminder, Customer } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
+import { AutocompleteDropdown } from '../components/AutocompleteDropdown';
 
 interface RemindersPageProps {
    onNavigate: (tab: string) => void;
@@ -16,6 +17,17 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
    const [reminders, setReminders] = useState<ServiceReminder[]>([]);
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [loading, setLoading] = useState(true);
+   const [customers, setCustomers] = useState<Customer[]>([]);
+
+   // Filter state
+   const [filterType, setFilterType] = useState<'all' | 'thisMonth' | 'nextMonth' | 'custom'>('all');
+   const [customDate, setCustomDate] = useState({ start: '', end: '' });
+
+   // Autocomplete state
+   const [showNameDropdown, setShowNameDropdown] = useState(false);
+   const [showBikeDropdown, setShowBikeDropdown] = useState(false);
+   const [showPhoneDropdown, setShowPhoneDropdown] = useState(false);
+   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
 
    const [formData, setFormData] = useState({
       customerName: '',
@@ -32,8 +44,12 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
    const loadData = async () => {
       setLoading(true);
       try {
-         const data = await dbService.getReminders();
-         setReminders(data);
+         const [remindersData, customersData] = await Promise.all([
+            dbService.getReminders(),
+            dbService.getCustomers()
+         ]);
+         setReminders(remindersData);
+         setCustomers(customersData);
       } catch (err) {
          console.error(err);
       } finally {
@@ -65,6 +81,57 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
       window.open(whatsappUrl, '_blank');
    };
 
+   // Filter Logic
+   const getFilteredReminders = () => {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      return reminders.filter(r => {
+         const rDate = new Date(r.serviceDate);
+
+         if (filterType === 'thisMonth') {
+            return rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear;
+         }
+         if (filterType === 'nextMonth') {
+            const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+            const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+            return rDate.getMonth() === nextMonth && rDate.getFullYear() === nextYear;
+         }
+         if (filterType === 'custom' && customDate.start && customDate.end) {
+            const start = new Date(customDate.start);
+            const end = new Date(customDate.end);
+            return rDate >= start && rDate <= end;
+         }
+         return true;
+      }).sort((a, b) => new Date(a.serviceDate).getTime() - new Date(b.serviceDate).getTime());
+   };
+
+   // Autocomplete Handlers
+   const handleNameChange = (val: string) => {
+      setFormData({ ...formData, customerName: val });
+      if (val.trim()) {
+         const filtered = customers.filter(c => c.name.toLowerCase().includes(val.toLowerCase()));
+         setFilteredCustomers(filtered);
+         setShowNameDropdown(filtered.length > 0);
+      } else {
+         setShowNameDropdown(false);
+      }
+   };
+
+   const selectCustomer = (customer: Customer) => {
+      setFormData({
+         ...formData,
+         customerName: customer.name,
+         phone: customer.phone || '',
+         bikeNumber: customer.bikeNumber
+      });
+      setShowNameDropdown(false);
+      setShowBikeDropdown(false);
+   };
+
+   const filteredReminders = getFilteredReminders();
+
    if (loading) {
       return (
          <div className="flex items-center justify-center min-h-screen">
@@ -85,7 +152,7 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
                </button>
                <div>
                   <h1 className="text-2xl font-bold text-slate-900">Service Reminders</h1>
-                  <p className="text-sm text-slate-600 mt-1">{reminders.length} active reminders</p>
+                  <p className="text-sm text-slate-600 mt-1">{filteredReminders.length} reminders found</p>
                </div>
             </div>
             <Button onClick={() => setIsModalOpen(true)}>
@@ -106,17 +173,39 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
             </div>
          </Card>
 
+         {/* Filter Section */}
+         <div className="flex gap-2 overflow-x-auto pb-2">
+            <button
+               onClick={() => setFilterType('all')}
+               className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${filterType === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
+            >
+               All
+            </button>
+            <button
+               onClick={() => setFilterType('thisMonth')}
+               className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${filterType === 'thisMonth' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
+            >
+               This Month
+            </button>
+            <button
+               onClick={() => setFilterType('nextMonth')}
+               className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${filterType === 'nextMonth' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}
+            >
+               Next Month
+            </button>
+         </div>
+
          <div className="space-y-3">
-            {reminders.length === 0 ? (
+            {filteredReminders.length === 0 ? (
                <Card>
                   <div className="text-center py-12">
                      <Bell className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                     <h3 className="text-lg font-semibold text-slate-900 mb-2">No reminders</h3>
-                     <p className="text-slate-600">Add service reminders for your customers</p>
+                     <h3 className="text-lg font-semibold text-slate-900 mb-2">No reminders found</h3>
+                     <p className="text-slate-600">Try changing filters or add a new reminder</p>
                   </div>
                </Card>
             ) : (
-               reminders.map((reminder) => (
+               filteredReminders.map((reminder) => (
                   <Card key={reminder.id} padding="md">
                      <div className="space-y-3">
                         <div className="flex items-start justify-between">
@@ -165,15 +254,23 @@ const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
             size="md"
          >
             <form onSubmit={handleSubmit} className="space-y-4">
-               <Input
-                  label="Customer Name"
-                  type="text"
-                  required
-                  placeholder="Enter customer name"
-                  value={formData.customerName}
-                  onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                  icon={<User className="w-5 h-5" />}
-               />
+               <div className="relative">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Customer Name</label>
+                  <Input
+                     type="text"
+                     required
+                     placeholder="Search customer..."
+                     value={formData.customerName}
+                     onChange={(e) => handleNameChange(e.target.value)}
+                     icon={<User className="w-5 h-5" />}
+                  />
+                  <AutocompleteDropdown
+                     show={showNameDropdown}
+                     customers={filteredCustomers}
+                     onSelect={selectCustomer}
+                     displayField="name"
+                  />
+               </div>
 
                <Input
                   label="Phone"

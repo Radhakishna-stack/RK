@@ -483,6 +483,29 @@ export const dbService = {
       }
     }
 
+    // Auto-create Service Reminder if date is set
+    if (data.serviceReminderDate) {
+      const existingReminders = await dbService.getReminders();
+      // Avoid duplicate reminder for same customer and date
+      const duplicate = existingReminders.find(r =>
+        r.bikeNumber === data.bikeNumber &&
+        r.reminderDate === data.serviceReminderDate
+      );
+
+      if (!duplicate) {
+        await dbService.addReminder({
+          customerName: data.customerName,
+          phone: data.customerPhone || '',
+          bikeNumber: data.bikeNumber,
+          reminderDate: data.serviceReminderDate,
+          serviceType: 'General Service',
+          status: 'Pending',
+          message: `Hi ${data.customerName}, your bike service is due on ${data.serviceReminderDate}. Please visit us!`,
+          serviceDate: data.serviceReminderDate // redundant but keeps type happy
+        });
+      }
+    }
+
     return newInv;
   },
   updateInvoicePaymentStatus: async (id: string, status: 'Paid' | 'Pending' | 'Unpaid'): Promise<void> => {
