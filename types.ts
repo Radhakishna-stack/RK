@@ -192,6 +192,7 @@ export interface Expense {
   category: string;
   date: string;
   paymentMode: string;
+  transactionId?: string; // Links to the ledger transaction
   // Legacy or unused fields kept optional just in case
   title?: string;
   notes?: string;

@@ -324,6 +324,11 @@ export const dbService = {
     }
   },
 
+  deleteTransaction: async (id: string): Promise<void> => {
+    const transactions = await dbService.getTransactions();
+    localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(transactions.filter(t => t.id !== id)));
+  },
+
   getCustomerBalance: async (bikeNumber: string, customerName: string): Promise<number> => {
     const invoices = await dbService.getInvoices();
     const txns = await dbService.getTransactions();
@@ -592,22 +597,74 @@ export const dbService = {
   },
 
   getExpenses: async (): Promise<Expense[]> => JSON.parse(localStorage.getItem(LS_KEYS.EXPENSES) || '[]'),
+
   addExpense: async (data: any): Promise<Expense> => {
     const current = await dbService.getExpenses();
-    const newExp = { ...data, id: 'E' + Date.now(), date: new Date().toISOString() };
+    const accounts = await dbService.getBankAccounts();
+
+    // Determine Account ID
+    let accountId = 'CASH-01'; // Default
+    if (data.paymentMode === 'Cash') {
+      accountId = 'CASH-01';
+    } else {
+      // Find a suitable bank/UPI account
+      const bankAcc = accounts.find(a => a.type !== 'Cash' && (a.type === 'UPI' || a.type === 'Savings' || a.type === 'Current'));
+      if (bankAcc) accountId = bankAcc.id;
+      // If no specific match, leave as Cash or fallback? 
+      // If user selected Card but we only have Cash account, it's ambiguous. 
+      // But typically there's a Bank account.
+    }
+
+    // Create Transaction first
+    const newTxn = await dbService.addTransaction({
+      entityId: 'EXPENSE',
+      accountId: accountId,
+      type: 'OUT',
+      amount: data.amount,
+      paymentMode: data.paymentMode,
+      description: `Expense: ${data.description} (${data.category})`,
+      date: data.date || new Date().toISOString()
+    });
+
+    const newExp = {
+      ...data,
+      id: 'E' + Date.now(),
+      date: data.date || new Date().toISOString(),
+      transactionId: newTxn.id,
+      accountId: accountId
+    };
+
     localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify([newExp, ...current]));
     return newExp;
   },
+
   deleteExpense: async (id: string): Promise<void> => {
     const current = await dbService.getExpenses();
     const itemToDelete = current.find(e => e.id === id);
+
     if (itemToDelete) {
+      if (itemToDelete.transactionId) {
+        await dbService.deleteTransaction(itemToDelete.transactionId);
+      }
+
       await dbService.moveToRecycleBin('Expense', itemToDelete);
       localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(current.filter(e => e.id !== id)));
     }
   },
+
   updateExpense: async (id: string, updates: Partial<Expense>): Promise<void> => {
     const current = await dbService.getExpenses();
+    const expense = current.find(e => e.id === id);
+
+    if (expense && expense.transactionId) {
+      // Update linked transaction
+      await dbService.updateTransaction(expense.transactionId, {
+        amount: updates.amount !== undefined ? updates.amount : undefined, // Only update if changed
+        date: updates.date,
+        description: (updates.description || updates.category) ? `Expense: ${updates.description || expense.description} (${updates.category || expense.category})` : undefined
+      });
+    }
+
     localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(current.map(e => e.id === id ? { ...e, ...updates } : e)));
   },
 
