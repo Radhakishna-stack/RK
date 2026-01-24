@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Plus, Send, User, Bike, Calendar, MessageCircle } from 'lucide-react';
+import { Bell, Plus, Send, User, Bike, Calendar, MessageCircle, ArrowLeft } from 'lucide-react';
 import { dbService } from '../db';
 import { ServiceReminder } from '../types';
 import { Card } from '../components/ui/Card';
@@ -8,7 +8,11 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 
-const RemindersPage: React.FC = () => {
+interface RemindersPageProps {
+   onNavigate: (tab: string) => void;
+}
+
+const RemindersPage: React.FC<RemindersPageProps> = ({ onNavigate }) => {
    const [reminders, setReminders] = useState<ServiceReminder[]>([]);
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [loading, setLoading] = useState(true);
@@ -28,7 +32,7 @@ const RemindersPage: React.FC = () => {
    const loadData = async () => {
       setLoading(true);
       try {
-         const data = await dbService.getServiceReminders();
+         const data = await dbService.getReminders();
          setReminders(data);
       } catch (err) {
          console.error(err);
@@ -40,7 +44,7 @@ const RemindersPage: React.FC = () => {
    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       try {
-         await dbService.addServiceReminder(formData);
+         await dbService.addReminder(formData);
          await loadData();
          setIsModalOpen(false);
          setFormData({
@@ -75,9 +79,14 @@ const RemindersPage: React.FC = () => {
    return (
       <div className="space-y-6">
          <div className="flex items-center justify-between">
-            <div>
-               <h1 className="text-2xl font-bold text-slate-900">Service Reminders</h1>
-               <p className="text-sm text-slate-600 mt-1">{reminders.length} active reminders</p>
+            <div className="flex items-center gap-3">
+               <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+                  <ArrowLeft className="w-6 h-6" />
+               </button>
+               <div>
+                  <h1 className="text-2xl font-bold text-slate-900">Service Reminders</h1>
+                  <p className="text-sm text-slate-600 mt-1">{reminders.length} active reminders</p>
+               </div>
             </div>
             <Button onClick={() => setIsModalOpen(true)}>
                <Plus className="w-5 h-5 mr-2" />

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Plus, Search, DollarSign, Calendar, Trash2, Tag, TrendingDown
+  Plus, Search, DollarSign, Calendar, Trash2, Tag, TrendingDown, ArrowLeft
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Expense } from '../types';
@@ -11,7 +11,11 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 
-const ExpensesPage: React.FC = () => {
+interface ExpensesPageProps {
+  onNavigate: (tab: string) => void;
+}
+
+const ExpensesPage: React.FC<ExpensesPageProps> = ({ onNavigate }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -97,9 +101,14 @@ const ExpensesPage: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Expenses</h1>
-          <p className="text-sm text-slate-600 mt-1">{expenses.length} total expenses</p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Expenses</h1>
+            <p className="text-sm text-slate-600 mt-1">{expenses.length} total expenses</p>
+          </div>
         </div>
         <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="w-5 h-5 mr-2" />

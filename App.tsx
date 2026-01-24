@@ -153,7 +153,7 @@ const App: React.FC = () => {
       case 'business': return <DashboardV2 onNavigate={handleNavigate} />;
       case 'money': return <BankAccountsPage onNavigate={handleNavigate} />;
       case 'more': return <MorePage onNavigate={handleNavigate} />;
-      case 'staff_control': return canAccessRoute(userRole, 'staff_control') ? <StaffControlCenter /> : <DashboardPage onNavigate={handleNavigate} />;
+      case 'staff_control': return canAccessRoute(userRole, 'staff_control') ? <StaffControlCenter onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
       case 'items': return <InventoryPage onNavigate={(tab, query) => {
         if (tab === 'market_explorer') navigateToMarketExplorer(query);
         else handleNavigate(tab);
@@ -170,15 +170,15 @@ const App: React.FC = () => {
       case 'sale_report': return canAccessRoute(userRole, 'sale_report') ? <SaleReportPage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
       case 'party_statement': return <PartyStatementPage onNavigate={handleNavigate} />;
       case 'sales': return <SalesListPage onNavigate={handleNavigate} />;
-      case 'billing': return canAccessRoute(userRole, 'billing') ? <BillingPage /> : <DashboardPage onNavigate={handleNavigate} />;
+      case 'billing': return canAccessRoute(userRole, 'billing') ? <BillingPage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
       case 'estimate': return <EstimatePage />;
-      case 'purchase': return canAccessRoute(userRole, 'purchase') ? <PurchasePage /> : <DashboardPage onNavigate={handleNavigate} />;
-      case 'customers': return canAccessRoute(userRole, 'customers') ? <CustomersPage /> : <DashboardPage onNavigate={handleNavigate} />;
-      case 'visitors': return <VisitorsPage />;
-      case 'stock_wanting': return <StockWantingPage />;
-      case 'complaints': return <ComplaintsPage />;
-      case 'expenses': return canAccessRoute(userRole, 'expenses') ? <ExpensesPage /> : <DashboardPage onNavigate={handleNavigate} />;
-      case 'reminders': return <RemindersPage />;
+      case 'purchase': return canAccessRoute(userRole, 'purchase') ? <PurchasePage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
+      case 'customers': return canAccessRoute(userRole, 'customers') ? <CustomersPage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
+      case 'visitors': return <VisitorsPage onNavigate={handleNavigate} />;
+      case 'stock_wanting': return <StockWantingPage onNavigate={handleNavigate} />;
+      case 'complaints': return <ComplaintsPage onNavigate={handleNavigate} />;
+      case 'expenses': return canAccessRoute(userRole, 'expenses') ? <ExpensesPage onNavigate={handleNavigate} /> : <DashboardPage onNavigate={handleNavigate} />;
+      case 'reminders': return <RemindersPage onNavigate={handleNavigate} />;
       case 'utilities': return <UtilitiesPage onNavigate={(tab, query) => {
         if (tab === 'market_explorer') navigateToMarketExplorer(query);
         else handleNavigate(tab);

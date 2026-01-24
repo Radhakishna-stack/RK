@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Plus, Trash2, Save, Calendar, Bike, Phone, User, FileText, Receipt, Wallet, Banknote
+  Plus, Trash2, Save, Calendar, Bike, Phone, User, FileText, Receipt, Wallet, Banknote, ArrowLeft
 } from 'lucide-react';
 import { dbService } from '../db';
 import { InventoryItem, BankAccount, Invoice, Customer } from '../types';
@@ -12,7 +12,11 @@ import { Input } from '../components/ui/Input';
 import { InvoicePreview } from '../components/InvoicePreview';
 import { AutocompleteDropdown } from '../components/AutocompleteDropdown';
 
-const BillingPage: React.FC = () => {
+interface BillingPageProps {
+  onNavigate: (tab: string) => void;
+}
+
+const BillingPage: React.FC<BillingPageProps> = ({ onNavigate }) => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -368,7 +372,10 @@ const BillingPage: React.FC = () => {
         <>
           {/* Header */}
           <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
-            <div className="px-4 py-4">
+            <div className="px-4 py-4 flex items-center gap-3">
+              <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
               <h1 className="text-2xl font-bold text-slate-900">Add New Sale</h1>
             </div>
           </div>

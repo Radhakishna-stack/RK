@@ -210,6 +210,8 @@ export interface ServiceReminder {
   serviceType: string;
   status: 'Pending' | 'Sent';
   lastNotified?: string;
+  message?: string;
+  serviceDate?: string;
 }
 
 export interface DashboardStats {

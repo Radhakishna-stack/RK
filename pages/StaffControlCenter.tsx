@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, User, Phone, Key, Trash2 } from 'lucide-react';
+import { Shield, Plus, User, Phone, Key, Trash2, ArrowLeft } from 'lucide-react';
 import { dbService } from '../db';
 import { Salesman } from '../types';
 import { Card } from '../components/ui/Card';
@@ -8,12 +8,16 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 
-const StaffControlCenter: React.FC = () => {
+interface StaffControlCenterProps {
+  onNavigate: (tab: string) => void;
+}
+
+const StaffControlCenter: React.FC<StaffControlCenterProps> = ({ onNavigate }) => {
   const [staff, setStaff] = useState<Salesman[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -45,7 +49,7 @@ const StaffControlCenter: React.FC = () => {
         ...formData,
         targetArea: formData.role // Using targetArea field for role
       });
-      
+
       await loadData();
       setIsModalOpen(false);
       setFormData({ name: '', phone: '', role: 'Technician', accessCode: '' });
@@ -80,9 +84,14 @@ const StaffControlCenter: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Staff Control</h1>
-          <p className="text-sm text-slate-600 mt-1">{staff.length} staff members</p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Staff Control</h1>
+            <p className="text-sm text-slate-600 mt-1">{staff.length} staff members</p>
+          </div>
         </div>
         <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="w-5 h-5 mr-2" />
@@ -125,7 +134,7 @@ const StaffControlCenter: React.FC = () => {
                   <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
                     <User className="w-6 h-6 text-blue-600" />
                   </div>
-                  
+
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
                       <h3 className="text-lg font-bold text-slate-900">{member.name}</h3>
@@ -133,7 +142,7 @@ const StaffControlCenter: React.FC = () => {
                         {member.targetArea || 'Staff'}
                       </Badge>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 text-sm text-slate-600">
                       <Phone className="w-4 h-4" />
                       <span>{member.phone}</span>
@@ -193,8 +202,8 @@ const StaffControlCenter: React.FC = () => {
                   onClick={() => setFormData({ ...formData, role })}
                   className={`
                     p-3 rounded-xl font-semibold text-sm transition-all
-                    ${formData.role === role 
-                      ? 'bg-blue-600 text-white shadow-md' 
+                    ${formData.role === role
+                      ? 'bg-blue-600 text-white shadow-md'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
                   `}
                 >

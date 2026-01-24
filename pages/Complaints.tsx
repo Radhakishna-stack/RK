@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus, Search, Clock, CheckCircle, AlertCircle, Bike, Phone, Calendar, DollarSign, X,
-  Camera, Upload, FlipHorizontal, Image as ImageIcon, Trash2, User
+  Camera, Upload, FlipHorizontal, Image as ImageIcon, Trash2, User, ArrowLeft
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Complaint, ComplaintStatus, Customer } from '../types';
@@ -12,7 +12,11 @@ import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 
-const ComplaintsPage: React.FC = () => {
+interface ComplaintsPageProps {
+  onNavigate: (tab: string) => void;
+}
+
+const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,9 +167,14 @@ const ComplaintsPage: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Service Jobs</h1>
-          <p className="text-sm text-slate-600 mt-1">{complaints.length} total jobs</p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Service Jobs</h1>
+            <p className="text-sm text-slate-600 mt-1">{complaints.length} total jobs</p>
+          </div>
         </div>
         <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="w-5 h-5 mr-2" />

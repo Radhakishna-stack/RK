@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Building, Key, Bell, Palette, Database, Globe, Users, UserPlus, Edit2, Trash2, ToggleLeft, ToggleRight, Shield, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, Building, Key, Bell, Palette, Database, Globe, Users, UserPlus, Edit2, Trash2, ToggleLeft, ToggleRight, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { dbService } from '../db';
 import { AppSettings, User, UserRole } from '../types';
 import { Card } from '../components/ui/Card';
@@ -214,9 +214,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-        <p className="text-sm text-slate-600 mt-1">Manage your app configuration</p>
+      <div className="flex items-center gap-3">
+        <button onClick={() => onNavigate('home')} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+          <p className="text-sm text-slate-600 mt-1">Manage your app configuration</p>
+        </div>
       </div>
 
       {/* Section Tabs */}

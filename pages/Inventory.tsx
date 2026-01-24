@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Plus, Search, Package, TrendingDown, TrendingUp, AlertCircle, Edit3, Trash2
+  Plus, Search, Package, TrendingDown, TrendingUp, AlertCircle, Edit3, Trash2, ArrowLeft
 } from 'lucide-react';
 import { dbService } from '../db';
 import { InventoryItem } from '../types';
@@ -54,7 +54,7 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
     try {
       if (editingItem) {
         // Update existing item
-        await dbService.updateStock(editingItem.id, parseInt(formData.stock) - editingItem.stock);
+        await dbService.updateStock(editingItem.id, parseInt(formData.stock) - editingItem.stock, 'Manual Update');
       } else {
         // Add new item
         await dbService.addInventoryItem({
@@ -120,9 +120,14 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
-          <p className="text-sm text-slate-600 mt-1">{items.length} items in stock</p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
+            <p className="text-sm text-slate-600 mt-1">{items.length} items in stock</p>
+          </div>
         </div>
         <Button onClick={() => {
           setEditingItem(null);

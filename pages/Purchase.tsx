@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Building, Phone, Calculator, Check } from 'lucide-react';
+import { Plus, Package, Building, Phone, Calculator, Check, ArrowLeft } from 'lucide-react';
 import { dbService } from '../db';
 import { InventoryItem, Customer } from '../types';
 import { Card } from '../components/ui/Card';
@@ -14,7 +14,11 @@ interface PurchaseItem {
    purchasePrice: number;
 }
 
-const PurchasePage: React.FC = () => {
+interface PurchasePageProps {
+   onNavigate: (tab: string) => void;
+}
+
+const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
    const [inventory, setInventory] = useState<InventoryItem[]>([]);
    const [suppliers, setSuppliers] = useState<Customer[]>([]);
    const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,9 +90,7 @@ const PurchasePage: React.FC = () => {
          for (const item of purchaseItems) {
             const inventoryItem = inventory.find(i => i.id === item.itemId);
             if (inventoryItem) {
-               await dbService.updateInventoryItem(item.itemId, {
-                  quantity: inventoryItem.quantity + item.quantity
-               });
+               await dbService.updateStock(item.itemId, item.quantity, 'Purchase');
             }
          }
 
@@ -125,9 +127,14 @@ const PurchasePage: React.FC = () => {
    return (
       <div className="space-y-6">
          <div className="flex items-center justify-between">
-            <div>
-               <h1 className="text-2xl font-bold text-slate-900">Purchase</h1>
-               <p className="text-sm text-slate-600 mt-1">Record stock purchases</p>
+            <div className="flex items-center gap-3">
+               <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+                  <ArrowLeft className="w-6 h-6" />
+               </button>
+               <div>
+                  <h1 className="text-2xl font-bold text-slate-900">Purchase</h1>
+                  <p className="text-sm text-slate-600 mt-1">Record stock purchases</p>
+               </div>
             </div>
             <Button onClick={() => setIsModalOpen(true)}>
                <Plus className="w-5 h-5 mr-2" />

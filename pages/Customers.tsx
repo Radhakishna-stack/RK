@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Search, Phone, Bike, Trash2, Users, MapPin
+  Search, Phone, Bike, Trash2, Users, MapPin, ArrowLeft
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Customer } from '../types';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 
-const CustomersPage: React.FC = () => {
+interface CustomersPageProps {
+  onNavigate?: (tab: string) => void;
+}
+
+const CustomersPage: React.FC<CustomersPageProps> = ({ onNavigate }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,9 +64,16 @@ const CustomersPage: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Customers</h1>
-          <p className="text-sm text-slate-600 mt-1">{customers.length} total customers</p>
+        <div className="flex items-center gap-3">
+          {onNavigate && (
+            <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Customers</h1>
+            <p className="text-sm text-slate-600 mt-1">{customers.length} total customers</p>
+          </div>
         </div>
       </div>
 
