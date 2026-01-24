@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Landmark, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, Search, Landmark, Trash2, TrendingUp, TrendingDown, Clock } from 'lucide-react';
 import { dbService } from '../db';
 import { BankAccount } from '../types';
 import { Card } from '../components/ui/Card';
@@ -8,12 +8,20 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 
-const BankAccountsPage: React.FC = () => {
+interface BankAccountsPageProps {
+   onNavigate: (tab: string) => void;
+}
+
+const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
    const [accounts, setAccounts] = useState<BankAccount[]>([]);
    const [loading, setLoading] = useState(true);
    const [searchTerm, setSearchTerm] = useState('');
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [isSubmitting, setIsSubmitting] = useState(false);
+
+   // Financial Summary States
+   const [cashBalance, setCashBalance] = useState(0);
+   const [pendingCheques, setPendingCheques] = useState(0);
 
    const [formData, setFormData] = useState({
       bankName: '',
@@ -31,6 +39,25 @@ const BankAccountsPage: React.FC = () => {
       try {
          const data = await dbService.getBankAccounts();
          setAccounts(data);
+
+         // Fetch transactions for summary
+         const transactions = await dbService.getTransactions();
+
+         // Calculate Cash Balance
+         const cashIn = transactions
+            .filter(t => t.type === 'cash-in')
+            .reduce((sum, t) => sum + t.amount, 0);
+         const cashOut = transactions
+            .filter(t => t.type === 'cash-out')
+            .reduce((sum, t) => sum + t.amount, 0);
+         setCashBalance(cashIn - cashOut);
+
+         // Calculate Pending Cheques
+         const pending = transactions
+            .filter(t => (t.type === 'cheque-received' || t.type === 'cheque-issued') && t.status === 'pending')
+            .reduce((sum, t) => sum + t.amount, 0);
+         setPendingCheques(pending);
+
       } catch (err) {
          console.error(err);
       } finally {
@@ -96,13 +123,57 @@ const BankAccountsPage: React.FC = () => {
             </Button>
          </div>
 
-         {/* Total Balance */}
-         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 border-0 text-white">
-            <div>
-               <p className="text-sm text-blue-100 mb-1">Total Bank Balance</p>
-               <h2 className="text-4xl font-bold">₹{totalBalance.toLocaleString()}</h2>
-            </div>
-         </Card>
+         {/* Financial Summary */}
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Total Bank Balance */}
+            <Card className="bg-gradient-to-br from-blue-600 to-blue-700 border-0 text-white shadow-lg">
+               <div>
+                  <div className="flex items-center gap-2 mb-2 text-blue-100">
+                     <Landmark className="w-5 h-5" />
+                     <p className="text-sm font-medium">Bank Balance</p>
+                  </div>
+                  <h2 className="text-3xl font-bold">₹{totalBalance.toLocaleString()}</h2>
+               </div>
+            </Card>
+
+            {/* Cash In Hand */}
+            <button
+               onClick={() => onNavigate('cash_in_hand')}
+               className="text-left w-full transition-transform hover:-translate-y-1"
+            >
+               <Card className="bg-gradient-to-br from-green-600 to-green-700 border-0 text-white shadow-lg h-full">
+                  <div>
+                     <div className="flex items-center gap-2 mb-2 text-green-100">
+                        <TrendingUp className="w-5 h-5" />
+                        <p className="text-sm font-medium">Cash In Hand</p>
+                     </div>
+                     <h2 className="text-3xl font-bold">₹{cashBalance.toLocaleString()}</h2>
+                     <div className="mt-2 text-xs bg-green-800/30 inline-block px-2 py-1 rounded-lg">
+                        Tap to view details →
+                     </div>
+                  </div>
+               </Card>
+            </button>
+
+            {/* Pending Cheques */}
+            <button
+               onClick={() => onNavigate('cheques')}
+               className="text-left w-full transition-transform hover:-translate-y-1"
+            >
+               <Card className="bg-gradient-to-br from-amber-500 to-amber-600 border-0 text-white shadow-lg h-full">
+                  <div>
+                     <div className="flex items-center gap-2 mb-2 text-amber-100">
+                        <Clock className="w-5 h-5" /> // Note: Clock import needed if not present
+                        <p className="text-sm font-medium">Pending Cheques</p>
+                     </div>
+                     <h2 className="text-3xl font-bold">₹{pendingCheques.toLocaleString()}</h2>
+                     <div className="mt-2 text-xs bg-amber-700/30 inline-block px-2 py-1 rounded-lg">
+                        Tap to manage →
+                     </div>
+                  </div>
+               </Card>
+            </button>
+         </div>
 
          {/* Search */}
          <Input

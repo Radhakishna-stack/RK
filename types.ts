@@ -151,11 +151,16 @@ export interface Transaction {
   id: string;
   entityId: string; // Party ID or description
   accountId: string; // Reference to BankAccount.id
-  type: 'IN' | 'OUT';
+  type: 'IN' | 'OUT' | 'cash-in' | 'cash-out' | 'cheque-received' | 'cheque-issued';
   amount: number;
   paymentMode: string; // For legacy/display
   date: string;
   description: string;
+  category?: string;
+  status?: 'pending' | 'cleared' | 'bounced' | 'completed';
+  chequeNumber?: string;
+  partyName?: string;
+  bankName?: string;
 }
 
 export interface StockTransaction {
