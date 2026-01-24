@@ -46,6 +46,7 @@ import CashInHandPage from './pages/CashInHand';
 import ChequesPage from './pages/Cheques';
 import MorePage from './pages/More';
 import LoginPage from './pages/Login';
+import PaymentReceiptPage from './pages/PaymentReceipt';
 import { AuthSession, User } from './types';
 import { getSession, login, logout, validateCredentials } from './auth';
 import { canAccessRoute } from './permissions';
@@ -189,6 +190,7 @@ const App: React.FC = () => {
       case 'bank_accounts': return <BankAccountsPage onNavigate={handleNavigate} />;
       case 'cash_in_hand': return <CashInHandPage onNavigate={handleNavigate} />;
       case 'cheques': return <ChequesPage onNavigate={handleNavigate} />;
+      case 'payment_receipt': return <PaymentReceiptPage onNavigate={handleNavigate} />;
       default: return <DashboardPage onNavigate={handleNavigate} />;
     }
   };

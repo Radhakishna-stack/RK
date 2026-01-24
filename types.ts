@@ -214,6 +214,21 @@ export interface ServiceReminder {
   serviceDate?: string;
 }
 
+export interface PaymentReceipt {
+  id: string;              // Auto-generated receipt ID (e.g., "PR-1737738000000")
+  receiptNumber: string;   // Display format (e.g., "PR-0001")
+  customerId: string;      // Reference to Customer.id
+  customerName: string;    // Cached for display
+  customerPhone: string;   // Cached for display
+  bikeNumber?: string;     // Optional: linked to customer's bike
+  cashAmount: number;      // Amount received in cash
+  upiAmount: number;       // Amount received via UPI
+  totalAmount: number;     // cashAmount + upiAmount
+  date: string;            // ISO format
+  description?: string;    // Optional notes
+  createdAt: string;       // Timestamp
+}
+
 export interface DashboardStats {
   totalCustomers: number;
   totalComplaints: number;

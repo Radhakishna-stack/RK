@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Plus, Clock, TrendingUp, Receipt, AlertCircle,
+  Plus, Clock, TrendingUp, Receipt, ArrowDownCircle, AlertCircle,
   ClipboardCheck, Users, Package, Bike, Phone, Wallet
 } from 'lucide-react';
 import { dbService } from '../db';
@@ -90,6 +90,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           <QuickAction icon={<Receipt />} label="New Sale" onClick={() => onNavigate('sales')} />
           <QuickAction icon={<Package />} label="Stock" onClick={() => onNavigate('items')} />
           <QuickAction icon={<TrendingUp />} label="Reports" onClick={() => onNavigate('sale_report')} />
+          <QuickAction icon={<ArrowDownCircle />} label="Payment In" onClick={() => onNavigate('payment_receipt')} />
         </div>
       </div>
 

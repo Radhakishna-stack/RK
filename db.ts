@@ -1,5 +1,6 @@
 
-import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, PickupBooking, PickupSlot, StaffLocation, PickupStatus, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole } from './types';
+
+import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, PickupBooking, PickupSlot, StaffLocation, PickupStatus, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole, PaymentReceipt } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { encryptPassword } from './auth';
 
@@ -22,7 +23,8 @@ const LS_KEYS = {
   STAFF_LOCS: 'mg_staff_locs',
   RECYCLE_BIN: 'mg_recycle_bin',
   BANK_ACCOUNTS: 'mg_bank_accounts',
-  USERS: 'mg_users'
+  USERS: 'mg_users',
+  PAYMENT_RECEIPTS: 'mg_payment_receipts'
 };
 
 const DEFAULT_BANK: BankAccount = {
@@ -951,5 +953,64 @@ export const dbService = {
       return u;
     });
     localStorage.setItem(LS_KEYS.USERS, JSON.stringify(updatedUsers));
+  },
+
+  // Payment Receipts
+  getPaymentReceipts: async (): Promise<PaymentReceipt[]> => {
+    const receipts = localStorage.getItem(LS_KEYS.PAYMENT_RECEIPTS);
+    return receipts ? JSON.parse(receipts) : [];
+  },
+
+  addPaymentReceipt: async (data: Omit<PaymentReceipt, 'id' | 'receiptNumber' | 'createdAt'>): Promise<PaymentReceipt> => {
+    const current = await dbService.getPaymentReceipts();
+
+    // Generate receipt number with zero-padded counter
+    const nextNumber = current.length + 1;
+    const receiptNumber = `PR-${String(nextNumber).padStart(4, '0')}`;
+    const id = `PR-${Date.now()}`;
+
+    const newReceipt: PaymentReceipt = {
+      ...data,
+      id,
+      receiptNumber,
+      createdAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(LS_KEYS.PAYMENT_RECEIPTS, JSON.stringify([newReceipt, ...current]));
+
+    // Create transaction entries for cash and UPI
+    if (data.cashAmount > 0) {
+      await dbService.addTransaction({
+        entityId: data.customerId,
+        accountId: 'CASH-01',
+        type: 'IN',
+        amount: data.cashAmount,
+        paymentMode: 'Cash',
+        description: `Payment Receipt ${receiptNumber} - Cash${data.description ? ` (${data.description})` : ''}`
+      });
+    }
+
+    if (data.upiAmount > 0) {
+      await dbService.addTransaction({
+        entityId: data.customerId,
+        accountId: 'WALLET-01',
+        type: 'IN',
+        amount: data.upiAmount,
+        paymentMode: 'UPI',
+        description: `Payment Receipt ${receiptNumber} - UPI${data.description ? ` (${data.description})` : ''}`
+      });
+    }
+
+    return newReceipt;
+  },
+
+  getPaymentReceiptById: async (id: string): Promise<PaymentReceipt | undefined> => {
+    const receipts = await dbService.getPaymentReceipts();
+    return receipts.find(r => r.id === id);
+  },
+
+  deletePaymentReceipt: async (id: string): Promise<void> => {
+    const receipts = await dbService.getPaymentReceipts();
+    localStorage.setItem(LS_KEYS.PAYMENT_RECEIPTS, JSON.stringify(receipts.filter(r => r.id !== id)));
   }
 };

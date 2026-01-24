@@ -98,6 +98,7 @@ export function canAccessRoute(role: UserRole, route: string): boolean {
         'dashboard': 'canAccessAnalytics',
         'business': 'canAccessAnalytics',
         'complaints': 'canViewComplaints',
+        'payment_receipt': 'canAccessBilling',
     };
 
     const requiredPermission = routePermissionMap[route];

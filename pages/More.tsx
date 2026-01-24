@@ -94,9 +94,9 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate }) => {
                 />
                 <MenuItem
                     icon={<ArrowDownCircle />}
-                    label="Payment In"
+                    label="Payment Receipt"
                     description="Receive payments"
-                    onClick={() => onNavigate('payment_in')}
+                    onClick={() => onNavigate('payment_receipt')}
                 />
                 <MenuItem
                     icon={<Wallet />}
