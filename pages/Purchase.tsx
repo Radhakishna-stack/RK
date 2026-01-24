@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Package, Building, Phone, Calculator, Check, ArrowLeft } from 'lucide-react';
 import { dbService } from '../db';
-import { InventoryItem, Customer } from '../types';
+import { InventoryItem, Customer, Transaction } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -36,6 +36,7 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
    const [selectedItemId, setSelectedItemId] = useState('');
    const [manualItem, setManualItem] = useState({ name: '', price: '', quantity: '1' });
    const [useManualItem, setUseManualItem] = useState(false);
+   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
    useEffect(() => {
       loadData();
@@ -44,12 +45,14 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
    const loadData = async () => {
       setLoading(true);
       try {
-         const [inventoryData, customersData] = await Promise.all([
+         const [inventoryData, customersData, txnsData] = await Promise.all([
             dbService.getInventory(),
-            dbService.getCustomers()
+            dbService.getCustomers(),
+            dbService.getTransactions()
          ]);
          setInventory(inventoryData);
          setSuppliers(customersData);
+         setTransactions(txnsData.filter(t => t.type === 'purchase').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       } catch (err) {
          console.error(err);
       } finally {
@@ -199,6 +202,36 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
             </div>
          </Card>
 
+         <div className="space-y-4">
+            <h2 className="text-lg font-bold text-slate-800">Recent Purchases</h2>
+            {transactions.length === 0 ? (
+               <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+                  No purchases recorded yet
+               </div>
+            ) : (
+               <div className="grid gap-3">
+                  {transactions.map((txn) => (
+                     <Card key={txn.id} padding="md">
+                        <div className="flex justify-between items-start">
+                           <div className="flex-1">
+                              <div className="font-semibold text-slate-900 line-clamp-2">{txn.description}</div>
+                              <div className="text-xs text-slate-500 mt-1">
+                                 {new Date(txn.date).toLocaleDateString()} • {new Date(txn.date).toLocaleTimeString()}
+                              </div>
+                           </div>
+                           <div className="text-right pl-4">
+                              <div className="text-lg font-bold text-red-600">-₹{txn.amount.toLocaleString()}</div>
+                              <div className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full inline-block mt-1">
+                                 Purchase
+                              </div>
+                           </div>
+                        </div>
+                     </Card>
+                  ))}
+               </div>
+            )}
+         </div>
+
          <Modal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
@@ -324,6 +357,8 @@ const PurchasePage: React.FC<PurchasePageProps> = ({ onNavigate }) => {
                               </p>
                            </div>
                         </Card>
+
+
                      ))}
                   </div>
                )}

@@ -151,7 +151,7 @@ export interface Transaction {
   id: string;
   entityId: string; // Party ID or description
   accountId: string; // Reference to BankAccount.id
-  type: 'IN' | 'OUT' | 'cash-in' | 'cash-out' | 'cheque-received' | 'cheque-issued';
+  type: 'IN' | 'OUT' | 'cash-in' | 'cash-out' | 'cheque-received' | 'cheque-issued' | 'purchase';
   amount: number;
   paymentMode: string; // For legacy/display
   date: string;
