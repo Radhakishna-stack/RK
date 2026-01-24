@@ -9,7 +9,6 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { InvoicePreview } from '../components/InvoicePreview';
-import { AutocompleteDropdown } from '../components/AutocompleteDropdown';
 
 const BillingPage: React.FC = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -46,12 +45,6 @@ const BillingPage: React.FC = () => {
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
-
-  // Autocomplete state
-  const [showNameDropdown, setShowNameDropdown] = useState(false);
-  const [showBikeDropdown, setShowBikeDropdown] = useState(false);
-  const [showPhoneDropdown, setShowPhoneDropdown] = useState(false);
-  const [filteredCustomers, setFilteredCustomers] = useState<any[]>([]);
 
   useEffect(() => {
     loadData();
@@ -120,88 +113,33 @@ const BillingPage: React.FC = () => {
   // Auto-fill customer details based on bike number
   const handleBikeNumberChange = (value: string) => {
     setBikeNumber(value.toUpperCase());
-
-    // Filter and show dropdown
-    if (value.trim()) {
-      const filtered = customers.filter(c =>
-        c.bikeNumber.toUpperCase().includes(value.toUpperCase())
-      );
-      setFilteredCustomers(filtered);
-      setShowBikeDropdown(filtered.length > 0);
-    } else {
-      setFilteredCustomers([]);
-      setShowBikeDropdown(false);
-    }
-
-    // Auto-fill if exact match
     const customer = customers.find(c => c.bikeNumber === value.toUpperCase());
     if (customer) {
       setCustomerName(customer.name);
       setCustomerPhone(customer.phone || '');
-      setShowBikeDropdown(false);
     }
   };
 
   // Auto-fill customer details based on customer name
   const handleCustomerNameChange = (value: string) => {
     setCustomerName(value);
-
-    // Filter and show dropdown
-    if (value.trim()) {
-      const filtered = customers.filter(c =>
-        c.name.toLowerCase().includes(value.toLowerCase())
-      );
-      setFilteredCustomers(filtered);
-      setShowNameDropdown(filtered.length > 0);
-    } else {
-      setFilteredCustomers([]);
-      setShowNameDropdown(false);
-    }
-
-    // Auto-fill if exact match
     const customer = customers.find(c => c.name.toLowerCase() === value.toLowerCase());
     if (customer) {
       setBikeNumber(customer.bikeNumber);
       setCustomerPhone(customer.phone || '');
-      setShowNameDropdown(false);
     }
   };
 
   // Auto-fill customer details based on phone
   const handlePhoneChange = (value: string) => {
     setCustomerPhone(value);
-
-    // Filter and show dropdown
-    if (value.trim() && value.length >= 3) {
-      const filtered = customers.filter(c =>
-        c.phone && c.phone.includes(value)
-      );
-      setFilteredCustomers(filtered);
-      setShowPhoneDropdown(filtered.length > 0);
-    } else {
-      setFilteredCustomers([]);
-      setShowPhoneDropdown(false);
-    }
-
-    // Auto-fill if exact match
     if (value.length >= 10) {
       const customer = customers.find(c => c.phone === value);
       if (customer) {
         setCustomerName(customer.name);
         setBikeNumber(customer.bikeNumber);
-        setShowPhoneDropdown(false);
       }
     }
-  };
-
-  // Select customer from dropdown
-  const selectCustomer = (customer: any) => {
-    setCustomerName(customer.name);
-    setBikeNumber(customer.bikeNumber);
-    setCustomerPhone(customer.phone || '');
-    setShowNameDropdown(false);
-    setShowBikeDropdown(false);
-    setShowPhoneDropdown(false);
   };
 
   const handleSave = async (saveAndNew: boolean = false) => {
