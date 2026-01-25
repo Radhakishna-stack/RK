@@ -150,6 +150,12 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate }) => {
                     description="Logistics management"
                     onClick={() => onNavigate('connect')}
                 />
+                <MenuItem
+                    icon={<Calendar />}
+                    label="Scheduling"
+                    description="Manage pickup slots"
+                    onClick={() => onNavigate('pickup_scheduling')}
+                />
             </Section>
 
             {/* Marketing Section */}

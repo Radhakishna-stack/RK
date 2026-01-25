@@ -1148,6 +1148,23 @@ export const dbService = {
     return newReceipt;
   },
 
+  // Pickup Slots
+  getPickupSlots: async (): Promise<PickupSlot[]> => {
+    const data = localStorage.getItem(LS_KEYS.PICKUP_SLOTS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addPickupSlot: async (slot: PickupSlot): Promise<void> => {
+    const slots = await dbService.getPickupSlots();
+    slots.push(slot);
+    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(slots));
+  },
+
+  deletePickupSlot: async (id: string): Promise<void> => {
+    const slots = await dbService.getPickupSlots();
+    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(slots.filter(s => s.id !== id)));
+  },
+
   updatePickupBooking: async (id: string, updates: Partial<PickupBooking>): Promise<void> => {
     const bookings = await dbService.getPickupBookings();
     const updatedBookings = bookings.map(b => b.id === id ? { ...b, ...updates } : b);
