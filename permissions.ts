@@ -52,7 +52,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
         canManageExpenses: true,
         canViewSettings: true,
         canManageSettings: false,
-        canManageStaff: false,
+        canManageStaff: true,
         canManageUsers: false,
         canViewComplaints: true,
         canEditComplaints: true,
