@@ -289,6 +289,7 @@ const App: React.FC = () => {
             <Route path="/cheques" element={<ChequesPage onNavigate={handleNavigate} />} />
             <Route path="/payment-receipt" element={<PaymentReceiptPage onNavigate={handleNavigate} />} />
 
+            <Route path="/settings/permissions" element={<SettingsPage onNavigate={handleNavigate} initialSection="permissions" />} />
             <Route path="/settings/*" element={<SettingsPage onNavigate={handleNavigate} />} />
 
             {/* Fallback */}
