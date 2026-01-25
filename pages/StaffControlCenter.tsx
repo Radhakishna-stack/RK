@@ -29,10 +29,14 @@ const StaffControlCenter: React.FC<StaffControlCenterProps> = ({ onNavigate }) =
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(() => {
-      if (activeTab === 'tracking') loadLocations();
-    }, 10000); // 10s refresh for tracking
-    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'tracking') {
+      loadLocations(); // Initial load for tab
+      const interval = setInterval(loadLocations, 10000);
+      return () => clearInterval(interval);
+    }
   }, [activeTab]);
 
   const loadData = async () => {
@@ -91,7 +95,13 @@ const StaffControlCenter: React.FC<StaffControlCenterProps> = ({ onNavigate }) =
   };
 
   const openMap = (lat: number, lng: number) => {
+    if (!lat || !lng) return;
     window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+  };
+
+  const navigateTo = (lat: number, lng: number) => {
+    if (!lat || !lng) return;
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
   };
 
   const roles = ['Technician', 'Salesman', 'Manager', 'Accountant'];
@@ -175,10 +185,16 @@ const StaffControlCenter: React.FC<StaffControlCenterProps> = ({ onNavigate }) =
                     </div>
                   </div>
 
-                  <Button onClick={() => openMap(loc.lat, loc.lng)} variant="outline" className="w-full">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View on Google Maps
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button onClick={() => openMap(loc.lat, loc.lng)} variant="outline" size="sm">
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      View Map
+                    </Button>
+                    <Button onClick={() => navigateTo(loc.lat, loc.lng)} size="sm">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      Navigate
+                    </Button>
+                  </div>
                 </Card>
               ))
             )}
