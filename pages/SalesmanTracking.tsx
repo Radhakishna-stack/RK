@@ -130,7 +130,7 @@ const SalesmanTrackingPage: React.FC = () => {
           salesmen.map((salesman) => {
             const location = getLocationForSalesman(salesman.id);
             const isActive = location &&
-              (new Date().getTime() - new Date(location.timestamp).getTime()) < 900000; // Active in last 15 mins
+              (new Date().getTime() - new Date(location.lastUpdated).getTime()) < 900000; // Active in last 15 mins
 
             return (
               <Card key={salesman.id} padding="md">
@@ -166,7 +166,7 @@ const SalesmanTrackingPage: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <MapPin className="w-4 h-4" />
                             <span className="text-xs">
-                              Last seen {new Date(location.timestamp).toLocaleString()}
+                              Last seen {new Date(location.lastUpdated).toLocaleString()}
                             </span>
                           </div>
                         )}

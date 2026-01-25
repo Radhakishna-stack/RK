@@ -1148,6 +1148,12 @@ export const dbService = {
     return newReceipt;
   },
 
+  updatePickupBooking: async (id: string, updates: Partial<PickupBooking>): Promise<void> => {
+    const bookings = await dbService.getPickupBookings();
+    const updatedBookings = bookings.map(b => b.id === id ? { ...b, ...updates } : b);
+    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify(updatedBookings));
+  },
+
   getPaymentReceiptById: async (id: string): Promise<PaymentReceipt | undefined> => {
     const receipts = await dbService.getPaymentReceipts();
     return receipts.find(r => r.id === id);
