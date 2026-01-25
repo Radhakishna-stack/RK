@@ -431,7 +431,7 @@ export interface AppSettings {
 }
 
 // Authentication & Authorization Types
-export type UserRole = 'admin' | 'employee' | 'manager';
+export type UserRole = 'admin' | 'employee' | 'manager' | 'mechanic';
 
 export interface User {
   id: string;

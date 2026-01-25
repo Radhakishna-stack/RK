@@ -1,7 +1,8 @@
 import { UserRole, RolePermissions } from './types';
 
 // Role-based permissions configuration
-export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
+// Default configuration
+export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     admin: {
         canViewSales: true,
         canCreateSales: true,
@@ -59,13 +60,46 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
         canAccessPurchase: true,
         canAccessAnalytics: true,
     },
+    mechanic: {
+        canViewSales: false,
+        canCreateSales: false,
+        canEditSales: false,
+        canDeleteSales: false,
+        canViewReports: false,
+        canManageInventory: false,
+        canManageCustomers: false,
+        canManageExpenses: false,
+        canViewSettings: false,
+        canManageSettings: false,
+        canManageStaff: false,
+        canManageUsers: false,
+        canViewComplaints: true,
+        canEditComplaints: true,
+        canAccessBilling: false,
+        canAccessPurchase: false,
+        canAccessAnalytics: false,
+    },
 };
+
+// Backwards compatibility for db.ts import
+export const ROLE_PERMISSIONS = DEFAULT_ROLE_PERMISSIONS;
 
 /**
  * Get permissions for a given role
  */
 export function getPermissions(role: UserRole): RolePermissions {
-    return ROLE_PERMISSIONS[role];
+    try {
+        const stored = localStorage.getItem('mg_role_permissions');
+        if (stored) {
+            const allPermissions = JSON.parse(stored);
+            if (allPermissions[role]) {
+                return allPermissions[role];
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load dynamic permissions', e);
+    }
+    return DEFAULT_ROLE_PERMISSIONS[role];
 }
 
 /**
@@ -75,7 +109,8 @@ export function hasPermission(
     role: UserRole,
     permission: keyof RolePermissions
 ): boolean {
-    return ROLE_PERMISSIONS[role][permission];
+    const permissions = getPermissions(role);
+    return permissions[permission];
 }
 
 /**

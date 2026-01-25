@@ -244,7 +244,7 @@ const App: React.FC = () => {
           }`}>
           <Routes>
             {/* Core Tabs */}
-            <Route path="/" element={userRole === 'employee' ? <Navigate to="/employee-panel" /> : <DashboardPage onNavigate={handleNavigate} />} />
+            <Route path="/" element={(userRole === 'employee' || userRole === 'mechanic') ? <Navigate to="/employee-panel" /> : <DashboardPage onNavigate={handleNavigate} />} />
             <Route path="/dashboard" element={<Navigate to="/" />} />
             <Route path="/business" element={<DashboardV2 onNavigate={handleNavigate} />} />
             <Route path="/money" element={<BankAccountsPage onNavigate={handleNavigate} />} />

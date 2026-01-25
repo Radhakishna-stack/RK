@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Building, Key, Bell, Palette, Database, Globe, Users, UserPlus, Edit2, Trash2, ToggleLeft, ToggleRight, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { dbService } from '../db';
 import { AppSettings, User, UserRole } from '../types';
+import RolePermissionsEditor from '../components/RolePermissionsEditor';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -16,7 +17,7 @@ interface SettingsPageProps {
 const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business', onNavigate }) => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'business' | 'api' | 'notifications' | 'appearance' | 'users'>(initialSection as any || 'business');
+  const [activeSection, setActiveSection] = useState<'business' | 'api' | 'notifications' | 'appearance' | 'users' | 'permissions'>(initialSection as any || 'business');
   const [users, setUsers] = useState<User[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -195,7 +196,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
   const sections = [
     { id: 'business' as const, icon: Building, label: 'Business Info' },
     { id: 'api' as const, icon: Key, label: 'API Keys' },
-    ...(currentUserRole === 'admin' ? [{ id: 'users' as const, icon: Users, label: 'Users' }] : []),
+    ...(currentUserRole === 'admin' ? [
+      { id: 'users' as const, icon: Users, label: 'Users' },
+      { id: 'permissions' as const, icon: Shield, label: 'Permissions' }
+    ] : []),
     { id: 'notifications' as const, icon: Bell, label: 'Notifications' },
     { id: 'appearance' as const, icon: Palette, label: 'Appearance' }
   ];
@@ -411,6 +415,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
             )}
           </div>
         </div>
+      )}
+
+      {activeSection === 'permissions' && currentUserRole === 'admin' && (
+        <RolePermissionsEditor />
       )}
 
       {activeSection === 'notifications' && (

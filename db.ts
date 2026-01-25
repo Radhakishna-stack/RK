@@ -14,6 +14,7 @@ const LS_KEYS = {
   EXPENSES: 'mg_expenses',
   REMINDERS: 'mg_reminders',
   SETTINGS: 'mg_settings',
+  ROLE_PERMISSIONS: 'mg_role_permissions',
   STOCK_TXNS: 'mg_stock_txns',
   TRANSACTIONS: 'mg_transactions',
   SALESMEN: 'mg_salesmen',
@@ -121,6 +122,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   accounting: { enabled: false, allowJournalEntries: false }
 };
 
+// Import default permissions to use as fallback
+import { ROLE_PERMISSIONS as DEFAULT_ROLE_PERMISSIONS } from './permissions';
+import { RolePermissions } from './types';
+
 // Helper function to generate unique IDs with random component
 const generateUniqueId = (prefix: string): string => {
   const timestamp = Date.now();
@@ -198,6 +203,17 @@ export const dbService = {
     if (id === 'CASH-01') throw new Error("Cannot delete primary Cash account");
     const current = await dbService.getBankAccounts();
     localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify(current.filter(b => b.id !== id)));
+  },
+
+  getAllRolePermissions: async (): Promise<Record<string, RolePermissions>> => {
+    const local = localStorage.getItem(LS_KEYS.ROLE_PERMISSIONS);
+    return local ? JSON.parse(local) : DEFAULT_ROLE_PERMISSIONS;
+  },
+
+  updateRolePermissions: async (role: string, permissions: RolePermissions): Promise<void> => {
+    const current = await dbService.getAllRolePermissions();
+    const updated = { ...current, [role]: permissions };
+    localStorage.setItem(LS_KEYS.ROLE_PERMISSIONS, JSON.stringify(updated));
   },
 
   getAccountBalance: async (accountId: string): Promise<number> => {
