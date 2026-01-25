@@ -216,6 +216,30 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.ROLE_PERMISSIONS, JSON.stringify(updated));
   },
 
+  getStaffLocations: async (): Promise<StaffLocation[]> => {
+    const local = localStorage.getItem(LS_KEYS.STAFF_LOCS);
+    return local ? JSON.parse(local) : [];
+  },
+
+  updateStaffLocation: async (staffId: string, lat: number, lng: number): Promise<void> => {
+    const current = await dbService.getStaffLocations();
+    const staffName = (await dbService.getSalesmen()).find(s => s.id === staffId)?.name || 'Unknown';
+
+    // Remove old entry for this staff if exists
+    const others = current.filter(s => s.staffId !== staffId);
+
+    const newLoc: StaffLocation = {
+      staffId,
+      staffName,
+      lat,
+      lng,
+      lastUpdated: new Date().toISOString(),
+      bookingId: 'IDLE' // Default, can be updated if we track active booking
+    };
+
+    localStorage.setItem(LS_KEYS.STAFF_LOCS, JSON.stringify([...others, newLoc]));
+  },
+
   getAccountBalance: async (accountId: string): Promise<number> => {
     const accounts = await dbService.getBankAccounts();
     const target = accounts.find(a => a.id === accountId);

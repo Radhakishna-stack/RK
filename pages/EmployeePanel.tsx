@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Hammer, Play, CheckCircle2, Clock, RefreshCw, AlertCircle, Bike } from 'lucide-react';
+import { Hammer, Play, CheckCircle2, Clock, RefreshCw, AlertCircle, Bike, Navigation } from 'lucide-react';
 import { dbService } from '../db';
 import { Complaint, ComplaintStatus, PickupBooking, PickupStatus } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { getCurrentUser } from '../auth';
 
 interface EmployeePanelProps {
   userRole: string;
+  onNavigate?: (path: string) => void;
 }
 
 const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole }) => {
@@ -15,6 +17,42 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole }) => {
   const [pickups, setPickups] = useState<PickupBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'jobs' | 'pickups'>('jobs');
+  const [gpsError, setGpsError] = useState('');
+
+  // GPS Tracking
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    const trackLocation = () => {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            dbService.updateStaffLocation(
+              currentUser.id,
+              position.coords.latitude,
+              position.coords.longitude
+            ).catch(console.error);
+            setGpsError('');
+          },
+          (error) => {
+            console.error('GPS Error:', error);
+            setGpsError('GPS access denied. Location tracking disabled.');
+          },
+          { enableHighAccuracy: true }
+        );
+      } else {
+        setGpsError('Geolocation not supported by this browser.');
+      }
+    };
+
+    // Initial track
+    trackLocation();
+
+    // Track every 30 seconds
+    const intervalId = setInterval(trackLocation, 30000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -31,6 +69,7 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole }) => {
       ]);
 
       // Filter jobs assigned to current user or pending
+      // Ideally we should filter by specific assigned staff ID, but for now filtering pending
       const myJobs = jobsData.filter(job =>
         job.status === 'pending' || job.status === 'in-progress'
       );
@@ -57,6 +96,12 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole }) => {
     loadData();
   };
 
+  const openNavigation = (address: string) => {
+    // Open Google Maps
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+    window.open(url, '_blank');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -74,6 +119,12 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole }) => {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">My Work</h1>
         <p className="text-sm text-slate-600 mt-1">Active jobs and pickups assigned to you</p>
+        {gpsError && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg">
+            <AlertCircle className="w-4 h-4" />
+            {gpsError}
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -222,14 +273,26 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole }) => {
 
                       <div className="space-y-1 text-sm text-slate-600">
                         <p><strong>Bike:</strong> {pickup.bikeNumber}</p>
-                        <p><strong>Address:</strong> {pickup.address}</p>
+                        <p className="flex items-center gap-1">
+                          <Navigation className="w-3 h-3 text-blue-600" />
+                          {pickup.address}
+                        </p>
                         <p><strong>Time:</strong> {pickup.pickupTime}</p>
                       </div>
                     </div>
                   </div>
 
-                  {pickup.status === 'pending' && (
-                    <div className="flex gap-2 pt-2 border-t border-slate-200">
+                  <div className="flex gap-2 pt-2 border-t border-slate-200">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => openNavigation(pickup.address)}
+                      className="flex-1"
+                    >
+                      <Navigation className="w-4 h-4 mr-1" />
+                      Navigate
+                    </Button>
+                    {pickup.status === 'pending' && (
                       <Button
                         size="sm"
                         onClick={() => updatePickupStatus(pickup.id, 'in-transit')}
@@ -237,20 +300,18 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole }) => {
                       >
                         Start Pickup
                       </Button>
-                    </div>
-                  )}
-                  {pickup.status === 'in-transit' && (
-                    <div className="flex gap-2 pt-2 border-t border-slate-200">
+                    )}
+                    {pickup.status === 'in-transit' && (
                       <Button
                         size="sm"
                         onClick={() => updatePickupStatus(pickup.id, 'completed')}
                         className="flex-1"
                       >
                         <CheckCircle2 className="w-4 h-4 mr-1" />
-                        Complete Pickup
+                        Complete
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </Card>
             ))
