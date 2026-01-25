@@ -85,7 +85,10 @@ const StaffControlCenter: React.FC<StaffControlCenterProps> = ({ onNavigate }) =
   };
 
   const formatLastSeen = (isoString: string) => {
+    if (!isoString) return 'Unknown';
     const date = new Date(isoString);
+    if (isNaN(date.getTime())) return 'Invalid Time';
+
     const now = new Date();
     const diff = Math.floor((now.getTime() - date.getTime()) / 60000); // minutes
 
@@ -177,11 +180,11 @@ const StaffControlCenter: React.FC<StaffControlCenterProps> = ({ onNavigate }) =
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-500">Latitude</span>
-                      <span className="font-mono">{loc.lat.toFixed(6)}</span>
+                      <span className="font-mono">{typeof loc.lat === 'number' ? loc.lat.toFixed(6) : 'N/A'}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-500">Longitude</span>
-                      <span className="font-mono">{loc.lng.toFixed(6)}</span>
+                      <span className="font-mono">{typeof loc.lng === 'number' ? loc.lng.toFixed(6) : 'N/A'}</span>
                     </div>
                   </div>
 
