@@ -871,7 +871,7 @@ export const dbService = {
     }
   },
 
-  getPickupSlots: async (): Promise<PickupSlot[]> => JSON.parse(localStorage.getItem(LS_KEYS.PICKUP_SLOTS) || '[]'),
+
   getSlotsByDate: async (date: string): Promise<PickupSlot[]> => {
     const slots = await dbService.getPickupSlots();
     return slots.filter(s => s.date === date);
@@ -910,13 +910,11 @@ export const dbService = {
   },
 
   getLiveStaffTracking: async (bookingId: string): Promise<StaffLocation | null> => {
-    const locs: Record<string, StaffLocation> = JSON.parse(localStorage.getItem(LS_KEYS.STAFF_LOCS) || '{}');
-    return locs[bookingId] || null;
-  },
-  updateStaffLocation: async (loc: StaffLocation): Promise<void> => {
-    const locs: Record<string, StaffLocation> = JSON.parse(localStorage.getItem(LS_KEYS.STAFF_LOCS) || '{}');
-    locs[loc.bookingId] = loc;
-    localStorage.setItem(LS_KEYS.STAFF_LOCS, JSON.stringify(locs));
+    const locs: StaffLocation[] = JSON.parse(localStorage.getItem(LS_KEYS.STAFF_LOCS) || '[]');
+    // Assuming we want to find the staff dealing with this booking, but the current schema for StaffLocation
+    // might not strictly link to bookingId in a 1:1 map if it's just latest location.
+    // However, the array 'locs' contains items with 'bookingId'.
+    return locs.find(l => l.bookingId === bookingId) || null;
   },
 
   parseLocationFromLink: (text: string): { lat: number, lng: number, address?: string } | null => {
