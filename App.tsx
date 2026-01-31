@@ -63,19 +63,13 @@ import { canAccessRoute } from './permissions';
 import { dbService } from './db';
 
 const App: React.FC = () => {
-<<<<<<< HEAD
-  const [activeTab, setActiveTab] = useState('home');
-  const [userRole, setUserRole] = useState<'admin' | 'employee'>('admin');
-  const [currentEmployeeId] = useState('emp_001'); // TODO: Get from auth
-  const [currentEmployeeName] = useState('Current Employee'); // TODO: Get from auth
-  const [initialSearchQuery, setInitialSearchQuery] = useState('');
-=======
   const navigate = useNavigate();
   const location = useLocation();
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [loginError, setLoginError] = useState('');
->>>>>>> 7adb96421721e1e712c6c5ab08b2665083884037
+  const [currentEmployeeId] = useState('emp_001'); // TODO: Get from auth
+  const [currentEmployeeName] = useState('Current Employee'); // TODO: Get from auth
 
   // Determine active tab for UI highlighting based on current path
   const getActiveTab = (path: string) => {
@@ -94,53 +88,6 @@ const App: React.FC = () => {
       // Initialize default users if needed
       await dbService.initializeDefaultUsers();
 
-<<<<<<< HEAD
-    switch (activeTab) {
-      case 'home': return <DashboardPage onNavigate={setActiveTab} />;
-      case 'dashboard': return <DashboardV2 onNavigate={setActiveTab} />;
-      case 'business': return <DashboardV2 onNavigate={setActiveTab} />;
-      case 'money': return <BankAccountsPage onNavigate={setActiveTab} />;
-      case 'more': return <MorePage onNavigate={setActiveTab} />;
-      case 'staff_control': return <StaffControlCenter />;
-      case 'items': return <InventoryPage onNavigate={(tab, query) => {
-        if (tab === 'market_explorer') navigateToMarketExplorer(query);
-        else setActiveTab(tab);
-      }} />;
-      case 'connect': return <ConnectPage />;
-      case 'horoscope': return <BusinessHoroscope onNavigate={setActiveTab} />;
-      case 'marketing_tools': return <MarketingTools onNavigate={setActiveTab} />;
-      case 'whatsapp_marketing': return <WhatsAppMarketingPage onNavigate={setActiveTab} />;
-      case 'tech_agent': return <TechAgentPage onNavigate={setActiveTab} />;
-      case 'google_profile': return <GoogleProfilePage onNavigate={setActiveTab} />;
-      case 'ads': return <AdsManagerPage />;
-      case 'smart_ads': return <SmartAdsPage onNavigate={setActiveTab} />;
-      case 'market_explorer': return <MarketExplorerPage onNavigate={setActiveTab} initialQuery={initialSearchQuery} />;
-      case 'sale_report': return <SaleReportPage onNavigate={setActiveTab} />;
-      case 'party_statement': return <PartyStatementPage onNavigate={setActiveTab} />;
-      case 'billing': return <BillingPage />;
-      case 'estimate': return <EstimatePage />;
-      case 'payment_in': return <PaymentInPage />;
-      case 'purchase': return <PurchasePage />;
-      case 'customers': return <CustomersPage />;
-      case 'visitors': return <VisitorsPage />;
-      case 'stock_wanting': return <StockWantingPage />;
-      case 'complaints': return <ComplaintsPage />;
-      case 'expenses': return <ExpensesPage />;
-      case 'reminders': return <RemindersPage />;
-      case 'utilities': return <UtilitiesPage onNavigate={(tab, query) => {
-        if (tab === 'market_explorer') navigateToMarketExplorer(query);
-        else setActiveTab(tab);
-      }} />;
-      case 'recycle_bin': return <RecycleBinPage onNavigate={setActiveTab} />;
-      case 'salesmen': return <SalesmanTrackingPage onNavigate={setActiveTab} />;
-      case 'employee_panel': return <EmployeePanel onNavigate={setActiveTab} userRole={userRole} />;
-      case 'field_jobs': return <FieldJobs onNavigate={setActiveTab} employeeId={currentEmployeeId} employeeName={currentEmployeeName} />;
-      case 'field_service_manager': return <FieldServiceManagerPage onNavigate={setActiveTab} />;
-      case 'bank_accounts': return <BankAccountsPage onNavigate={setActiveTab} />;
-      case 'cash_in_hand': return <CashInHandPage onNavigate={setActiveTab} />;
-      case 'cheques': return <ChequesPage onNavigate={setActiveTab} />;
-      default: return <DashboardPage onNavigate={setActiveTab} />;
-=======
       // Check for existing session
       const session = getSession();
       setAuthSession(session);
@@ -166,7 +113,6 @@ const App: React.FC = () => {
     } catch (error: any) {
       setLoginError(error.message);
       throw error;
->>>>>>> 7adb96421721e1e712c6c5ab08b2665083884037
     }
   };
 
@@ -209,7 +155,9 @@ const App: React.FC = () => {
         'employee_panel': '/employee-panel',
         'stock_wanting': '/stock-wanting',
         'new_sale': '/billing', // Default billing
-        'recycle_bin': '/recycle-bin'
+        'recycle_bin': '/recycle-bin',
+        'field_jobs': '/field-jobs',
+        'field_service_manager': '/field-service-manager'
       };
       targetPath = routeMap[path] || `/${path}`;
     }
@@ -344,6 +292,8 @@ const App: React.FC = () => {
             <Route path="/utilities" element={<UtilitiesPage onNavigate={handleNavigate} />} />
             <Route path="/recycle-bin" element={<RecycleBinPage onNavigate={handleNavigate} />} />
             <Route path="/salesmen" element={<SalesmanTrackingPage onNavigate={handleNavigate} />} />
+            <Route path="/field-jobs" element={<FieldJobs onNavigate={handleNavigate} employeeId={currentEmployeeId} employeeName={currentEmployeeName} />} />
+            <Route path="/field-service-manager" element={<FieldServiceManagerPage onNavigate={handleNavigate} />} />
 
             <Route path="/bank-accounts" element={<BankAccountsPage onNavigate={handleNavigate} />} />
             <Route path="/cash-in-hand" element={<CashInHandPage onNavigate={handleNavigate} />} />
