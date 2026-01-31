@@ -13,6 +13,10 @@ const ConnectPage: React.FC = () => {
    const [loading, setLoading] = useState(true);
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [isSubmitting, setIsSubmitting] = useState(false);
+   const [staffList, setStaffList] = useState<any[]>([]);
+   const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
+   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+   const [selectedStaffId, setSelectedStaffId] = useState('');
    const [statusFilter, setStatusFilter] = useState<'all' | PickupStatus>('all');
 
    const [formData, setFormData] = useState({
@@ -27,7 +31,13 @@ const ConnectPage: React.FC = () => {
 
    useEffect(() => {
       loadData();
+      loadStaff();
    }, []);
+
+   const loadStaff = async () => {
+      const staff = await dbService.getSalesmen(); // Using salesmen as "Field Staff"
+      setStaffList(staff);
+   };
 
    const loadData = async () => {
       setLoading(true);
@@ -40,6 +50,23 @@ const ConnectPage: React.FC = () => {
          setLoading(false);
       }
    };
+
+   const handleAssignStaff = async () => {
+      if (!selectedBookingId || !selectedStaffId) return;
+
+      const staffMember = staffList.find(s => s.id === selectedStaffId);
+      await dbService.updatePickupBooking(selectedBookingId, {
+         staffId: selectedStaffId,
+         staffName: staffMember?.name
+      });
+
+      setAssignmentModalOpen(false);
+      setSelectedBookingId(null);
+      setSelectedStaffId('');
+      loadData();
+   };
+
+   // ... (existing handlers)
 
    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -243,41 +270,57 @@ const ConnectPage: React.FC = () => {
                            </div>
 
                            {/* Status Update Buttons */}
-                           {booking.status !== 'completed' && (
-                              <div className="flex gap-2 pt-2 border-t border-slate-200">
-                                 {booking.status === 'pending' && (
-                                    <>
-                                       <Button
-                                          size="sm"
-                                          variant="secondary"
-                                          onClick={() => updateStatus(booking.id, 'in-transit')}
-                                          className="flex-1"
-                                       >
-                                          <Truck className="w-4 h-4 mr-1" />
-                                          Start Transit
-                                       </Button>
-                                       <Button
-                                          size="sm"
-                                          onClick={() => updateStatus(booking.id, 'completed')}
-                                          className="flex-1"
-                                       >
-                                          <CheckCircle2 className="w-4 h-4 mr-1" />
-                                          Complete
-                                       </Button>
-                                    </>
-                                 )}
-                                 {booking.status === 'in-transit' && (
+                           <div className="flex gap-2 pt-3 border-t border-slate-200 mt-3">
+                              {booking.status === 'pending' && (
+                                 <>
+                                    <Button
+                                       size="sm"
+                                       variant="outline"
+                                       onClick={() => {
+                                          setSelectedBookingId(booking.id);
+                                          setAssignmentModalOpen(true);
+                                       }}
+                                       className="flex-1"
+                                    >
+                                       <User className="w-3 h-3 mr-1" />
+                                       {booking.staffName ? 'Reassign' : 'Assign Staff'}
+                                    </Button>
+                                    <Button
+                                       size="sm"
+                                       variant="secondary"
+                                       onClick={() => updateStatus(booking.id, 'in-transit')}
+                                       className="flex-1"
+                                    >
+                                       <Truck className="w-3 h-3 mr-1" />
+                                       Start
+                                    </Button>
                                     <Button
                                        size="sm"
                                        onClick={() => updateStatus(booking.id, 'completed')}
-                                       className="w-full"
+                                       className="flex-1"
                                     >
-                                       <CheckCircle2 className="w-4 h-4 mr-1" />
-                                       Mark as Completed
+                                       <CheckCircle2 className="w-3 h-3 mr-1" />
+                                       Done
                                     </Button>
-                                 )}
-                              </div>
-                           )}
+                                 </>
+                              )}
+                              {booking.status === 'in-transit' && (
+                                 <Button
+                                    size="sm"
+                                    onClick={() => updateStatus(booking.id, 'completed')}
+                                    className="w-full"
+                                 >
+                                    <CheckCircle2 className="w-4 h-4 mr-1" />
+                                    Mark as Completed
+                                 </Button>
+                              )}
+                              {booking.staffName && (
+                                 <div className="w-full text-xs text-center text-slate-500 mt-1 flex items-center justify-center gap-1">
+                                    <User className="w-3 h-3" />
+                                    Assigned to: <span className="font-semibold">{booking.staffName}</span>
+                                 </div>
+                              )}
+                           </div>
                         </div>
                      </Card>
                   ))
@@ -291,7 +334,9 @@ const ConnectPage: React.FC = () => {
             title="New Pickup/Delivery Booking"
             size="md"
          >
+            {/* ... Existing Create Form ... */}
             <form onSubmit={handleSubmit} className="space-y-4">
+               {/* ... (Keep existing form content) ... */}
                <div className="space-y-1.5">
                   <label className="block text-sm font-semibold text-slate-700">
                      Service Type
@@ -397,6 +442,46 @@ const ConnectPage: React.FC = () => {
                   </Button>
                </div>
             </form>
+         </Modal>
+
+         {/* Assignment Modal */}
+         <Modal
+            isOpen={assignmentModalOpen}
+            onClose={() => setAssignmentModalOpen(false)}
+            title="Assign Staff"
+            size="sm"
+         >
+            <div className="space-y-4">
+               <p className="text-sm text-slate-600">Select a team member to handle this request.</p>
+               <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {staffList.map((staff) => (
+                     <button
+                        key={staff.id}
+                        onClick={() => setSelectedStaffId(staff.id)}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${selectedStaffId === staff.id
+                           ? 'border-blue-600 bg-blue-50 text-blue-700'
+                           : 'border-slate-200 hover:bg-slate-50'
+                           }`}
+                     >
+                        <span className="font-semibold">{staff.name}</span>
+                        {selectedStaffId === staff.id && <CheckCircle2 className="w-4 h-4" />}
+                     </button>
+                  ))}
+                  {staffList.length === 0 && (
+                     <div className="text-center py-4 text-slate-500 text-sm">
+                        No staff members found. Add them in Staff Control.
+                     </div>
+                  )}
+               </div>
+               <div className="flex gap-2 pt-4">
+                  <Button variant="ghost" className="flex-1" onClick={() => setAssignmentModalOpen(false)}>
+                     Cancel
+                  </Button>
+                  <Button className="flex-1" onClick={handleAssignStaff} disabled={!selectedStaffId}>
+                     Confirm Assignment
+                  </Button>
+               </div>
+            </div>
          </Modal>
       </div>
    );

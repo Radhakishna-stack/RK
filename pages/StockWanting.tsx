@@ -1,14 +1,18 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  FileSpreadsheet, Download, Printer, Trash2, 
-  Loader2, Search, Calculator, Check, Plus, 
-  Save, X, FileCheck, FileArchive
+import {
+  FileSpreadsheet, Download, Printer, Trash2,
+  Loader2, Search, Calculator, Check, Plus,
+  Save, X, FileCheck, FileArchive, ArrowLeft
 } from 'lucide-react';
 import { dbService } from '../db';
 import { StockWantingItem } from '../types';
 
-const StockWantingPage: React.FC = () => {
+interface StockWantingPageProps {
+  onNavigate: (tab: string) => void;
+}
+
+const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
   const [items, setItems] = useState<StockWantingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,7 +45,7 @@ const StockWantingPage: React.FC = () => {
   };
 
   const filteredItems = useMemo(() => {
-    return items.filter(i => 
+    return items.filter(i =>
       i.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       i.partNumber.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -53,7 +57,7 @@ const StockWantingPage: React.FC = () => {
 
   const handleCommitEntry = async () => {
     if (!newEntry.itemName || !newEntry.quantity) return;
-    
+
     setIsSubmitting(true);
     try {
       const added = await dbService.addStockWantingItem({
@@ -83,10 +87,10 @@ const StockWantingPage: React.FC = () => {
       alert("List is empty. Nothing to export.");
       return;
     }
-    
+
     const defaultName = `Wanting_List_${new Date().toLocaleDateString().replace(/\//g, '-')}`;
     const fileName = prompt("Enter a name for this Wanting List (e.g. Honda Spares Order):", defaultName);
-    
+
     if (!fileName) return;
 
     try {
@@ -115,11 +119,11 @@ const StockWantingPage: React.FC = () => {
       // 2. Update PDF Header & Trigger Print
       const printTitle = document.getElementById('print-file-title');
       if (printTitle) printTitle.innerText = fileName.toUpperCase();
-      
+
       // Small timeout to let the download start before opening print dialog
       setTimeout(() => {
         window.print();
-        
+
         // 3. Finalize: Ask to Archive/Clear
         setTimeout(() => {
           if (window.confirm("Export complete. Would you like to CLEAR the current active list to start a fresh file?")) {
@@ -155,21 +159,26 @@ const StockWantingPage: React.FC = () => {
     <div className="space-y-6 pb-32 animate-in fade-in duration-500 max-w-5xl mx-auto px-1">
       {/* Header HUD */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 no-print">
-        <div>
-          <h2 className="text-3xl font-black tracking-tighter text-slate-900 uppercase leading-none">Stock Wanting</h2>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-3 flex items-center gap-2">
-            <FileSpreadsheet className="w-3 h-3 text-blue-500" /> Direct-Entry Tech Spreadsheet
-          </p>
+        <div className="flex items-start gap-4">
+          <button onClick={() => onNavigate('home')} className="mt-1 text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <div>
+            <h2 className="text-3xl font-black tracking-tighter text-slate-900 uppercase leading-none">Stock Wanting</h2>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-3 flex items-center gap-2">
+              <FileSpreadsheet className="w-3 h-3 text-blue-500" /> Direct-Entry Tech Spreadsheet
+            </p>
+          </div>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
-           <button 
-             onClick={handleCloseAndExport}
-             disabled={items.length === 0 || loading}
-             className="flex-1 md:flex-none bg-blue-600 text-white px-8 py-4 rounded-[22px] font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30"
-           >
-             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileArchive className="w-5 h-5" />}
-             Finalize & Close File
-           </button>
+          <button
+            onClick={handleCloseAndExport}
+            disabled={items.length === 0 || loading}
+            className="flex-1 md:flex-none bg-blue-600 text-white px-8 py-4 rounded-[22px] font-black text-[11px] uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30"
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileArchive className="w-5 h-5" />}
+            Finalize & Close File
+          </button>
         </div>
       </header>
 
@@ -177,21 +186,21 @@ const StockWantingPage: React.FC = () => {
       <div className="bg-white p-4 rounded-[32px] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 no-print">
         <div className="relative flex-1 group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors w-5 h-5" />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="FILTER CURRENT LIST..."
             className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-[22px] focus:ring-4 focus:ring-blue-500/5 outline-none font-black text-[11px] uppercase tracking-widest transition-all"
-            value={searchTerm} 
+            value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="bg-slate-900 px-6 py-4 rounded-[22px] flex items-center gap-4 text-white">
-           <div className="flex flex-col">
-              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Active Order Value</p>
-              <p className="text-lg font-black text-blue-400 leading-none mt-1">₹{totalEstimate.toLocaleString()}</p>
-           </div>
-           <div className="w-px h-8 bg-white/10"></div>
-           <Calculator className="w-5 h-5 text-slate-400" />
+          <div className="flex flex-col">
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Active Order Value</p>
+            <p className="text-lg font-black text-blue-400 leading-none mt-1">₹{totalEstimate.toLocaleString()}</p>
+          </div>
+          <div className="w-px h-8 bg-white/10"></div>
+          <Calculator className="w-5 h-5 text-slate-400" />
         </div>
       </div>
 
@@ -220,9 +229,9 @@ const StockWantingPage: React.FC = () => {
                   <td className="px-6 py-4 text-[11px] font-black text-slate-500 border-r border-slate-100 text-right">₹{item.rate.toLocaleString()}</td>
                   <td className="px-6 py-4 text-[11px] font-black text-slate-900 border-r border-slate-100 text-right bg-slate-50/30">₹{(item.quantity * item.rate).toLocaleString()}</td>
                   <td className="px-6 py-4 text-center no-print">
-                     <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors active:scale-90">
-                        <Trash2 className="w-4 h-4" />
-                     </button>
+                    <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors active:scale-90">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -234,51 +243,51 @@ const StockWantingPage: React.FC = () => {
                     <Plus className="w-4 h-4 text-blue-400 mx-auto" />
                   </td>
                   <td className="px-4 py-3 border-r border-blue-100">
-                    <input 
+                    <input
                       ref={partNoRef}
-                      type="text" 
+                      type="text"
                       placeholder="PART #"
                       className="w-full bg-transparent border-b border-transparent focus:border-blue-400 outline-none px-2 py-1 text-[11px] font-black uppercase text-blue-700 transition-all placeholder:text-blue-200"
                       value={newEntry.partNumber}
-                      onChange={e => setNewEntry({...newEntry, partNumber: e.target.value})}
+                      onChange={e => setNewEntry({ ...newEntry, partNumber: e.target.value })}
                       onKeyDown={e => e.key === 'Enter' && handleCommitEntry()}
                     />
                   </td>
                   <td className="px-4 py-3 border-r border-blue-100">
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="ENTER ITEM DESCRIPTION..."
                       className="w-full bg-transparent border-b border-transparent focus:border-blue-400 outline-none px-2 py-1 text-[11px] font-black uppercase text-slate-700 transition-all placeholder:text-slate-300"
                       value={newEntry.itemName}
-                      onChange={e => setNewEntry({...newEntry, itemName: e.target.value})}
+                      onChange={e => setNewEntry({ ...newEntry, itemName: e.target.value })}
                       onKeyDown={e => e.key === 'Enter' && handleCommitEntry()}
                     />
                   </td>
                   <td className="px-4 py-3 border-r border-blue-100">
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       placeholder="QTY"
                       className="w-full bg-transparent border-b border-transparent focus:border-blue-400 outline-none px-2 py-1 text-[11px] font-black text-center text-slate-700 transition-all placeholder:text-slate-300"
                       value={newEntry.quantity}
-                      onChange={e => setNewEntry({...newEntry, quantity: e.target.value})}
+                      onChange={e => setNewEntry({ ...newEntry, quantity: e.target.value })}
                       onKeyDown={e => e.key === 'Enter' && handleCommitEntry()}
                     />
                   </td>
                   <td className="px-4 py-3 border-r border-blue-100">
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       placeholder="RATE"
                       className="w-full bg-transparent border-b border-transparent focus:border-blue-400 outline-none px-2 py-1 text-[11px] font-black text-right text-slate-700 transition-all placeholder:text-slate-300"
                       value={newEntry.rate}
-                      onChange={e => setNewEntry({...newEntry, rate: e.target.value})}
+                      onChange={e => setNewEntry({ ...newEntry, rate: e.target.value })}
                       onKeyDown={e => e.key === 'Enter' && handleCommitEntry()}
                     />
                   </td>
                   <td className="px-6 py-4 text-right border-r border-blue-100">
-                     <span className="text-[11px] font-black text-blue-500 opacity-40">AUTO</span>
+                    <span className="text-[11px] font-black text-blue-500 opacity-40">AUTO</span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button 
+                    <button
                       onClick={handleCommitEntry}
                       disabled={!newEntry.itemName || !newEntry.quantity || isSubmitting}
                       className="p-2 bg-blue-600 text-white rounded-xl shadow-lg active:scale-95 disabled:opacity-20 transition-all"
@@ -292,10 +301,10 @@ const StockWantingPage: React.FC = () => {
               {filteredItems.length === 0 && !loading && searchTerm && (
                 <tr>
                   <td colSpan={7} className="py-20 text-center">
-                     <div className="flex flex-col items-center gap-4 text-slate-300">
-                        <X className="w-12 h-12 opacity-10" />
-                        <p className="text-[10px] font-black uppercase tracking-widest">No matching results in current file</p>
-                     </div>
+                    <div className="flex flex-col items-center gap-4 text-slate-300">
+                      <X className="w-12 h-12 opacity-10" />
+                      <p className="text-[10px] font-black uppercase tracking-widest">No matching results in current file</p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -309,11 +318,11 @@ const StockWantingPage: React.FC = () => {
               )}
             </tbody>
             <tfoot className="bg-slate-900 text-white font-black text-xs uppercase">
-               <tr>
-                  <td colSpan={5} className="px-6 py-6 text-right tracking-[0.2em] border-r border-white/5">Consolidated File Estimate</td>
-                  <td className="px-6 py-6 text-right text-lg tracking-tighter border-r border-white/5">₹{totalEstimate.toLocaleString()}</td>
-                  <td className="no-print bg-slate-800"></td>
-               </tr>
+              <tr>
+                <td colSpan={5} className="px-6 py-6 text-right tracking-[0.2em] border-r border-white/5">Consolidated File Estimate</td>
+                <td className="px-6 py-6 text-right text-lg tracking-tighter border-r border-white/5">₹{totalEstimate.toLocaleString()}</td>
+                <td className="no-print bg-slate-800"></td>
+              </tr>
             </tfoot>
           </table>
         </div>
@@ -321,16 +330,16 @@ const StockWantingPage: React.FC = () => {
 
       {/* Direct Entry Instruction HUD */}
       <div className="bg-blue-50 p-6 rounded-[32px] border border-blue-100 flex items-center justify-between no-print shadow-sm">
-         <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-50">
-               <Plus className="w-6 h-6" />
-            </div>
-            <div>
-               <p className="text-[11px] font-black text-blue-900 uppercase">Quick Add Protocol</p>
-               <p className="text-[10px] text-blue-600 font-medium">Type details in the blue row and hit <span className="font-black">ENTER</span> to commit. No modals required.</p>
-            </div>
-         </div>
-         <FileCheck className="w-8 h-8 text-blue-200 hidden sm:block" />
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-sm border border-blue-50">
+            <Plus className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-[11px] font-black text-blue-900 uppercase">Quick Add Protocol</p>
+            <p className="text-[10px] text-blue-600 font-medium">Type details in the blue row and hit <span className="font-black">ENTER</span> to commit. No modals required.</p>
+          </div>
+        </div>
+        <FileCheck className="w-8 h-8 text-blue-200 hidden sm:block" />
       </div>
 
       {/* Print Styles */}
@@ -347,16 +356,16 @@ const StockWantingPage: React.FC = () => {
       `}</style>
 
       <div className="hidden print:block print-header text-center space-y-3">
-         <h1 className="text-3xl font-black uppercase tracking-tighter">MOTO GEAR SRK</h1>
-         <h2 id="print-file-title" className="text-lg font-bold text-slate-700 uppercase tracking-widest border border-slate-900 inline-block px-6 py-2 rounded-lg">STOCK WANTING REGISTER</h2>
-         <div className="flex justify-between items-center px-4 pt-4">
-            <p className="text-[10px] font-black uppercase text-slate-500">Doc ID: {Date.now().toString().slice(-8)}</p>
-            <p className="text-[10px] font-black uppercase text-slate-500">Generated: {new Date().toLocaleString()}</p>
-         </div>
+        <h1 className="text-3xl font-black uppercase tracking-tighter">MOTO GEAR SRK</h1>
+        <h2 id="print-file-title" className="text-lg font-bold text-slate-700 uppercase tracking-widest border border-slate-900 inline-block px-6 py-2 rounded-lg">STOCK WANTING REGISTER</h2>
+        <div className="flex justify-between items-center px-4 pt-4">
+          <p className="text-[10px] font-black uppercase text-slate-500">Doc ID: {Date.now().toString().slice(-8)}</p>
+          <p className="text-[10px] font-black uppercase text-slate-500">Generated: {new Date().toLocaleString()}</p>
+        </div>
       </div>
 
       <div className="hidden print:block print-footer">
-         <p className="font-black uppercase tracking-[0.3em]">Confidential Procurement List • Moto Gear SRK Operations</p>
+        <p className="font-black uppercase tracking-[0.3em]">Confidential Procurement List • Moto Gear SRK Operations</p>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Plus, Search, DollarSign, Calendar, Trash2, Tag, TrendingDown
+  Plus, Search, DollarSign, Calendar, Trash2, Tag, TrendingDown, ArrowLeft, Edit2
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Expense } from '../types';
@@ -11,12 +11,19 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 
-const ExpensesPage: React.FC = () => {
+interface ExpensesPageProps {
+  onNavigate: (tab: string) => void;
+}
+
+const ExpensesPage: React.FC<ExpensesPageProps> = ({ onNavigate }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Edit Mode
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     description: '',
@@ -46,19 +53,43 @@ const ExpensesPage: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await dbService.addExpense({
-        ...formData,
-        amount: parseFloat(formData.amount)
-      });
+      if (editingId) {
+        await dbService.updateExpense(editingId, {
+          ...formData,
+          amount: parseFloat(formData.amount)
+        });
+      } else {
+        await dbService.addExpense({
+          ...formData,
+          amount: parseFloat(formData.amount)
+        });
+      }
 
       await loadData();
-      setIsModalOpen(false);
-      setFormData({ description: '', amount: '', category: '', date: new Date().toISOString().split('T')[0], paymentMode: 'Cash' });
+      resetForm();
     } catch (err) {
-      alert('Failed to add expense. Please try again.');
+      alert('Failed to save expense. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const resetForm = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setFormData({ description: '', amount: '', category: '', date: new Date().toISOString().split('T')[0], paymentMode: 'Cash' });
+  };
+
+  const handleEdit = (expense: Expense) => {
+    setEditingId(expense.id);
+    setFormData({
+      description: expense.description,
+      amount: expense.amount.toString(),
+      category: expense.category || '',
+      date: expense.date,
+      paymentMode: expense.paymentMode
+    });
+    setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -97,11 +128,19 @@ const ExpensesPage: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Expenses</h1>
-          <p className="text-sm text-slate-600 mt-1">{expenses.length} total expenses</p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Expenses</h1>
+            <p className="text-sm text-slate-600 mt-1">{expenses.length} total expenses</p>
+          </div>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
+        <Button onClick={() => {
+          resetForm();
+          setIsModalOpen(true);
+        }}>
           <Plus className="w-5 h-5 mr-2" />
           Add Expense
         </Button>
@@ -182,12 +221,20 @@ const ExpensesPage: React.FC = () => {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => handleDelete(expense.id)}
-                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => handleEdit(expense)}
+                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(expense.id)}
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </Card>
           ))
@@ -198,7 +245,7 @@ const ExpensesPage: React.FC = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Add New Expense"
+        title={editingId ? "Edit Expense" : "Add New Expense"}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -282,7 +329,7 @@ const ExpensesPage: React.FC = () => {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => setIsModalOpen(false)}
+              onClick={resetForm}
               className="flex-1"
             >
               Cancel
@@ -292,7 +339,7 @@ const ExpensesPage: React.FC = () => {
               isLoading={isSubmitting}
               className="flex-1"
             >
-              Add Expense
+              {editingId ? 'Update Expense' : 'Add Expense'}
             </Button>
           </div>
         </form>

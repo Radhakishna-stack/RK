@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Plus, Clock, TrendingUp, Receipt, AlertCircle,
-  ClipboardCheck, Users, Package, DollarSign, Bike, Phone
+  Plus, Clock, TrendingUp, Receipt, ArrowDownCircle, AlertCircle,
+  ClipboardCheck, Users, Package, Bike, Phone, Wallet
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Invoice, Customer, DashboardStats, Complaint, ComplaintStatus } from '../types';
@@ -62,7 +62,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="p-4 pb-32 space-y-6">
+    <div className="p-4 space-y-6">
       {/* Welcome Header */}
       <div className="space-y-2">
         <h1 className="text-2xl font-bold text-slate-900">Welcome Back!</h1>
@@ -77,7 +77,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             <h2 className="text-4xl font-bold">₹{(stats?.totalReceived || 0).toLocaleString()}</h2>
           </div>
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
-            <DollarSign className="w-8 h-8" />
+            <Wallet className="w-8 h-8" />
           </div>
         </div>
       </Card>
@@ -87,11 +87,10 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         <h2 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-3 gap-3">
           <QuickAction icon={<ClipboardCheck />} label="New Job" onClick={() => onNavigate('complaints')} />
-          <QuickAction icon={<Receipt />} label="New Sale" onClick={() => onNavigate('billing')} />
-          <QuickAction icon={<Users />} label="Add Customer" onClick={() => onNavigate('customers')} />
-          <QuickAction icon={<DollarSign />} label="Payment" onClick={() => onNavigate('payment_in')} />
+          <QuickAction icon={<Receipt />} label="New Sale" onClick={() => onNavigate('sales')} />
           <QuickAction icon={<Package />} label="Stock" onClick={() => onNavigate('items')} />
           <QuickAction icon={<TrendingUp />} label="Reports" onClick={() => onNavigate('sale_report')} />
+          <QuickAction icon={<ArrowDownCircle />} label="Payment In" onClick={() => onNavigate('payment_receipt')} />
         </div>
       </div>
 
@@ -206,13 +205,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         <MiniStat
           label="Cash Balance"
           value={`₹${(stats?.cashInHand || 0).toLocaleString()}`}
-          icon={<DollarSign className="w-5 h-5" />}
+          icon={<Wallet className="w-5 h-5" />}
           onClick={() => onNavigate('cash_in_hand')}
         />
         <MiniStat
           label="Bank Balance"
           value={`₹${(stats?.bankBalance || 0).toLocaleString()}`}
-          icon={<DollarSign className="w-5 h-5" />}
+          icon={<Wallet className="w-5 h-5" />}
           onClick={() => onNavigate('bank_accounts')}
         />
       </div>

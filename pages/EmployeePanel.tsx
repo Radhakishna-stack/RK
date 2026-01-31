@@ -1,46 +1,59 @@
 import React, { useState, useEffect } from 'react';
-import { Hammer, Play, CheckCircle2, Clock, RefreshCw, AlertCircle, Bike } from 'lucide-react';
+import { Hammer, Play, CheckCircle2, Clock, RefreshCw, AlertCircle, Bike, Navigation } from 'lucide-react';
 import { dbService } from '../db';
 import { Complaint, ComplaintStatus, PickupBooking, PickupStatus } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { getCurrentUser } from '../auth';
 
 interface EmployeePanelProps {
   userRole: string;
+<<<<<<< HEAD
   onNavigate: (page: string) => void;
+=======
+  onNavigate?: (path: string) => void;
+>>>>>>> 7adb96421721e1e712c6c5ab08b2665083884037
 }
 
 const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) => {
   const [jobs, setJobs] = useState<Complaint[]>([]);
   const [pickups, setPickups] = useState<PickupBooking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'jobs' | 'pickups'>('jobs');
+  const [requests, setRequests] = useState<PickupBooking[]>([]);
+  const [activeTab, setActiveTab] = useState<'jobs' | 'pickups' | 'requests'>('jobs');
+  const [gpsError, setGpsError] = useState('');
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
+  // ... (GPS Logic) ...
 
   const loadData = async () => {
     setLoading(true);
     try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) return;
+
       const [jobsData, pickupsData] = await Promise.all([
         dbService.getComplaints(),
         dbService.getPickupBookings()
       ]);
 
-      // Filter jobs assigned to current user or pending
       const myJobs = jobsData.filter(job =>
         job.status === 'pending' || job.status === 'in-progress'
       );
       setJobs(myJobs);
 
-      const activePickups = pickupsData.filter(p =>
-        p.status === 'pending' || p.status === 'in-transit'
+      // Filter by Staff ID
+      const myPickups = pickupsData.filter(p =>
+        (p.status === 'pending' || p.status === 'in-transit') && p.staffId === currentUser.id
       );
-      setPickups(activePickups);
+      setPickups(myPickups);
+
+      // Available Requests (Unassigned)
+      const unassigned = pickupsData.filter(p =>
+        p.status === 'pending' && !p.staffId
+      );
+      setRequests(unassigned);
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -56,6 +69,26 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
   const updatePickupStatus = async (id: string, status: PickupStatus) => {
     await dbService.updatePickupBooking(id, { status });
     loadData();
+  };
+
+  const claimJob = async (id: string) => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    if (window.confirm('Accept this pickup request?')) {
+      await dbService.updatePickupBooking(id, {
+        staffId: currentUser.id,
+        staffName: currentUser.name
+      });
+      loadData();
+      setActiveTab('pickups');
+    }
+  };
+
+  const openNavigation = (address: string) => {
+    // Open Google Maps
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+    window.open(url, '_blank');
   };
 
   if (loading) {
@@ -75,6 +108,13 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
       <div>
         <h1 className="text-2xl font-bold text-slate-900">My Work</h1>
         <p className="text-sm text-slate-600 mt-1">Active jobs and pickups assigned to you</p>
+
+        {gpsError && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg">
+            <AlertCircle className="w-4 h-4" />
+            {gpsError}
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -112,22 +152,22 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
       </Card>
 
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-1">
         <button
           onClick={() => setActiveTab('jobs')}
           className={`
-            flex-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all
+            flex-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all whitespace-nowrap
             ${activeTab === 'jobs'
               ? 'bg-blue-600 text-white shadow-md'
               : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
           `}
         >
-          Service Jobs ({jobs.length})
+          Jobs ({jobs.length})
         </button>
         <button
           onClick={() => setActiveTab('pickups')}
           className={`
-            flex-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all
+            flex-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all whitespace-nowrap
             ${activeTab === 'pickups'
               ? 'bg-blue-600 text-white shadow-md'
               : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
@@ -135,11 +175,22 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
         >
           Pickups ({pickups.length})
         </button>
+        <button
+          onClick={() => setActiveTab('requests')}
+          className={`
+            flex-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all whitespace-nowrap
+            ${activeTab === 'requests'
+              ? 'bg-amber-500 text-white shadow-md'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
+          `}
+        >
+          New Requests ({requests.length})
+        </button>
       </div>
 
       {/* Content */}
       <div className="space-y-3">
-        {activeTab === 'jobs' ? (
+        {activeTab === 'jobs' && (
           jobs.length === 0 ? (
             <Card>
               <div className="text-center py-12">
@@ -213,13 +264,15 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
               </Card>
             ))
           )
-        ) : (
+        )}
+
+        {activeTab === 'pickups' && (
           pickups.length === 0 ? (
             <Card>
               <div className="text-center py-12">
                 <Bike className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">No active pickups</h3>
-                <p className="text-slate-600">No pickups assigned. Check back later.</p>
+                <p className="text-slate-600">You don't have any assigned pickups.</p>
               </div>
             </Card>
           ) : (
@@ -240,14 +293,26 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
 
                       <div className="space-y-1 text-sm text-slate-600">
                         <p><strong>Bike:</strong> {pickup.bikeNumber}</p>
-                        <p><strong>Address:</strong> {pickup.address}</p>
+                        <p className="flex items-center gap-1">
+                          <Navigation className="w-3 h-3 text-blue-600" />
+                          {pickup.address}
+                        </p>
                         <p><strong>Time:</strong> {pickup.pickupTime}</p>
                       </div>
                     </div>
                   </div>
 
-                  {pickup.status === 'pending' && (
-                    <div className="flex gap-2 pt-2 border-t border-slate-200">
+                  <div className="flex gap-2 pt-2 border-t border-slate-200">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => openNavigation(pickup.address)}
+                      className="flex-1"
+                    >
+                      <Navigation className="w-4 h-4 mr-1" />
+                      Navigate
+                    </Button>
+                    {pickup.status === 'pending' && (
                       <Button
                         size="sm"
                         onClick={() => updatePickupStatus(pickup.id, 'in-transit')}
@@ -255,20 +320,52 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
                       >
                         Start Pickup
                       </Button>
-                    </div>
-                  )}
-                  {pickup.status === 'in-transit' && (
-                    <div className="flex gap-2 pt-2 border-t border-slate-200">
+                    )}
+                    {pickup.status === 'in-transit' && (
                       <Button
                         size="sm"
                         onClick={() => updatePickupStatus(pickup.id, 'completed')}
                         className="flex-1"
                       >
                         <CheckCircle2 className="w-4 h-4 mr-1" />
-                        Complete Pickup
+                        Complete
                       </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))
+          )
+        )}
+
+        {activeTab === 'requests' && (
+          requests.length === 0 ? (
+            <Card>
+              <div className="text-center py-12">
+                <CheckCircle2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">No new requests</h3>
+                <p className="text-slate-600">Check back later for new pickup requests.</p>
+              </div>
+            </Card>
+          ) : (
+            requests.map((req) => (
+              <Card key={req.id} padding="md">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-lg font-bold text-slate-900">{req.customerName}</h3>
+                        <Badge variant="neutral" size="sm">Unassigned</Badge>
+                      </div>
+                      <div className="space-y-1 text-sm text-slate-600">
+                        <p><strong>Location:</strong> {req.address}</p>
+                        <p><strong>Time:</strong> {req.pickupTime || req.timeRange}</p>
+                      </div>
                     </div>
-                  )}
+                  </div>
+                  <Button className="w-full" onClick={() => claimJob(req.id)}>
+                    Accept Job
+                  </Button>
                 </div>
               </Card>
             ))

@@ -1,6 +1,8 @@
 
-import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, PickupBooking, PickupSlot, StaffLocation, PickupStatus, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount } from './types';
+
+import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, PickupBooking, PickupSlot, StaffLocation, PickupStatus, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole, PaymentReceipt } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
+import { encryptPassword } from './auth';
 
 const LS_KEYS = {
   CUSTOMERS: 'mg_customers',
@@ -12,6 +14,7 @@ const LS_KEYS = {
   EXPENSES: 'mg_expenses',
   REMINDERS: 'mg_reminders',
   SETTINGS: 'mg_settings',
+  ROLE_PERMISSIONS: 'mg_role_permissions',
   STOCK_TXNS: 'mg_stock_txns',
   TRANSACTIONS: 'mg_transactions',
   SALESMEN: 'mg_salesmen',
@@ -20,7 +23,9 @@ const LS_KEYS = {
   WA_STATUS: 'mg_wa_status',
   STAFF_LOCS: 'mg_staff_locs',
   RECYCLE_BIN: 'mg_recycle_bin',
-  BANK_ACCOUNTS: 'mg_bank_accounts'
+  BANK_ACCOUNTS: 'mg_bank_accounts',
+  USERS: 'mg_users',
+  PAYMENT_RECEIPTS: 'mg_payment_receipts'
 };
 
 const DEFAULT_BANK: BankAccount = {
@@ -117,6 +122,54 @@ const DEFAULT_SETTINGS: AppSettings = {
   accounting: { enabled: false, allowJournalEntries: false }
 };
 
+// Import default permissions to use as fallback
+import { ROLE_PERMISSIONS as DEFAULT_ROLE_PERMISSIONS } from './permissions';
+import { RolePermissions } from './types';
+
+// Helper function to generate unique IDs with random component
+const generateUniqueId = (prefix: string): string => {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return `${prefix}${timestamp}${random}`;
+};
+
+// Helper function to create or update customer records
+const upsertCustomer = async (customerData: {
+  customerName: string;
+  bikeNumber: string;
+  customerPhone?: string;
+  city?: string;
+}): Promise<void> => {
+  const currentCustomers = await dbService.getCustomers();
+  const existingCustIndex = currentCustomers.findIndex(c =>
+    c.bikeNumber.toUpperCase() === customerData.bikeNumber.toUpperCase()
+  );
+
+  if (existingCustIndex !== -1) {
+    // Update existing customer details
+    currentCustomers[existingCustIndex] = {
+      ...currentCustomers[existingCustIndex],
+      name: customerData.customerName,
+      phone: customerData.customerPhone || currentCustomers[existingCustIndex].phone,
+      city: customerData.city || currentCustomers[existingCustIndex].city
+    };
+  } else {
+    // Create new customer record
+    currentCustomers.push({
+      id: generateUniqueId('C'),
+      name: customerData.customerName,
+      bikeNumber: customerData.bikeNumber.toUpperCase(),
+      phone: customerData.customerPhone || '',
+      city: customerData.city || '',
+      loyaltyPoints: 0,
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  // Persist updated customer list
+  localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(currentCustomers));
+};
+
 export const dbService = {
   getConnectionStatus: () => 'connected',
 
@@ -152,6 +205,41 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify(current.filter(b => b.id !== id)));
   },
 
+  getAllRolePermissions: async (): Promise<Record<string, RolePermissions>> => {
+    const local = localStorage.getItem(LS_KEYS.ROLE_PERMISSIONS);
+    return local ? JSON.parse(local) : DEFAULT_ROLE_PERMISSIONS;
+  },
+
+  updateRolePermissions: async (role: string, permissions: RolePermissions): Promise<void> => {
+    const current = await dbService.getAllRolePermissions();
+    const updated = { ...current, [role]: permissions };
+    localStorage.setItem(LS_KEYS.ROLE_PERMISSIONS, JSON.stringify(updated));
+  },
+
+  getStaffLocations: async (): Promise<StaffLocation[]> => {
+    const local = localStorage.getItem(LS_KEYS.STAFF_LOCS);
+    return local ? JSON.parse(local) : [];
+  },
+
+  updateStaffLocation: async (staffId: string, lat: number, lng: number): Promise<void> => {
+    const current = await dbService.getStaffLocations();
+    const staffName = (await dbService.getSalesmen()).find(s => s.id === staffId)?.name || 'Unknown';
+
+    // Remove old entry for this staff if exists
+    const others = current.filter(s => s.staffId !== staffId);
+
+    const newLoc: StaffLocation = {
+      staffId,
+      staffName,
+      lat,
+      lng,
+      lastUpdated: new Date().toISOString(),
+      bookingId: 'IDLE' // Default, can be updated if we track active booking
+    };
+
+    localStorage.setItem(LS_KEYS.STAFF_LOCS, JSON.stringify([...others, newLoc]));
+  },
+
   getAccountBalance: async (accountId: string): Promise<number> => {
     const accounts = await dbService.getBankAccounts();
     const target = accounts.find(a => a.id === accountId);
@@ -161,7 +249,7 @@ export const dbService = {
     const accountTxns = txns.filter(t => t.accountId === accountId);
 
     const flow = accountTxns.reduce((sum, t) => t.type === 'IN' ? sum + t.amount : sum - t.amount, 0);
-    return target.openingBalance + flow;
+    return (target.openingBalance || 0) + flow;
   },
 
   getBusinessHoroscope: async (businessName: string): Promise<string> => {
@@ -267,6 +355,20 @@ export const dbService = {
     return newTxn;
   },
 
+  updateTransaction: async (id: string, updates: Partial<Transaction>): Promise<void> => {
+    const transactions = await dbService.getTransactions();
+    const index = transactions.findIndex(t => t.id === id);
+    if (index !== -1) {
+      transactions[index] = { ...transactions[index], ...updates };
+      localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(transactions));
+    }
+  },
+
+  deleteTransaction: async (id: string): Promise<void> => {
+    const transactions = await dbService.getTransactions();
+    localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(transactions.filter(t => t.id !== id)));
+  },
+
   getCustomerBalance: async (bikeNumber: string, customerName: string): Promise<number> => {
     const invoices = await dbService.getInvoices();
     const txns = await dbService.getTransactions();
@@ -317,10 +419,25 @@ export const dbService = {
 
   getComplaints: async (): Promise<Complaint[]> => JSON.parse(localStorage.getItem(LS_KEYS.COMPLAINTS) || '[]'),
   addComplaint: async (data: any): Promise<Complaint> => {
-    const current = await dbService.getComplaints();
-    const newComp = { ...data, id: 'J' + Date.now(), status: ComplaintStatus.PENDING, createdAt: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify([newComp, ...current]));
-    return newComp;
+    const currentComplaints = await dbService.getComplaints();
+    const newComplaint = {
+      ...data,
+      id: 'B' + Date.now(),
+      status: ComplaintStatus.PENDING,
+      createdAt: new Date().toISOString()
+    };
+
+    // Auto-save/update customer details using helper
+    await upsertCustomer({
+      customerName: data.customerName,
+      bikeNumber: data.bikeNumber,
+      customerPhone: data.customerPhone,
+      city: data.city
+    });
+
+    // Save complaint
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify([newComplaint, ...currentComplaints]));
+    return newComplaint;
   },
   updateComplaintStatus: async (id: string, status: ComplaintStatus): Promise<void> => {
     const current = await dbService.getComplaints();
@@ -341,6 +458,7 @@ export const dbService = {
 
   getInvoices: async (): Promise<Invoice[]> => JSON.parse(localStorage.getItem(LS_KEYS.INVOICES) || '[]'),
   generateInvoice: async (data: any): Promise<Invoice> => {
+<<<<<<< HEAD
     const current = await dbService.getInvoices();
     const newInv = { ...data, id: 'I' + Date.now(), date: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...current]));
@@ -355,9 +473,113 @@ export const dbService = {
       if (cust) {
         await dbService.updateCustomerLoyalty(cust.id, (cust.loyaltyPoints || 0) + earned);
       }
+=======
+    const currentInvoices = await dbService.getInvoices();
+    const accounts = await dbService.getBankAccounts();
+
+    // Auto-save/update customer details using helper
+    await upsertCustomer({
+      customerName: data.customerName,
+      bikeNumber: data.bikeNumber,
+      customerPhone: data.customerPhone
+    });
+
+    // Handle Invoice creation
+    const newInv = { ...data, id: 'I' + Date.now(), date: data.date || new Date().toISOString() };
+    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...currentInvoices]));
+
+    // Handle payment collections (Cash and UPI)
+    if (data.paymentCollections) {
+      const { cash, upi } = data.paymentCollections;
+
+      // Create Cash transaction if cash amount > 0
+      if (cash > 0) {
+        const cashAccount = accounts.find(a => a.type === 'Cash');
+        if (cashAccount) {
+          await dbService.addTransaction({
+            entityId: data.bikeNumber,
+            accountId: cashAccount.id,
+            type: 'IN',
+            amount: cash,
+            paymentMode: 'Cash',
+            description: `Payment for Invoice ${newInv.id} - ${data.customerName}`
+          });
+        }
+      }
+
+      // Create UPI transaction if UPI amount > 0
+      if (upi > 0) {
+        // Use selected account OR fallback to finding one
+        let upiAccount = accounts.find(a => a.id === data.paymentCollections.upiAccountId);
+
+        // Fallback: Find UPI/Wallet or any non-cash
+        if (!upiAccount) {
+          upiAccount = accounts.find(a => a.type === 'UPI' || a.type === 'Wallet') || accounts.find(a => a.type !== 'Cash');
+        }
+
+        if (upiAccount) {
+          await dbService.addTransaction({
+            entityId: data.bikeNumber,
+            accountId: upiAccount.id,
+            type: 'IN',
+            amount: upi,
+            paymentMode: 'UPI',
+            description: `Payment for Invoice ${newInv.id} - ${data.customerName}`
+          });
+        }
+      }
+    }
+
+    // Update loyalty points if payment is made
+    if (data.paymentStatus === 'Paid' || data.paymentStatus === 'Pending') {
+      const settings = await dbService.getSettings();
+      const rate = settings.party.loyaltyRate || 100;
+
+      // Calculate loyalty points based on amount paid, not total invoice amount
+      let paidAmount = data.finalAmount;
+      if (data.paymentCollections && data.paymentStatus === 'Pending') {
+        paidAmount = (data.paymentCollections.cash || 0) + (data.paymentCollections.upi || 0);
+      }
+
+      const earned = Math.floor(paidAmount / rate);
+
+      // Fetch customer after upsert to get the latest data
+      const updatedCustomers = await dbService.getCustomers();
+      const cust = updatedCustomers.find(c => c.bikeNumber.toUpperCase() === data.bikeNumber.toUpperCase());
+      if (cust && earned > 0) {
+        await dbService.updateCustomerLoyalty(cust.id, (cust.loyaltyPoints || 0) + earned);
+      }
+    }
+
+    // Auto-create Service Reminder if date is set
+    if (data.serviceReminderDate) {
+      const existingReminders = await dbService.getReminders();
+      // Avoid duplicate reminder for same customer and date
+      const duplicate = existingReminders.find(r =>
+        r.bikeNumber === data.bikeNumber &&
+        r.reminderDate === data.serviceReminderDate
+      );
+
+      if (!duplicate) {
+        await dbService.addReminder({
+          customerName: data.customerName,
+          phone: data.customerPhone || '',
+          bikeNumber: data.bikeNumber,
+          reminderDate: data.serviceReminderDate,
+          serviceType: 'General Service',
+          status: 'Pending',
+          message: `Hi ${data.customerName}, your bike service is due on ${data.serviceReminderDate}. Please visit us!`,
+          serviceDate: data.serviceReminderDate // redundant but keeps type happy
+        });
+      }
+>>>>>>> 7adb96421721e1e712c6c5ab08b2665083884037
     }
 
     return newInv;
+  },
+  updateInvoicePaymentStatus: async (id: string, status: 'Paid' | 'Pending' | 'Unpaid'): Promise<void> => {
+    const current = await dbService.getInvoices();
+    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify(current.map(i => i.id === id ? { ...i, paymentStatus: status } : i)));
   },
   deleteInvoice: async (id: string): Promise<void> => {
     const current = await dbService.getInvoices();
@@ -432,19 +654,75 @@ export const dbService = {
   },
 
   getExpenses: async (): Promise<Expense[]> => JSON.parse(localStorage.getItem(LS_KEYS.EXPENSES) || '[]'),
+
   addExpense: async (data: any): Promise<Expense> => {
     const current = await dbService.getExpenses();
-    const newExp = { ...data, id: 'E' + Date.now(), date: new Date().toISOString() };
+    const accounts = await dbService.getBankAccounts();
+
+    // Determine Account ID
+    let accountId = 'CASH-01'; // Default
+    if (data.paymentMode === 'Cash') {
+      accountId = 'CASH-01';
+    } else {
+      // Find a suitable bank/UPI account
+      const bankAcc = accounts.find(a => a.type !== 'Cash' && (a.type === 'UPI' || a.type === 'Savings' || a.type === 'Current'));
+      if (bankAcc) accountId = bankAcc.id;
+      // If no specific match, leave as Cash or fallback? 
+      // If user selected Card but we only have Cash account, it's ambiguous. 
+      // But typically there's a Bank account.
+    }
+
+    // Create Transaction first
+    const newTxn = await dbService.addTransaction({
+      entityId: 'EXPENSE',
+      accountId: accountId,
+      type: 'OUT',
+      amount: data.amount,
+      paymentMode: data.paymentMode,
+      description: `Expense: ${data.description} (${data.category})`,
+      date: data.date || new Date().toISOString()
+    });
+
+    const newExp = {
+      ...data,
+      id: 'E' + Date.now(),
+      date: data.date || new Date().toISOString(),
+      transactionId: newTxn.id,
+      accountId: accountId
+    };
+
     localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify([newExp, ...current]));
     return newExp;
   },
+
   deleteExpense: async (id: string): Promise<void> => {
     const current = await dbService.getExpenses();
     const itemToDelete = current.find(e => e.id === id);
+
     if (itemToDelete) {
+      if (itemToDelete.transactionId) {
+        await dbService.deleteTransaction(itemToDelete.transactionId);
+      }
+
       await dbService.moveToRecycleBin('Expense', itemToDelete);
       localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(current.filter(e => e.id !== id)));
     }
+  },
+
+  updateExpense: async (id: string, updates: Partial<Expense>): Promise<void> => {
+    const current = await dbService.getExpenses();
+    const expense = current.find(e => e.id === id);
+
+    if (expense && expense.transactionId) {
+      // Update linked transaction
+      await dbService.updateTransaction(expense.transactionId, {
+        amount: updates.amount !== undefined ? updates.amount : undefined, // Only update if changed
+        date: updates.date,
+        description: (updates.description || updates.category) ? `Expense: ${updates.description || expense.description} (${updates.category || expense.category})` : undefined
+      });
+    }
+
+    localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(current.map(e => e.id === id ? { ...e, ...updates } : e)));
   },
 
   getReminders: async (): Promise<ServiceReminder[]> => JSON.parse(localStorage.getItem(LS_KEYS.REMINDERS) || '[]'),
@@ -457,6 +735,10 @@ export const dbService = {
   updateReminderStatus: async (id: string, status: 'Pending' | 'Sent'): Promise<void> => {
     const current = await dbService.getReminders();
     localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify(current.map(r => r.id === id ? { ...r, status, lastNotified: new Date().toISOString() } : r)));
+  },
+  updateReminder: async (id: string, updates: Partial<ServiceReminder>): Promise<void> => {
+    const current = await dbService.getReminders();
+    localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify(current.map(r => r.id === id ? { ...r, ...updates } : r)));
   },
   deleteReminder: async (id: string): Promise<void> => {
     const current = await dbService.getReminders();
@@ -606,7 +888,7 @@ export const dbService = {
     }
   },
 
-  getPickupSlots: async (): Promise<PickupSlot[]> => JSON.parse(localStorage.getItem(LS_KEYS.PICKUP_SLOTS) || '[]'),
+
   getSlotsByDate: async (date: string): Promise<PickupSlot[]> => {
     const slots = await dbService.getPickupSlots();
     return slots.filter(s => s.date === date);
@@ -645,13 +927,11 @@ export const dbService = {
   },
 
   getLiveStaffTracking: async (bookingId: string): Promise<StaffLocation | null> => {
-    const locs: Record<string, StaffLocation> = JSON.parse(localStorage.getItem(LS_KEYS.STAFF_LOCS) || '{}');
-    return locs[bookingId] || null;
-  },
-  updateStaffLocation: async (loc: StaffLocation): Promise<void> => {
-    const locs: Record<string, StaffLocation> = JSON.parse(localStorage.getItem(LS_KEYS.STAFF_LOCS) || '{}');
-    locs[loc.bookingId] = loc;
-    localStorage.setItem(LS_KEYS.STAFF_LOCS, JSON.stringify(locs));
+    const locs: StaffLocation[] = JSON.parse(localStorage.getItem(LS_KEYS.STAFF_LOCS) || '[]');
+    // Assuming we want to find the staff dealing with this booking, but the current schema for StaffLocation
+    // might not strictly link to bookingId in a 1:1 map if it's just latest location.
+    // However, the array 'locs' contains items with 'bookingId'.
+    return locs.find(l => l.bookingId === bookingId) || null;
   },
 
   parseLocationFromLink: (text: string): { lat: number, lng: number, address?: string } | null => {
@@ -744,5 +1024,223 @@ export const dbService = {
 
   emptyRecycleBin: async (): Promise<void> => {
     localStorage.setItem(LS_KEYS.RECYCLE_BIN, JSON.stringify([]));
+  },
+
+  // User Management Functions
+  initializeDefaultUsers: async (): Promise<void> => {
+    const users = await dbService.getUsers();
+    if (users.length === 0) {
+      // Create default admin user
+      const defaultAdmin: User = {
+        id: generateUniqueId('U'),
+        username: 'admin',
+        password: encryptPassword('admin123'),
+        role: 'admin',
+        name: 'Administrator',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+      localStorage.setItem(LS_KEYS.USERS, JSON.stringify([defaultAdmin]));
+    }
+  },
+
+  getUsers: async (): Promise<User[]> => {
+    const users = JSON.parse(localStorage.getItem(LS_KEYS.USERS) || '[]');
+    return users;
+  },
+
+  getUserByUsername: async (username: string): Promise<User | null> => {
+    const users = await dbService.getUsers();
+    return users.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
+  },
+
+  addUser: async (data: Omit<User, 'id' | 'createdAt'>): Promise<User> => {
+    const users = await dbService.getUsers();
+
+    // Check if username already exists
+    const existing = users.find(u => u.username.toLowerCase() === data.username.toLowerCase());
+    if (existing) {
+      throw new Error('Username already exists');
+    }
+
+    const newUser: User = {
+      ...data,
+      id: generateUniqueId('U'),
+      password: encryptPassword(data.password),
+      createdAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(LS_KEYS.USERS, JSON.stringify([...users, newUser]));
+    return newUser;
+  },
+
+  updateUser: async (id: string, updates: Partial<Omit<User, 'id' | 'createdAt'>>): Promise<void> => {
+    const users = await dbService.getUsers();
+    const updatedUsers = users.map(u => {
+      if (u.id === id) {
+        const user = { ...u, ...updates };
+        // If password is being updated, encrypt it
+        if (updates.password) {
+          user.password = encryptPassword(updates.password);
+        }
+        return user;
+      }
+      return u;
+    });
+    localStorage.setItem(LS_KEYS.USERS, JSON.stringify(updatedUsers));
+  },
+
+  deleteUser: async (id: string): Promise<void> => {
+    const users = await dbService.getUsers();
+    // Prevent deleting the last admin
+    const admins = users.filter(u => u.role === 'admin');
+    const userToDelete = users.find(u => u.id === id);
+
+    if (userToDelete?.role === 'admin' && admins.length === 1) {
+      throw new Error('Cannot delete the last admin user');
+    }
+
+    localStorage.setItem(LS_KEYS.USERS, JSON.stringify(users.filter(u => u.id !== id)));
+  },
+
+  toggleUserStatus: async (id: string): Promise<void> => {
+    const users = await dbService.getUsers();
+    const updatedUsers = users.map(u => {
+      if (u.id === id) {
+        return { ...u, isActive: !u.isActive };
+      }
+      return u;
+    });
+    localStorage.setItem(LS_KEYS.USERS, JSON.stringify(updatedUsers));
+  },
+
+  // Payment Receipts
+  getPaymentReceipts: async (): Promise<PaymentReceipt[]> => {
+    const receipts = localStorage.getItem(LS_KEYS.PAYMENT_RECEIPTS);
+    return receipts ? JSON.parse(receipts) : [];
+  },
+
+  addPaymentReceipt: async (data: Omit<PaymentReceipt, 'id' | 'receiptNumber' | 'createdAt'>): Promise<PaymentReceipt> => {
+    const current = await dbService.getPaymentReceipts();
+
+    // Generate receipt number with zero-padded counter
+    const nextNumber = current.length + 1;
+    const receiptNumber = `PR-${String(nextNumber).padStart(4, '0')}`;
+    const id = `PR-${Date.now()}`;
+
+    const newReceipt: PaymentReceipt = {
+      ...data,
+      id,
+      receiptNumber,
+      createdAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(LS_KEYS.PAYMENT_RECEIPTS, JSON.stringify([newReceipt, ...current]));
+
+    // Create transaction entries for cash and UPI
+    if (data.cashAmount > 0) {
+      await dbService.addTransaction({
+        entityId: data.customerId,
+        accountId: 'CASH-01',
+        type: 'IN',
+        amount: data.cashAmount,
+        paymentMode: 'Cash',
+        description: `Payment Receipt ${receiptNumber} - Cash${data.description ? ` (${data.description})` : ''}`
+      });
+    }
+
+    if (data.upiAmount > 0) {
+      await dbService.addTransaction({
+        entityId: data.customerId,
+        accountId: 'WALLET-01',
+        type: 'IN',
+        amount: data.upiAmount,
+        paymentMode: 'UPI',
+        description: `Payment Receipt ${receiptNumber} - UPI${data.description ? ` (${data.description})` : ''}`
+      });
+    }
+
+    return newReceipt;
+  },
+
+  // Pickup Slots
+  getPickupSlots: async (): Promise<PickupSlot[]> => {
+    const data = localStorage.getItem(LS_KEYS.PICKUP_SLOTS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addPickupSlot: async (slot: PickupSlot): Promise<void> => {
+    const slots = await dbService.getPickupSlots();
+    slots.push(slot);
+    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(slots));
+  },
+
+  deletePickupSlot: async (id: string): Promise<void> => {
+    const slots = await dbService.getPickupSlots();
+    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(slots.filter(s => s.id !== id)));
+  },
+
+  updatePickupBooking: async (id: string, updates: Partial<PickupBooking>): Promise<void> => {
+    const bookings = await dbService.getPickupBookings();
+    const updatedBookings = bookings.map(b => b.id === id ? { ...b, ...updates } : b);
+    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify(updatedBookings));
+  },
+
+  getPaymentReceiptById: async (id: string): Promise<PaymentReceipt | undefined> => {
+    const receipts = await dbService.getPaymentReceipts();
+    return receipts.find(r => r.id === id);
+  },
+
+  deletePaymentReceipt: async (id: string): Promise<void> => {
+    const receipts = await dbService.getPaymentReceipts();
+    localStorage.setItem(LS_KEYS.PAYMENT_RECEIPTS, JSON.stringify(receipts.filter(r => r.id !== id)));
+  },
+
+  updatePaymentReceipt: async (id: string, updates: Partial<PaymentReceipt>): Promise<void> => {
+    const receipts = await dbService.getPaymentReceipts();
+    const updatedReceipts = receipts.map(r => r.id === id ? { ...r, ...updates } : r);
+    localStorage.setItem(LS_KEYS.PAYMENT_RECEIPTS, JSON.stringify(updatedReceipts));
+
+    // Also try to update linked transactions if amount changed
+    // This is a best-effort attempt to keep ledgers in sync
+    const originalReceipt = receipts.find(r => r.id === id);
+    if (originalReceipt) {
+      const txns = await dbService.getTransactions();
+      // Find transactions with matching description pattern
+      const receiptNum = originalReceipt.receiptNumber;
+
+      let updatedTxns = [...txns];
+      let changed = false;
+
+      // Update Cash Transaction
+      if ((updates.cashAmount !== undefined && updates.cashAmount !== originalReceipt.cashAmount) || updates.date) {
+        const cashTxnIndex = updatedTxns.findIndex(t => t.description.includes(receiptNum) && t.paymentMode === 'Cash');
+        if (cashTxnIndex !== -1) {
+          updatedTxns[cashTxnIndex] = {
+            ...updatedTxns[cashTxnIndex],
+            amount: updates.cashAmount !== undefined ? updates.cashAmount : updatedTxns[cashTxnIndex].amount,
+            date: updates.date || updatedTxns[cashTxnIndex].date
+          };
+          changed = true;
+        }
+      }
+
+      // Update UPI Transaction
+      if ((updates.upiAmount !== undefined && updates.upiAmount !== originalReceipt.upiAmount) || updates.date) {
+        const upiTxnIndex = updatedTxns.findIndex(t => t.description.includes(receiptNum) && t.paymentMode === 'UPI');
+        if (upiTxnIndex !== -1) {
+          updatedTxns[upiTxnIndex] = {
+            ...updatedTxns[upiTxnIndex],
+            amount: updates.upiAmount !== undefined ? updates.upiAmount : updatedTxns[upiTxnIndex].amount,
+            date: updates.date || updatedTxns[upiTxnIndex].date
+          };
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(updatedTxns));
+      }
+    }
   }
 };

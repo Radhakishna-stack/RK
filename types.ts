@@ -4,7 +4,7 @@ export interface Customer {
   name: string;
   phone: string;
   bikeNumber: string;
-  city: string;
+  city?: string;
   email?: string;
   address?: string;
   gstin?: string;
@@ -195,29 +195,38 @@ export interface InvoiceItem {
   inventoryItemId?: string;
 }
 
+export interface PaymentCollection {
+  cash: number;
+  upi: number;
+  total: number;
+}
+
 export interface Invoice {
   id: string;
-  complaintId: string;
+  complaintId?: string; // Optional - direct sales don't need a complaint
   bikeNumber: string;
   customerName: string;
+  customerPhone?: string;
   details: string;
   items: InvoiceItem[];
   estimatedCost: number;
   finalAmount: number;
   taxAmount?: number;
   subTotal?: number;
-  paymentStatus: 'Paid' | 'Unpaid';
+  paymentStatus: 'Paid' | 'Pending' | 'Unpaid';
   accountId: string; // References BankAccount.id
   paymentMode: string; // Account Name for display
   date: string;
   odometerReading?: number;
   docType?: 'Sale' | 'Estimate';
+  serviceReminderDate?: string;
+  paymentCollections?: { cash: number; upi: number }; // Track split payment amounts
 }
 
 export interface BankAccount {
   id: string;
   name: string;
-  type: 'Cash' | 'Savings' | 'Current' | 'UPI/Wallet';
+  type: 'Cash' | 'Savings' | 'Current' | 'UPI/Wallet' | 'UPI' | 'Wallet';
   openingBalance: number;
   createdAt: string;
 }
@@ -226,11 +235,16 @@ export interface Transaction {
   id: string;
   entityId: string; // Party ID or description
   accountId: string; // Reference to BankAccount.id
-  type: 'IN' | 'OUT';
+  type: 'IN' | 'OUT' | 'cash-in' | 'cash-out' | 'cheque-received' | 'cheque-issued' | 'purchase' | 'expense';
   amount: number;
   paymentMode: string; // For legacy/display
   date: string;
   description: string;
+  category?: string;
+  status?: 'pending' | 'cleared' | 'bounced' | 'completed';
+  chequeNumber?: string;
+  partyName?: string;
+  bankName?: string;
 }
 
 export interface StockTransaction {
@@ -257,12 +271,16 @@ export interface InventoryItem {
 
 export interface Expense {
   id: string;
-  title: string;
+  description: string; // Used in UI
   amount: number;
+  category: string;
   date: string;
-  notes: string;
-  accountId: string;
   paymentMode: string;
+  transactionId?: string; // Links to the ledger transaction
+  // Legacy or unused fields kept optional just in case
+  title?: string;
+  notes?: string;
+  accountId?: string;
 }
 
 export interface Salesman {
@@ -285,6 +303,23 @@ export interface ServiceReminder {
   serviceType: string;
   status: 'Pending' | 'Sent';
   lastNotified?: string;
+  message?: string;
+  serviceDate?: string;
+}
+
+export interface PaymentReceipt {
+  id: string;              // Auto-generated receipt ID (e.g., "PR-1737738000000")
+  receiptNumber: string;   // Display format (e.g., "PR-0001")
+  customerId: string;      // Reference to Customer.id
+  customerName: string;    // Cached for display
+  customerPhone: string;   // Cached for display
+  bikeNumber?: string;     // Optional: linked to customer's bike
+  cashAmount: number;      // Amount received in cash
+  upiAmount: number;       // Amount received via UPI
+  totalAmount: number;     // cashAmount + upiAmount
+  date: string;            // ISO format
+  description?: string;    // Optional notes
+  createdAt: string;       // Timestamp
 }
 
 export interface DashboardStats {
@@ -477,4 +512,43 @@ export interface AppSettings {
     enabled: boolean;
     allowJournalEntries: boolean;
   };
+}
+
+// Authentication & Authorization Types
+export type UserRole = 'admin' | 'employee' | 'manager' | 'mechanic';
+
+export interface User {
+  id: string;
+  username: string;
+  password: string;
+  role: UserRole;
+  name: string;
+  phone?: string;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface AuthSession {
+  user: Omit<User, 'password'>;
+  loginTime: string;
+}
+
+export interface RolePermissions {
+  canViewSales: boolean;
+  canCreateSales: boolean;
+  canEditSales: boolean;
+  canDeleteSales: boolean;
+  canViewReports: boolean;
+  canManageInventory: boolean;
+  canManageCustomers: boolean;
+  canManageExpenses: boolean;
+  canViewSettings: boolean;
+  canManageSettings: boolean;
+  canManageStaff: boolean;
+  canManageUsers: boolean;
+  canViewComplaints: boolean;
+  canEditComplaints: boolean;
+  canAccessBilling: boolean;
+  canAccessPurchase: boolean;
+  canAccessAnalytics: boolean;
 }

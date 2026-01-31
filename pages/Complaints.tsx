@@ -1,34 +1,53 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Plus, Search, Clock, CheckCircle, AlertCircle, Bike, Phone, Calendar, DollarSign, X
+  Plus, Search, Clock, CheckCircle, AlertCircle, Bike, Phone, Calendar, DollarSign, X,
+  Camera, Upload, FlipHorizontal, Image as ImageIcon, Trash2, User, ArrowLeft
 } from 'lucide-react';
 import { dbService } from '../db';
-import { Complaint, ComplaintStatus } from '../types';
+import { Complaint, ComplaintStatus, Customer } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 
-const ComplaintsPage: React.FC = () => {
+interface ComplaintsPageProps {
+  onNavigate: (tab: string) => void;
+}
+
+const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<ComplaintStatus | 'ALL'>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [suggestions, setSuggestions] = useState<Customer[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [formData, setFormData] = useState({
     bikeNumber: '',
     customerName: '',
     customerPhone: '',
+    city: '',
     details: '',
     estimatedCost: '',
-    dueDate: ''
+    dueDate: '',
+    odometerReading: ''
   });
+  const [images, setImages] = useState<string[]>([]);
+
+  // Camera State
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
+    loadCustomers();
   }, []);
 
   const loadData = async () => {
@@ -43,6 +62,52 @@ const ComplaintsPage: React.FC = () => {
     }
   };
 
+  const loadCustomers = async () => {
+    try {
+      const data = await dbService.getCustomers();
+      setCustomers(data);
+    } catch (err) {
+      console.error('Failed to load customers:', err);
+    }
+  };
+
+  const handleBikeNumberChange = (value: string) => {
+    setFormData({ ...formData, bikeNumber: value.toUpperCase() });
+    if (value.length >= 2) {
+      const filtered = customers.filter(c =>
+        c.bikeNumber.toUpperCase().includes(value.toUpperCase())
+      ).slice(0, 5);
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handlePhoneChange = (value: string) => {
+    setFormData({ ...formData, customerPhone: value });
+    if (value.length >= 3) {
+      const filtered = customers.filter(c =>
+        c.phone.includes(value)
+      ).slice(0, 5);
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectCustomer = (customer: Customer) => {
+    setFormData({
+      ...formData,
+      bikeNumber: customer.bikeNumber,
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      city: customer.city || ''
+    });
+    setShowSuggestions(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -50,11 +115,13 @@ const ComplaintsPage: React.FC = () => {
       await dbService.addComplaint({
         ...formData,
         estimatedCost: parseInt(formData.estimatedCost) || 0,
-        photoUrls: []
+        odometerReading: parseInt(formData.odometerReading) || 0,
+        photoUrls: images
       });
       await loadData();
       setIsModalOpen(false);
-      setFormData({ bikeNumber: '', customerName: '', customerPhone: '', details: '', estimatedCost: '', dueDate: '' });
+      setFormData({ bikeNumber: '', customerName: '', customerPhone: '', city: '', details: '', estimatedCost: '', dueDate: '', odometerReading: '' });
+      setImages([]);
     } catch (err) {
       alert('Failed to create job. Please try again.');
     } finally {
@@ -100,9 +167,14 @@ const ComplaintsPage: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Service Jobs</h1>
-          <p className="text-sm text-slate-600 mt-1">{complaints.length} total jobs</p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => onNavigate('home')} className="text-slate-700 hover:bg-slate-100 p-2 -ml-2 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Service Jobs</h1>
+            <p className="text-sm text-slate-600 mt-1">{complaints.length} total jobs</p>
+          </div>
         </div>
         <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="w-5 h-5 mr-2" />
@@ -191,15 +263,48 @@ const ComplaintsPage: React.FC = () => {
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Bike Number"
-            type="text"
-            required
-            placeholder="MH12AB1234"
-            value={formData.bikeNumber}
-            onChange={(e) => setFormData({ ...formData, bikeNumber: e.target.value.toUpperCase() })}
-            icon={<Bike className="w-5 h-5" />}
-          />
+          <div className="relative">
+            <Input
+              label="Bike Number"
+              type="text"
+              required
+              placeholder="MH12AB1234"
+              value={formData.bikeNumber}
+              onChange={(e) => handleBikeNumberChange(e.target.value)}
+              onFocus={() => formData.bikeNumber.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
+              icon={<Bike className="w-5 h-5" />}
+            />
+            {showSuggestions && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
+                {suggestions.map((customer) => (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    onClick={() => selectCustomer(customer)}
+                    className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 border-b border-slate-100 last:border-0"
+                  >
+                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <User className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 text-sm">{customer.name}</div>
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        <span className="font-mono">{customer.bikeNumber}</span>
+                        <span>•</span>
+                        <span>{customer.phone}</span>
+                        {customer.city && (
+                          <>
+                            <span>•</span>
+                            <span>{customer.city}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Input
@@ -211,16 +316,58 @@ const ComplaintsPage: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
             />
 
-            <Input
-              label="Phone"
-              type="tel"
-              required
-              placeholder="10-digit number"
-              value={formData.customerPhone}
-              onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-              icon={<Phone className="w-5 h-5" />}
-            />
+            <div className="relative">
+              <Input
+                label="Phone"
+                type="tel"
+                required
+                placeholder="10-digit number"
+                value={formData.customerPhone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                onFocus={() => formData.customerPhone.length >= 3 && suggestions.length > 0 && setShowSuggestions(true)}
+                icon={<Phone className="w-5 h-5" />}
+              />
+              {showSuggestions && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg max-h-60 overflow-y-auto">
+                  {suggestions.map((customer) => (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      onClick={() => selectCustomer(customer)}
+                      className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 border-b border-slate-100 last:border-0"
+                    >
+                      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                        <User className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-bold text-slate-900 text-sm">{customer.name}</div>
+                        <div className="flex items-center gap-3 text-xs text-slate-500">
+                          <span className="font-mono">{customer.bikeNumber}</span>
+                          <span>•</span>
+                          <span>{customer.phone}</span>
+                          {customer.city && (
+                            <>
+                              <span>•</span>
+                              <span>{customer.city}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
+          <Input
+            label="City"
+            type="text"
+            required
+            placeholder="Enter city"
+            value={formData.city}
+            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+          />
 
           <div className="space-y-1.5">
             <label className="block text-sm font-semibold text-slate-700">
@@ -246,11 +393,91 @@ const ComplaintsPage: React.FC = () => {
             />
 
             <Input
-              label="Due Date (Optional)"
-              type="date"
-              value={formData.dueDate}
-              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              icon={<Calendar className="w-5 h-5" />}
+              label="Odometer (km)"
+              type="number"
+              placeholder="12500"
+              value={formData.odometerReading}
+              onChange={(e) => setFormData({ ...formData, odometerReading: e.target.value })}
+              icon={<Clock className="w-5 h-5" />}
+            />
+          </div>
+
+          <Input
+            label="Due Date (Optional)"
+            type="date"
+            value={formData.dueDate}
+            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+            icon={<Calendar className="w-5 h-5" />}
+          />
+
+          {/* Photo Upload Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold text-slate-700">Photos</label>
+              <span className="text-xs text-slate-500">{images.length} added</span>
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              {images.map((img, idx) => (
+                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group">
+                  <img src={img} className="w-full h-full object-cover" alt="job" />
+                  <button
+                    type="button"
+                    onClick={() => setImages(prev => prev.filter((_, i) => i !== idx))}
+                    className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                    .then(stream => {
+                      setIsCameraOpen(true);
+                      if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        streamRef.current = stream;
+                      }
+                    })
+                    .catch(err => alert("Camera access denied"));
+                }}
+                className="aspect-square rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-1 text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-colors"
+              >
+                <Camera className="w-6 h-6" />
+                <span className="text-[10px] font-bold uppercase">Camera</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => galleryInputRef.current?.click()}
+                className="aspect-square rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-1 text-slate-400 hover:border-blue-500 hover:text-blue-500 transition-colors"
+              >
+                <Upload className="w-6 h-6" />
+                <span className="text-[10px] font-bold uppercase">Upload</span>
+              </button>
+            </div>
+            <input
+              type="file"
+              ref={galleryInputRef}
+              multiple
+              accept="image/*"
+              className="hidden"
+              onChange={async (e) => {
+                const files = e.target.files;
+                if (!files) return;
+                const newPhotos: string[] = [];
+                for (let i = 0; i < files.length; i++) {
+                  const reader = new FileReader();
+                  reader.readAsDataURL(files[i]);
+                  await new Promise<void>(resolve => {
+                    reader.onloadend = () => {
+                      newPhotos.push(reader.result as string);
+                      resolve();
+                    }
+                  });
+                }
+                setImages(prev => [...prev, ...newPhotos]);
+              }}
             />
           </div>
 
@@ -273,6 +500,51 @@ const ComplaintsPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Camera Overlay */}
+      {isCameraOpen && (
+        <div className="fixed inset-0 bg-black z-[200] flex flex-col">
+          <div className="p-4 flex justify-between items-center text-white">
+            <button
+              onClick={() => {
+                streamRef.current?.getTracks().forEach(track => track.stop());
+                setIsCameraOpen(false);
+              }}
+              className="p-2"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <span className="font-bold">Take Photo</span>
+            <div className="w-8"></div>
+          </div>
+
+          <div className="flex-1 bg-black relative flex items-center justify-center">
+            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+
+          <div className="p-8 flex justify-center bg-black/80">
+            <button
+              onClick={() => {
+                if (videoRef.current && canvasRef.current) {
+                  const video = videoRef.current;
+                  const canvas = canvasRef.current;
+                  const context = canvas.getContext('2d');
+                  if (context) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    context.drawImage(video, 0, 0);
+                    setImages(prev => [...prev, canvas.toDataURL('image/jpeg')]);
+                  }
+                }
+              }}
+              className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center bg-white/20 active:scale-95 transition-transform"
+            >
+              <div className="w-16 h-16 bg-white rounded-full"></div>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -305,6 +577,9 @@ const JobCard: React.FC<{
               <Bike className="w-5 h-5 text-slate-600" />
               <h3 className="text-lg font-bold text-slate-900">{job.bikeNumber}</h3>
               {getStatusBadge(job.status)}
+              {job.photoUrls && job.photoUrls.length > 0 && (
+                <ImageIcon className="w-4 h-4 text-blue-500" />
+              )}
             </div>
             <p className="text-sm text-slate-600">{job.customerName}</p>
           </div>
