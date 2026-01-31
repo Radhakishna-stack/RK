@@ -103,6 +103,90 @@ export interface StaffLocation {
   staffName: string;
 }
 
+// Field Service Job Status Workflow
+export enum FieldJobStatus {
+  ASSIGNED = 'Assigned',
+  ACCEPTED = 'Accepted',
+  EN_ROUTE = 'En Route',
+  ARRIVED = 'Arrived',
+  IN_PROGRESS = 'In Progress',
+  RETURNING = 'Returning',
+  COMPLETED = 'Completed',
+  CANCELLED = 'Cancelled'
+}
+
+// Employee Availability Status
+export enum EmployeeStatus {
+  AVAILABLE = 'Available',
+  ON_JOB = 'On Job',
+  OFFLINE = 'Offline'
+}
+
+// Field Service Job
+export interface FieldServiceJob {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  bikeNumber: string;
+  issueDescription: string;
+  photoUrls?: string[];
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
+  status: FieldJobStatus;
+  assignedTo?: string; // Employee ID
+  assignedToName?: string; // Employee name
+  location: {
+    lat: number;
+    lng: number;
+    address: string;
+  };
+  createdAt: string;
+  acceptedAt?: string;
+  startedAt?: string;
+  arrivedAt?: string;
+  completedAt?: string;
+  estimatedCost?: number;
+  notes?: string;
+}
+
+// Real-time Employee Location
+export interface EmployeeLocation {
+  employeeId: string;
+  employeeName: string;
+  status: EmployeeStatus;
+  currentJobId?: string;
+  location: {
+    lat: number;
+    lng: number;
+    accuracy: number;
+  };
+  lastUpdated: string;
+  battery?: number; // Battery percentage
+}
+
+// Location Update for tracking
+export interface LocationUpdate {
+  employeeId: string;
+  jobId: string;
+  lat: number;
+  lng: number;
+  accuracy: number;
+  timestamp: string;
+  speed?: number;
+  heading?: number;
+}
+
+// Job Timeline Event
+export interface JobTimelineEvent {
+  id: string;
+  jobId: string;
+  status: FieldJobStatus;
+  timestamp: string;
+  location?: { lat: number; lng: number };
+  note?: string;
+}
+
+
 export interface InvoiceItem {
   id: string;
   description: string;

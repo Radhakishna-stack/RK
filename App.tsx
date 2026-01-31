@@ -42,11 +42,15 @@ import GoogleProfilePage from './pages/GoogleProfile';
 import BankAccountsPage from './pages/BankAccounts';
 import CashInHandPage from './pages/CashInHand';
 import ChequesPage from './pages/Cheques';
+import FieldJobs from './pages/FieldJobs';
+import FieldServiceManagerPage from './pages/FieldServiceManager';
 import MorePage from './pages/More';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [userRole, setUserRole] = useState<'admin' | 'employee'>('admin');
+  const [currentEmployeeId] = useState('emp_001'); // TODO: Get from auth
+  const [currentEmployeeName] = useState('Current Employee'); // TODO: Get from auth
   const [initialSearchQuery, setInitialSearchQuery] = useState('');
 
   const navigateToMarketExplorer = (query: string = '') => {
@@ -103,6 +107,8 @@ const App: React.FC = () => {
       case 'recycle_bin': return <RecycleBinPage onNavigate={setActiveTab} />;
       case 'salesmen': return <SalesmanTrackingPage onNavigate={setActiveTab} />;
       case 'employee_panel': return <EmployeePanel onNavigate={setActiveTab} userRole={userRole} />;
+      case 'field_jobs': return <FieldJobs onNavigate={setActiveTab} employeeId={currentEmployeeId} employeeName={currentEmployeeName} />;
+      case 'field_service_manager': return <FieldServiceManagerPage onNavigate={setActiveTab} />;
       case 'bank_accounts': return <BankAccountsPage onNavigate={setActiveTab} />;
       case 'cash_in_hand': return <CashInHandPage onNavigate={setActiveTab} />;
       case 'cheques': return <ChequesPage onNavigate={setActiveTab} />;

@@ -8,9 +8,10 @@ import { Badge } from '../components/ui/Badge';
 
 interface EmployeePanelProps {
   userRole: string;
+  onNavigate: (page: string) => void;
 }
 
-const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole }) => {
+const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) => {
   const [jobs, setJobs] = useState<Complaint[]>([]);
   const [pickups, setPickups] = useState<PickupBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +93,23 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole }) => {
           </div>
         </Card>
       </div>
+
+      {/* Field Jobs Quick Access */}
+      <Card
+        className="bg-gradient-to-br from-purple-500 to-purple-600 border-0 text-white cursor-pointer hover:shadow-xl transition-all"
+        onClick={() => onNavigate('field_jobs')}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-purple-100 mb-1">Field Service</p>
+            <h3 className="text-xl font-bold">My GPS Jobs</h3>
+            <p className="text-sm text-purple-100 mt-1">View jobs with live navigation</p>
+          </div>
+          <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+            <Bike className="w-7 h-7" />
+          </div>
+        </div>
+      </Card>
 
       {/* Tabs */}
       <div className="flex gap-2">

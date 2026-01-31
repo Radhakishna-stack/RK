@@ -145,6 +145,13 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate }) => {
                     onClick={() => onNavigate('staff_control')}
                 />
                 <MenuItem
+                    icon={<MapPin />}
+                    label="Field Service Manager"
+                    description="GPS tracking & field jobs"
+                    onClick={() => onNavigate('field_service_manager')}
+                    highlight
+                />
+                <MenuItem
                     icon={<Truck />}
                     label="Pickup & Delivery"
                     description="Logistics management"
