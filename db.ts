@@ -458,22 +458,6 @@ export const dbService = {
 
   getInvoices: async (): Promise<Invoice[]> => JSON.parse(localStorage.getItem(LS_KEYS.INVOICES) || '[]'),
   generateInvoice: async (data: any): Promise<Invoice> => {
-<<<<<<< HEAD
-    const current = await dbService.getInvoices();
-    const newInv = { ...data, id: 'I' + Date.now(), date: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...current]));
-
-    if (data.paymentStatus === 'Paid') {
-      const settings = await dbService.getSettings();
-      const rate = settings.party.loyaltyRate || 100;
-      const earned = Math.floor(data.finalAmount / rate);
-
-      const customers = await dbService.getCustomers();
-      const cust = customers.find(c => c.bikeNumber === data.bikeNumber || c.name === data.customerName);
-      if (cust) {
-        await dbService.updateCustomerLoyalty(cust.id, (cust.loyaltyPoints || 0) + earned);
-      }
-=======
     const currentInvoices = await dbService.getInvoices();
     const accounts = await dbService.getBankAccounts();
 
@@ -572,7 +556,6 @@ export const dbService = {
           serviceDate: data.serviceReminderDate // redundant but keeps type happy
         });
       }
->>>>>>> 7adb96421721e1e712c6c5ab08b2665083884037
     }
 
     return newInv;
