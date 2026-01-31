@@ -9,11 +9,7 @@ import { getCurrentUser } from '../auth';
 
 interface EmployeePanelProps {
   userRole: string;
-<<<<<<< HEAD
-  onNavigate: (page: string) => void;
-=======
   onNavigate?: (path: string) => void;
->>>>>>> 7adb96421721e1e712c6c5ab08b2665083884037
 }
 
 const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) => {
