@@ -115,13 +115,9 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate }) => {
                     label="Cash in Hand"
                     description="Cash flow tracking"
                     onClick={() => onNavigate('cash_in_hand')}
+                    noBorder
                 />
-                <MenuItem
-                    icon={<CheckSquare />}
-                    label="Cheques"
-                    description="Cheque management"
-                    onClick={() => onNavigate('cheques')}
-                />
+
             </Section>
 
             {/* Team Section */}

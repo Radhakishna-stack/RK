@@ -51,7 +51,7 @@ import RecycleBinPage from './pages/RecycleBin';
 import GoogleProfilePage from './pages/GoogleProfile';
 import BankAccountsPage from './pages/BankAccounts';
 import CashInHandPage from './pages/CashInHand';
-import ChequesPage from './pages/Cheques';
+
 import FieldJobs from './pages/FieldJobs';
 import FieldServiceManagerPage from './pages/FieldServiceManager';
 import MorePage from './pages/More';
@@ -297,7 +297,7 @@ const App: React.FC = () => {
 
             <Route path="/bank-accounts" element={<BankAccountsPage onNavigate={handleNavigate} />} />
             <Route path="/cash-in-hand" element={<CashInHandPage onNavigate={handleNavigate} />} />
-            <Route path="/cheques" element={<ChequesPage onNavigate={handleNavigate} />} />
+
             <Route path="/payment-receipt" element={<PaymentReceiptPage onNavigate={handleNavigate} />} />
 
             <Route path="/settings/permissions" element={<SettingsPage onNavigate={handleNavigate} initialSection="permissions" />} />
