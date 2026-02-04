@@ -248,10 +248,10 @@ const App: React.FC = () => {
         </header>
       )}
 
-      <main className={`flex-1 overflow-y-auto relative ${location.pathname.includes('billing') || location.pathname.includes('estimate/new') ? 'pb-0' :
-        (location.pathname === '/' || location.pathname === '/business' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'pb-32' : 'pb-40')
+      <main className={`flex-1 overflow-y-auto relative ${location.pathname.includes('billing') || location.pathname.includes('estimate/new') || location.pathname.includes('sales') ? 'pb-0' :
+        (location.pathname === '/' || location.pathname === '/business' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'pb-40' : 'pb-48')
         }`}>
-        <div className={`max-w-screen-xl mx-auto ${location.pathname === '/' || location.pathname === '/business' || location.pathname === '/horoscope' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'px-0 pt-0' : 'px-4 pt-4'
+        <div className={`max-w-screen-xl mx-auto pb-8 ${location.pathname === '/' || location.pathname === '/business' || location.pathname === '/horoscope' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'px-0 pt-0' : 'px-4 pt-4'
           }`}>
           <Routes>
             {/* Core Tabs */}
@@ -312,7 +312,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {(!location.pathname.includes('billing') && !location.pathname.includes('estimate/new')) && (
+      {(!location.pathname.includes('billing') && !location.pathname.includes('estimate/new') && !location.pathname.includes('sales')) && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex items-center justify-around py-3 px-2 z-50 no-print shadow-lg">
           <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
           <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
