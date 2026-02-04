@@ -19,8 +19,31 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
   const [requests, setRequests] = useState<PickupBooking[]>([]);
   const [activeTab, setActiveTab] = useState<'jobs' | 'pickups' | 'requests'>('jobs');
   const [gpsError, setGpsError] = useState('');
+  // GPS Tracking Logic
+  useEffect(() => {
+    if (!("geolocation" in navigator)) {
+      setGpsError('GPS not supported on this device');
+      return;
+    }
 
-  // ... (GPS Logic) ...
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        // In a real app, we would send this to the server
+        console.log('GPS Updated:', latitude, longitude);
+      },
+      (error) => {
+        setGpsError('Failed to get location: ' + error.message);
+      },
+      { enableHighAccuracy: true }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
