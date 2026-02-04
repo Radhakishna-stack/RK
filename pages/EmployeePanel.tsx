@@ -34,19 +34,19 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
       ]);
 
       const myJobs = jobsData.filter(job =>
-        job.status === 'pending' || job.status === 'in-progress'
+        job.status === ComplaintStatus.PENDING || job.status === ComplaintStatus.IN_PROGRESS
       );
       setJobs(myJobs);
 
       // Filter by Staff ID
       const myPickups = pickupsData.filter(p =>
-        (p.status === 'pending' || p.status === 'in-transit') && p.staffId === currentUser.id
+        (p.status === PickupStatus.SCHEDULED || p.status === PickupStatus.ON_THE_WAY) && p.staffId === currentUser.id
       );
       setPickups(myPickups);
 
       // Available Requests (Unassigned)
       const unassigned = pickupsData.filter(p =>
-        p.status === 'pending' && !p.staffId
+        p.status === PickupStatus.SCHEDULED && !p.staffId
       );
       setRequests(unassigned);
 
@@ -58,7 +58,7 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
   };
 
   const updateJobStatus = async (id: string, status: ComplaintStatus) => {
-    await dbService.updateComplaint(id, { status });
+    await dbService.updateComplaintStatus(id, status);
     loadData();
   };
 
@@ -205,15 +205,15 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
                         <h3 className="text-lg font-bold text-slate-900">{job.bikeNumber}</h3>
                         <Badge
                           variant={
-                            job.status === 'pending' ? 'warning' :
-                              job.status === 'in-progress' ? 'info' :
-                                job.status === 'ready' ? 'success' : 'neutral'
+                            job.status === ComplaintStatus.PENDING ? 'warning' :
+                              job.status === ComplaintStatus.IN_PROGRESS ? 'info' :
+                                job.status === ComplaintStatus.COMPLETED ? 'success' : 'neutral'
                           }
                           size="sm"
                         >
-                          {job.status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                          {job.status === 'in-progress' && <RefreshCw className="w-3 h-3 mr-1" />}
-                          {job.status === 'ready' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                          {job.status === ComplaintStatus.PENDING && <Clock className="w-3 h-3 mr-1" />}
+                          {job.status === ComplaintStatus.IN_PROGRESS && <RefreshCw className="w-3 h-3 mr-1" />}
+                          {job.status === ComplaintStatus.COMPLETED && <CheckCircle2 className="w-3 h-3 mr-1" />}
                           {job.status || 'Pending'}
                         </Badge>
                       </div>
@@ -223,7 +223,7 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
                           <Bike className="w-4 h-4" />
                           <span>{job.customerName}</span>
                         </div>
-                        <p className="text-slate-700 mt-2">{job.complaint}</p>
+                        <p className="text-slate-700 mt-2">{job.details}</p>
                         {job.estimatedCost && (
                           <p className="font-semibold text-blue-600 mt-2">
                             Est. Cost: ₹{job.estimatedCost.toLocaleString()}
@@ -235,20 +235,20 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
 
                   {/* Action Buttons */}
                   <div className="flex gap-2 pt-2 border-t border-slate-200">
-                    {job.status === 'pending' && (
+                    {job.status === ComplaintStatus.PENDING && (
                       <Button
                         size="sm"
-                        onClick={() => updateJobStatus(job.id, 'in-progress')}
+                        onClick={() => updateJobStatus(job.id, ComplaintStatus.IN_PROGRESS)}
                         className="flex-1"
                       >
                         <Play className="w-4 h-4 mr-1" />
                         Start Work
                       </Button>
                     )}
-                    {job.status === 'in-progress' && (
+                    {job.status === ComplaintStatus.IN_PROGRESS && (
                       <Button
                         size="sm"
-                        onClick={() => updateJobStatus(job.id, 'ready')}
+                        onClick={() => updateJobStatus(job.id, ComplaintStatus.COMPLETED)}
                         className="flex-1"
                       >
                         <CheckCircle2 className="w-4 h-4 mr-1" />
@@ -280,7 +280,7 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="text-lg font-bold text-slate-900">{pickup.customerName}</h3>
                         <Badge
-                          variant={pickup.status === 'pending' ? 'warning' : 'info'}
+                          variant={pickup.status === PickupStatus.SCHEDULED ? 'warning' : 'info'}
                           size="sm"
                         >
                           {pickup.status || 'Pending'}
@@ -291,9 +291,9 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
                         <p><strong>Bike:</strong> {pickup.bikeNumber}</p>
                         <p className="flex items-center gap-1">
                           <Navigation className="w-3 h-3 text-blue-600" />
-                          {pickup.address}
+                          {pickup.location?.address || 'No address'}
                         </p>
-                        <p><strong>Time:</strong> {pickup.pickupTime}</p>
+                        <p><strong>Time:</strong> {pickup.timeRange}</p>
                       </div>
                     </div>
                   </div>
@@ -302,25 +302,25 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => openNavigation(pickup.address)}
+                      onClick={() => openNavigation(pickup.location?.address || '')}
                       className="flex-1"
                     >
                       <Navigation className="w-4 h-4 mr-1" />
                       Navigate
                     </Button>
-                    {pickup.status === 'pending' && (
+                    {pickup.status === PickupStatus.SCHEDULED && (
                       <Button
                         size="sm"
-                        onClick={() => updatePickupStatus(pickup.id, 'in-transit')}
+                        onClick={() => updatePickupStatus(pickup.id, PickupStatus.ON_THE_WAY)}
                         className="flex-1"
                       >
                         Start Pickup
                       </Button>
                     )}
-                    {pickup.status === 'in-transit' && (
+                    {pickup.status === PickupStatus.ON_THE_WAY && (
                       <Button
                         size="sm"
-                        onClick={() => updatePickupStatus(pickup.id, 'completed')}
+                        onClick={() => updatePickupStatus(pickup.id, PickupStatus.DELIVERED)}
                         className="flex-1"
                       >
                         <CheckCircle2 className="w-4 h-4 mr-1" />
@@ -354,8 +354,8 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
                         <Badge variant="neutral" size="sm">Unassigned</Badge>
                       </div>
                       <div className="space-y-1 text-sm text-slate-600">
-                        <p><strong>Location:</strong> {req.address}</p>
-                        <p><strong>Time:</strong> {req.pickupTime || req.timeRange}</p>
+                        <p><strong>Location:</strong> {req.location?.address || 'No address'}</p>
+                        <p><strong>Time:</strong> {req.timeRange}</p>
                       </div>
                     </div>
                   </div>
