@@ -91,6 +91,57 @@ export class PWAManager {
         });
     }
 
+    // Send job notification to employee
+    async sendJobNotification(
+        title: string,
+        body: string,
+        jobId: string,
+        url: string = '/field-jobs'
+    ): Promise<boolean> {
+        if (!this.registration) {
+            console.error('No service worker registration');
+            return false;
+        }
+
+        const permission = await this.requestNotificationPermission();
+        if (permission !== 'granted') {
+            console.log('Notification permission denied');
+            return false;
+        }
+
+        try {
+            await this.registration.showNotification(title, {
+                body,
+                icon: '/icon-192.png',
+                badge: '/icon-192.png',
+                vibrate: [200, 100, 200, 100, 200], // Attention-grabbing pattern
+                tag: `job-${jobId}`, // Prevent duplicate notifications
+                requireInteraction: true, // Notification stays until user interacts
+                data: {
+                    url,
+                    jobId,
+                    timestamp: new Date().toISOString()
+                },
+                actions: [
+                    {
+                        action: 'view',
+                        title: 'View Job'
+                    },
+                    {
+                        action: 'dismiss',
+                        title: 'Dismiss'
+                    }
+                ]
+            });
+
+            console.log(`Notification sent for job ${jobId}`);
+            return true;
+        } catch (error) {
+            console.error('Failed to send notification:', error);
+            return false;
+        }
+    }
+
     // Background sync registration
     async registerBackgroundSync(tag: string) {
         if (!this.registration) {

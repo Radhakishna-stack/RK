@@ -1,5 +1,6 @@
 // Field Service Manager - Job Assignment & Employee Tracking
 import { FieldServiceJob, EmployeeLocation, FieldJobStatus, EmployeeStatus, Salesman } from '../types';
+import { pwaManager } from './pwaManager';
 
 // In-memory storage (will be replaced with Firebase/Supabase later)
 class FieldServiceStore {
@@ -141,7 +142,16 @@ export class FieldServiceManager {
             status: FieldJobStatus.ASSIGNED
         });
 
-        // TODO: Send push notification to employee
+        // Send push notification to employee
+        pwaManager.sendJobNotification(
+            '🔧 New Job Assigned',
+            `${job.customerName} - ${job.bikeNumber}\n${job.issueDescription}`,
+            jobId,
+            `/field-jobs`
+        ).catch(error => {
+            console.error('Failed to send job notification:', error);
+        });
+
         console.log(`Job ${jobId} assigned to ${employeeName}`);
 
         return true;

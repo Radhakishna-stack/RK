@@ -68,8 +68,6 @@ const App: React.FC = () => {
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [loginError, setLoginError] = useState('');
-  const [currentEmployeeId] = useState('emp_001'); // TODO: Get from auth
-  const [currentEmployeeName] = useState('Current Employee'); // TODO: Get from auth
 
   // Determine active tab for UI highlighting based on current path
   const getActiveTab = (path: string) => {
@@ -292,7 +290,7 @@ const App: React.FC = () => {
             <Route path="/utilities" element={<UtilitiesPage onNavigate={handleNavigate} />} />
             <Route path="/recycle-bin" element={<RecycleBinPage onNavigate={handleNavigate} />} />
             <Route path="/salesmen" element={<SalesmanTrackingPage onNavigate={handleNavigate} />} />
-            <Route path="/field-jobs" element={<FieldJobs onNavigate={handleNavigate} employeeId={currentEmployeeId} employeeName={currentEmployeeName} />} />
+            <Route path="/field-jobs" element={<FieldJobs onNavigate={handleNavigate} employeeId={authSession?.user.id || ''} employeeName={authSession?.user.name || ''} />} />
             <Route path="/field-service-manager" element={<FieldServiceManagerPage onNavigate={handleNavigate} />} />
 
             <Route path="/bank-accounts" element={<BankAccountsPage onNavigate={handleNavigate} />} />
