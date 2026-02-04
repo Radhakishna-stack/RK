@@ -248,11 +248,8 @@ const App: React.FC = () => {
         </header>
       )}
 
-      <main className={`flex-1 overflow-y-auto relative ${location.pathname.includes('billing') || location.pathname.includes('estimate/new') || location.pathname.includes('sales') ? 'pb-0' :
-        (location.pathname === '/' || location.pathname === '/business' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'pb-40' : 'pb-48')
-        }`}>
-        <div className={`max-w-screen-xl mx-auto pb-8 ${location.pathname === '/' || location.pathname === '/business' || location.pathname === '/horoscope' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'px-0 pt-0' : 'px-4 pt-4'
-          }`}>
+      <main className="flex-1 overflow-y-auto relative no-scrollbar">
+        <div className={`max-w-screen-xl mx-auto px-4 pt-4`}>
           <Routes>
             {/* Core Tabs */}
             <Route path="/" element={(userRole === 'employee' || userRole === 'mechanic') ? <Navigate to="/employee-panel" /> : <DashboardPage onNavigate={handleNavigate} />} />
@@ -313,7 +310,7 @@ const App: React.FC = () => {
       </main>
 
       {(!location.pathname.includes('billing') && !location.pathname.includes('estimate/new') && !location.pathname.includes('sales')) && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex items-center justify-around py-3 px-2 z-50 no-print shadow-lg">
+        <nav className="bg-white border-t border-slate-200 flex items-center justify-around py-3 px-2 z-50 no-print shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
           <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
           <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
           <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money'} onClick={() => navigate('/money')} />
