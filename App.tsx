@@ -202,7 +202,7 @@ const App: React.FC = () => {
   const userRole = authSession.user.role;
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 overflow-hidden text-slate-900">
+    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden text-slate-900">
       {location.pathname !== '/market-explorer' && location.pathname !== '/horoscope' && location.pathname !== '/tech-agent' && (
         <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-40 no-print shadow-sm">
           <div className="flex items-center gap-3">
@@ -248,8 +248,8 @@ const App: React.FC = () => {
         </header>
       )}
 
-      <main className={`flex-1 overflow-y-auto relative ${location.pathname.includes('billing') ? 'pb-0' :
-        (location.pathname === '/' || location.pathname === '/business' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'pb-28' : 'pb-32')
+      <main className={`flex-1 overflow-y-auto relative ${location.pathname.includes('billing') || location.pathname.includes('estimate/new') ? 'pb-0' :
+        (location.pathname === '/' || location.pathname === '/business' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'pb-32' : 'pb-40')
         }`}>
         <div className={`max-w-screen-xl mx-auto ${location.pathname === '/' || location.pathname === '/business' || location.pathname === '/horoscope' || location.pathname === '/market-explorer' || location.pathname === '/tech-agent' ? 'px-0 pt-0' : 'px-4 pt-4'
           }`}>
@@ -312,7 +312,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {!location.pathname.includes('billing') && (
+      {(!location.pathname.includes('billing') && !location.pathname.includes('estimate/new')) && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex items-center justify-around py-3 px-2 z-50 no-print shadow-lg">
           <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
           <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
