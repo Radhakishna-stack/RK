@@ -592,6 +592,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
                   onChange={(e) => setUserForm({ ...userForm, role: e.target.value as UserRole })}
                 >
                   <option value="employee">Employee</option>
+                  <option value="mechanic">Mechanic</option>
                   <option value="manager">Manager</option>
                   <option value="admin">Admin</option>
                 </select>
@@ -599,6 +600,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
                   {userForm.role === 'admin' && 'Full access to all features'}
                   {userForm.role === 'manager' && 'Access to most features except user management'}
                   {userForm.role === 'employee' && 'Limited access to basic features'}
+                  {userForm.role === 'mechanic' && 'Access to assigned jobs and pickups'}
                 </p>
               </div>
 
