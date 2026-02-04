@@ -248,7 +248,7 @@ const App: React.FC = () => {
         </header>
       )}
 
-      <main className="flex-1 overflow-y-auto relative no-scrollbar">
+      <main className={`flex-1 overflow-y-auto relative no-scrollbar ${location.pathname.includes('billing') || location.pathname.includes('estimate/new') || location.pathname.includes('sales') || location.pathname.includes('complaints') ? 'pb-0' : ''}`}>
         <div className={`max-w-screen-xl mx-auto px-4 pt-4`}>
           <Routes>
             {/* Core Tabs */}
@@ -309,7 +309,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {(!location.pathname.includes('billing') && !location.pathname.includes('estimate/new') && !location.pathname.includes('sales')) && (
+      {(!location.pathname.includes('billing') && !location.pathname.includes('estimate/new') && !location.pathname.includes('sales') && !location.pathname.includes('complaints')) && (
         <nav className="bg-white border-t border-slate-200 flex items-center justify-around py-3 px-2 z-50 no-print shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
           <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
           <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
