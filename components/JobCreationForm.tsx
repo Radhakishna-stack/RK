@@ -123,7 +123,7 @@ const JobCreationForm: React.FC<JobCreationFormProps> = ({ onClose, onJobCreated
     });
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100] animate-in">
             <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
@@ -254,14 +254,14 @@ const JobCreationForm: React.FC<JobCreationFormProps> = ({ onClose, onJobCreated
                                         key={p}
                                         onClick={() => setPriority(p)}
                                         className={`py-2 px-3 rounded-lg font-semibold text-sm transition-all ${priority === p
-                                                ? p === 'Urgent'
-                                                    ? 'bg-red-600 text-white'
-                                                    : p === 'High'
-                                                        ? 'bg-orange-600 text-white'
-                                                        : p === 'Medium'
-                                                            ? 'bg-blue-600 text-white'
-                                                            : 'bg-slate-600 text-white'
-                                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                            ? p === 'Urgent'
+                                                ? 'bg-red-600 text-white'
+                                                : p === 'High'
+                                                    ? 'bg-orange-600 text-white'
+                                                    : p === 'Medium'
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-slate-600 text-white'
+                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                                             }`}
                                     >
                                         {p}
@@ -354,8 +354,8 @@ const JobCreationForm: React.FC<JobCreationFormProps> = ({ onClose, onJobCreated
                                 <p><strong>Bike:</strong> {bikeNumber}</p>
                                 <p><strong>Issue:</strong> {issueDescription}</p>
                                 <p><strong>Priority:</strong> <span className={`font-semibold ${priority === 'Urgent' ? 'text-red-600' :
-                                        priority === 'High' ? 'text-orange-600' :
-                                            priority === 'Medium' ? 'text-blue-600' : 'text-slate-600'
+                                    priority === 'High' ? 'text-orange-600' :
+                                        priority === 'Medium' ? 'text-blue-600' : 'text-slate-600'
                                     }`}>{priority}</span></p>
                             </div>
                         </div>
@@ -376,8 +376,8 @@ const JobCreationForm: React.FC<JobCreationFormProps> = ({ onClose, onJobCreated
                                     <button
                                         onClick={() => setSelectedEmployee('')}
                                         className={`w-full p-3 border rounded-xl text-left transition-all ${selectedEmployee === ''
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-slate-200 hover:border-slate-300'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-slate-200 hover:border-slate-300'
                                             }`}
                                     >
                                         <p className="font-semibold text-slate-900">Leave Unassigned</p>
@@ -398,8 +398,8 @@ const JobCreationForm: React.FC<JobCreationFormProps> = ({ onClose, onJobCreated
                                                 key={employee.id}
                                                 onClick={() => setSelectedEmployee(employee.id)}
                                                 className={`w-full p-3 border rounded-xl text-left transition-all ${selectedEmployee === employee.id
-                                                        ? 'border-blue-500 bg-blue-50'
-                                                        : 'border-slate-200 hover:border-slate-300'
+                                                    ? 'border-blue-500 bg-blue-50'
+                                                    : 'border-slate-200 hover:border-slate-300'
                                                     }`}
                                             >
                                                 <div className="flex items-center justify-between">
