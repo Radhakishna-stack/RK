@@ -79,10 +79,11 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
       try {
          await dbService.addBankAccount({
             name: formData.bankName,
+            bankName: formData.bankName,
+            accountNumber: formData.accountNumber,
             type: formData.accountType as any,
             openingBalance: parseFloat(formData.balance) || 0,
-            accountNumber: formData.accountNumber
-         } as any);
+         });
 
          await loadData();
          setIsModalOpen(false);
@@ -102,8 +103,8 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
    };
 
    const filteredAccounts = accounts.filter(account =>
-      account.bankName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      account.accountNumber.includes(searchTerm)
+      (account.bankName || account.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (account.accountNumber || '').includes(searchTerm)
    );
 
    const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
@@ -217,12 +218,12 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
 
                            <div className="flex-1 space-y-2">
                               <div>
-                                 <h3 className="text-lg font-bold text-slate-900">{account.bankName}</h3>
-                                 <p className="text-sm text-slate-600 font-mono">{account.accountNumber}</p>
+                                 <h3 className="text-lg font-bold text-slate-900">{account.bankName || account.name}</h3>
+                                 <p className="text-sm text-slate-600 font-mono">{account.accountNumber || '****'}</p>
                               </div>
 
                               <Badge variant="neutral" size="sm">
-                                 {account.accountType}
+                                 {account.type}
                               </Badge>
 
                               <div className="pt-1">

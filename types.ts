@@ -226,6 +226,8 @@ export interface Invoice {
 export interface BankAccount {
   id: string;
   name: string;
+  bankName?: string;
+  accountNumber?: string;
   type: 'Cash' | 'Savings' | 'Current' | 'UPI/Wallet' | 'UPI' | 'Wallet';
   openingBalance: number;
   createdAt: string;
