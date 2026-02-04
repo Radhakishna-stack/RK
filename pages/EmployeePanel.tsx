@@ -49,7 +49,10 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
     setLoading(true);
     try {
       const currentUser = getCurrentUser();
-      if (!currentUser) return;
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
 
       const [jobsData, pickupsData] = await Promise.all([
         dbService.getComplaints(),

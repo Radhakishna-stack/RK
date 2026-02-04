@@ -83,13 +83,18 @@ const App: React.FC = () => {
   // Check for existing session on mount and initialize users
   useEffect(() => {
     const checkAuth = async () => {
-      // Initialize default users if needed
-      await dbService.initializeDefaultUsers();
+      try {
+        // Initialize default users if needed
+        await dbService.initializeDefaultUsers();
 
-      // Check for existing session
-      const session = getSession();
-      setAuthSession(session);
-      setIsAuthChecking(false);
+        // Check for existing session
+        const session = getSession();
+        setAuthSession(session);
+      } catch (err) {
+        console.error('Initialization failed:', err);
+      } finally {
+        setIsAuthChecking(false);
+      }
     };
 
     checkAuth();
