@@ -91,6 +91,7 @@ export interface PickupBooking {
     lng: number;
     address: string;
   };
+  mapsLink?: string;
   createdAt: string;
 }
 
