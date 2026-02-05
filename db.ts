@@ -182,6 +182,79 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.SETTINGS, JSON.stringify(settings));
   },
 
+  // Parse location coordinates from Google Maps / WhatsApp links
+  parseLocationFromLink: (text: string): { lat: number, lng: number, address?: string } | null => {
+    if (!text) return null;
+    const cleanText = text.replace(/[\"\']/g, '').trim();
+
+    // Direct coordinates format: "lat, lng"
+    const directRegex = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
+    const directMatch = cleanText.match(directRegex);
+    if (directMatch) return { lat: parseFloat(directMatch[1]), lng: parseFloat(directMatch[2]) };
+
+    // Google Maps desktop format: @lat,lng
+    const desktopRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const desktopMatch = cleanText.match(desktopRegex);
+    if (desktopMatch) return { lat: parseFloat(desktopMatch[1]), lng: parseFloat(desktopMatch[2]) };
+
+    // Query parameter formats: ?q=lat,lng or ?ll=lat,lng
+    const queryRegex = /[?&/](q|query|ll|search\/)(=?)(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const queryMatch = cleanText.match(queryRegex);
+    if (queryMatch) return { lat: parseFloat(queryMatch[3]), lng: parseFloat(queryMatch[4]) };
+
+    // Place/directions format: /place/lat,lng or /dir/lat,lng
+    const placeRegex = /\/(place|dir)\/(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const placeMatch = cleanText.match(placeRegex);
+    if (placeMatch) return { lat: parseFloat(placeMatch[2]), lng: parseFloat(placeMatch[3]) };
+
+    // Street view format: ?cbll=lat,lng
+    const streetRegex = /[?&]cbll=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const streetMatch = cleanText.match(streetRegex);
+    if (streetMatch) return { lat: parseFloat(streetMatch[1]), lng: parseFloat(streetMatch[2]) };
+
+    return null;
+  },
+
+  // Resolve location via AI when regex parsing fails
+  resolveLocationViaAI: async (text: string): Promise<{ lat: number, lng: number, address: string } | { error: string } | null> => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      if (!apiKey) {
+        console.error('No Gemini API key found');
+        return null;
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash-exp',
+        contents: `Precisely identify GPS coordinates for: "${text}". Result must be valid JSON with lat, lng, address.`,
+        config: {
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              lat: { type: Type.NUMBER },
+              lng: { type: Type.NUMBER },
+              address: { type: Type.STRING }
+            },
+            required: ["lat", "lng", "address"]
+          }
+        }
+      });
+
+      const result = JSON.parse(response.text || '{}');
+      if (result.lat && result.lng) return result;
+      return null;
+    } catch (e: any) {
+      console.error("AI Location Resolution Failed", e);
+      if (e?.message?.includes('429') || e?.message?.includes('RESOURCE_EXHAUSTED')) {
+        return { error: 'QUOTA_EXCEEDED' };
+      }
+      return null;
+    }
+  },
+
   getBankAccounts: async (): Promise<BankAccount[]> => {
     const local = localStorage.getItem(LS_KEYS.BANK_ACCOUNTS);
     if (!local) {
