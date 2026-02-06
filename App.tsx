@@ -49,6 +49,7 @@ import RecycleBinPage from './pages/RecycleBin';
 import GoogleProfilePage from './pages/GoogleProfile';
 import BankAccountsPage from './pages/BankAccounts';
 import CashInHandPage from './pages/CashInHand';
+import PickupSchedulingPage from './pages/PickupScheduling';
 
 import FieldJobs from './pages/FieldJobs';
 import FieldServiceManagerPage from './pages/FieldServiceManager';
@@ -144,17 +145,18 @@ const App: React.FC = () => {
         'marketing_tools': '/marketing-tools',
         'whatsapp_marketing': '/whatsapp-marketing',
         'tech_agent': '/tech-agent',
+        'pickup_scheduling': '/pickup-scheduling',
         'google_profile': '/google-profile',
         'smart_ads': '/smart-ads',
         'sale_report': '/sale-report',
         'party_statement': '/party-statement',
-        'new_estimate': '/estimate/new', // Special case logic might be needed in BillingPage
+        'new_estimate': '/estimate/new',
         'bank_accounts': '/money',
         'cash_in_hand': '/cash-in-hand',
         'payment_receipt': '/payment-receipt',
         'employee_panel': '/employee-panel',
         'stock_wanting': '/stock-wanting',
-        'new_sale': '/billing', // Default billing
+        'new_sale': '/billing',
         'recycle_bin': '/recycle-bin',
         'field_jobs': '/field-jobs',
         'field_service_manager': '/field-service-manager'
@@ -287,6 +289,7 @@ const App: React.FC = () => {
             <Route path="/utilities" element={<UtilitiesPage onNavigate={handleNavigate} />} />
             <Route path="/recycle-bin" element={<RecycleBinPage onNavigate={handleNavigate} />} />
             <Route path="/salesmen" element={<SalesmanTrackingPage onNavigate={handleNavigate} />} />
+            <Route path="/pickup-scheduling" element={<PickupSchedulingPage onNavigate={handleNavigate} />} />
             <Route path="/field-jobs" element={<FieldJobs onNavigate={handleNavigate} employeeId={authSession?.user.id || ''} employeeName={authSession?.user.name || ''} />} />
             <Route path="/field-service-manager" element={<FieldServiceManagerPage onNavigate={handleNavigate} />} />
 
