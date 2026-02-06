@@ -144,7 +144,6 @@ const App: React.FC = () => {
         'marketing_tools': '/marketing-tools',
         'whatsapp_marketing': '/whatsapp-marketing',
         'tech_agent': '/tech-agent',
-        'pickup_scheduling': '/pickup-scheduling',
         'google_profile': '/google-profile',
         'smart_ads': '/smart-ads',
         'sale_report': '/sale-report',
