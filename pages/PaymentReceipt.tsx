@@ -5,6 +5,7 @@ import { Customer, PaymentReceipt } from '../types';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
+import { DateFilter } from '../components/ui/DateFilter';
 
 interface PaymentReceiptPageProps {
     onNavigate: (tab: string) => void;
@@ -22,6 +23,9 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
     const [description, setDescription] = useState('');
 
     const [recentReceipts, setRecentReceipts] = useState<PaymentReceipt[]>([]);
+    const [filteredReceipts, setFilteredReceipts] = useState<PaymentReceipt[]>([]);
+    const [dateStart, setDateStart] = useState<string | null>(null);
+    const [dateEnd, setDateEnd] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
@@ -38,7 +42,8 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
             const customersData = await dbService.getCustomers();
             setCustomers(customersData);
             const receiptsData = await dbService.getPaymentReceipts();
-            setRecentReceipts(receiptsData.slice(0, 10)); // Get last 10
+            setRecentReceipts(receiptsData);
+            setFilteredReceipts(receiptsData.slice(0, 10)); // Default: show last 10
         } catch (error) {
             console.error('Error loading data:', error);
         } finally {
@@ -90,6 +95,23 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const applyDateFilter = (receipts: PaymentReceipt[], start: string | null, end: string | null) => {
+        if (!start || !end) {
+            setFilteredReceipts(receipts.slice(0, 10));
+            return;
+        }
+
+        const startTime = new Date(start).setHours(0, 0, 0, 0);
+        const endTime = new Date(end).setHours(23, 59, 59, 999);
+
+        const filtered = receipts.filter(r => {
+            const receiptTime = new Date(r.date).getTime();
+            return receiptTime >= startTime && receiptTime <= endTime;
+        });
+
+        setFilteredReceipts(filtered);
+    };
+
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent card click
         if (confirm('Are you sure you want to delete this receipt? Linked transactions will be removed.')) {
@@ -97,7 +119,8 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                 await dbService.deletePaymentReceipt(id);
                 // Refresh list
                 const receiptsData = await dbService.getPaymentReceipts();
-                setRecentReceipts(receiptsData.slice(0, 10));
+                setRecentReceipts(receiptsData);
+                applyDateFilter(receiptsData, dateStart, dateEnd);
             } catch (err) {
                 alert('Failed to delete receipt');
             }
@@ -163,7 +186,8 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
 
             // Reload receipts
             const receiptsData = await dbService.getPaymentReceipts();
-            setRecentReceipts(receiptsData.slice(0, 10));
+            setRecentReceipts(receiptsData);
+            applyDateFilter(receiptsData, dateStart, dateEnd);
 
         } catch (error) {
             console.error('Error saving receipt:', error);
@@ -453,17 +477,27 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
 
                 {/* Recent Receipts List */}
                 <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-bold text-slate-900 flex items-center gap-2">
-                            <History className="w-5 h-5 text-slate-500" />
-                            Recent Receipts
-                        </h2>
-                        <button
-                            onClick={loadData}
-                            className="text-sm text-blue-600 font-semibold hover:underline"
-                        >
-                            Refresh
-                        </button>
+                    <div className="mb-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h2 className="font-bold text-slate-900 flex items-center gap-2">
+                                <History className="w-5 h-5 text-slate-500" />
+                                Recent Receipts
+                            </h2>
+                            <button
+                                onClick={loadData}
+                                className="text-sm text-blue-600 font-semibold hover:underline"
+                            >
+                                Refresh
+                            </button>
+                        </div>
+                        <DateFilter
+                            onChange={(start, end) => {
+                                setDateStart(start);
+                                setDateEnd(end);
+                                applyDateFilter(recentReceipts, start, end);
+                            }}
+                            storageKey="paymentReceipts"
+                        />
                     </div>
 
                     <div className="space-y-3">
@@ -472,7 +506,7 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                                 <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                                 <p className="text-sm text-slate-500">Loading history...</p>
                             </div>
-                        ) : recentReceipts.length === 0 ? (
+                        ) : filteredReceipts.length === 0 ? (
                             <div className="text-center py-10 bg-white rounded-xl shadow-sm border border-slate-100">
                                 <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
                                     <CreditCard className="w-6 h-6 text-slate-300" />
@@ -481,7 +515,7 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                                 <p className="text-xs text-slate-400 mt-1">Create your first payment receipt</p>
                             </div>
                         ) : (
-                            recentReceipts.map((receipt) => (
+                            filteredReceipts.map((receipt) => (
                                 <Card key={receipt.id} padding="sm" className={`hover:shadow-md transition-shadow ${editingId === receipt.id ? 'ring-2 ring-blue-500' : ''}`}>
                                     <div className="flex justify-between items-start">
                                         <div>

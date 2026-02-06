@@ -6,6 +6,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { DateFilter } from '../components/ui/DateFilter';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -19,8 +20,8 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
    const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
 
    // Filters
-   const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]); // First day of current month
-   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+   const [startDate, setStartDate] = useState<string | null>(null);
+   const [endDate, setEndDate] = useState<string | null>(null);
 
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,6 +59,11 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
    };
 
    const filterData = () => {
+      if (!startDate || !endDate) {
+         setFilteredTransactions(transactions);
+         return;
+      }
+
       const start = new Date(startDate).setHours(0, 0, 0, 0);
       const end = new Date(endDate).setHours(23, 59, 59, 999);
 
@@ -110,6 +116,8 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
 
    // Calculate Opening Balance (transactions before start date)
    const calculateOpeningBalance = () => {
+      if (!startDate) return 0;
+
       const start = new Date(startDate).setHours(0, 0, 0, 0);
       const previousTxns = transactions.filter(t => new Date(t.date).getTime() < start);
 
@@ -220,27 +228,16 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
 
          {/* Filters */}
          <Card padding="sm" className="bg-slate-50 border-slate-200">
-            <div className="flex flex-wrap items-end gap-4">
-               <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">Start Date</label>
-                  <input
-                     type="date"
-                     className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                     value={startDate}
-                     onChange={(e) => setStartDate(e.target.value)}
-                  />
-               </div>
-               <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">End Date</label>
-                  <input
-                     type="date"
-                     className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                     value={endDate}
-                     onChange={(e) => setEndDate(e.target.value)}
-                  />
-               </div>
-               <div className="text-sm text-slate-500 pb-2 ml-auto">
-                  Showing {filteredTransactions.length} records
+            <div className="flex flex-wrap items-center justify-between gap-4">
+               <DateFilter
+                  onChange={(start, end) => {
+                     setStartDate(start);
+                     setEndDate(end);
+                  }}
+                  storageKey="cashInHand"
+               />
+               <div className="text-sm text-slate-500">
+                  Showing {filteredTransactions.length} record{filteredTransactions.length !== 1 ? 's' : ''}
                </div>
             </div>
          </Card>

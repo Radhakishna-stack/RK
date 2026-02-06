@@ -88,7 +88,7 @@ export class PWAManager {
             badge: '/icon-192.png',
             vibrate: [200, 100, 200],
             data: { url: '/' }
-        });
+        } as any);
     }
 
     // Send job notification to employee
@@ -132,7 +132,7 @@ export class PWAManager {
                         title: 'Dismiss'
                     }
                 ]
-            });
+            } as any);
 
             console.log(`Notification sent for job ${jobId}`);
             return true;

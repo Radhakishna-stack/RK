@@ -47,20 +47,22 @@ const RecycleBinPage: React.FC = () => {
     }
   };
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'customer': return Users;
-      case 'item': return Package;
-      case 'invoice': return FileText;
+  const getCategoryIcon = (type: string) => {
+    switch (type) {
+      case 'Customer': return Users;
+      case 'Inventory': return Package;
+      case 'Invoice': return FileText;
+      case 'Complaint': return AlertCircle;
       default: return FileText;
     }
   };
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'customer': return 'bg-blue-100 text-blue-600';
-      case 'item': return 'bg-green-100 text-green-600';
-      case 'invoice': return 'bg-purple-100 text-purple-600';
+  const getCategoryColor = (type: string) => {
+    switch (type) {
+      case 'Customer': return 'bg-blue-100 text-blue-600';
+      case 'Inventory': return 'bg-green-100 text-green-600';
+      case 'Invoice': return 'bg-purple-100 text-purple-600';
+      case 'Complaint': return 'bg-amber-100 text-amber-600';
       default: return 'bg-slate-100 text-slate-600';
     }
   };
@@ -122,11 +124,11 @@ const RecycleBinPage: React.FC = () => {
           items
             .sort((a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime())
             .map((item) => {
-              const Icon = getCategoryIcon(item.category);
-              const colorClass = getCategoryColor(item.category);
+              const Icon = getCategoryIcon(item.type);
+              const colorClass = getCategoryColor(item.type);
 
               return (
-                <Card key={item.id} padding="md">
+                <Card key={item.binId} padding="md">
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${colorClass}`}>
@@ -135,9 +137,9 @@ const RecycleBinPage: React.FC = () => {
 
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-bold text-slate-900">{item.name}</h3>
+                          <h3 className="font-bold text-slate-900">{item.data.name || item.data.customerName || item.data.description || 'Deleted Item'}</h3>
                           <Badge variant="neutral" size="sm">
-                            {item.category}
+                            {item.type}
                           </Badge>
                         </div>
                         <p className="text-sm text-slate-600">
@@ -153,7 +155,7 @@ const RecycleBinPage: React.FC = () => {
                       <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => handleRestore(item.id)}
+                        onClick={() => handleRestore(item.binId)}
                         className="flex-1"
                       >
                         <RotateCcw className="w-4 h-4 mr-1" />
@@ -162,7 +164,7 @@ const RecycleBinPage: React.FC = () => {
                       <Button
                         size="sm"
                         variant="danger"
-                        onClick={() => handleDelete(item.id)}
+                        onClick={() => handleDelete(item.binId)}
                         className="flex-1"
                       >
                         <Trash2 className="w-4 h-4 mr-1" />

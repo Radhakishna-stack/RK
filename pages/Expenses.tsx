@@ -10,6 +10,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
+import { DateFilter } from '../components/ui/DateFilter';
 
 interface ExpensesPageProps {
   onNavigate: (tab: string) => void;
@@ -19,6 +20,8 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ onNavigate }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateStart, setDateStart] = useState<string | null>(null);
+  const [dateEnd, setDateEnd] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -99,10 +102,22 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ onNavigate }) => {
     }
   };
 
-  const filteredExpenses = expenses.filter(expense =>
-    expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    expense.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredExpenses = expenses.filter(expense => {
+    // Apply date filter
+    if (dateStart && dateEnd) {
+      const start = new Date(dateStart).setHours(0, 0, 0, 0);
+      const end = new Date(dateEnd).setHours(23, 59, 59, 999);
+      const expDate = new Date(expense.date).getTime();
+
+      if (expDate < start || expDate > end) {
+        return false;
+      }
+    }
+
+    // Apply search filter
+    return expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expense.category.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   // Calculate totals
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -163,14 +178,25 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ onNavigate }) => {
         </Card>
       </div>
 
-      {/* Search */}
-      <Input
-        type="text"
-        placeholder="Search by description or category..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        icon={<Search className="w-5 h-5" />}
-      />
+      {/* Search and Filter */}
+      <div className="flex gap-3 items-start">
+        <div className="flex-1">
+          <Input
+            type="text"
+            placeholder="Search by description or category..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            icon={<Search className="w-5 h-5" />}
+          />
+        </div>
+        <DateFilter
+          onChange={(start, end) => {
+            setDateStart(start);
+            setDateEnd(end);
+          }}
+          storageKey="expenses"
+        />
+      </div>
 
       {/* Expenses List */}
       <div className="space-y-3">

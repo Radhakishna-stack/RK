@@ -38,12 +38,10 @@ import AdsManagerPage from './pages/AdsManager';
 import UtilitiesPage from './pages/Utilities';
 import BusinessHoroscope from './pages/BusinessHoroscope';
 import MarketingTools from './pages/MarketingTools';
-import ConnectPage from './pages/Connect';
 import SalesmanTrackingPage from './pages/SalesmanTracking';
 import MarketExplorerPage from './pages/MarketExplorer';
 import EmployeePanel from './pages/EmployeePanel';
 import StaffControlCenter from './pages/StaffControlCenter';
-import PickupSchedulingPage from './pages/PickupScheduling';
 import SmartAdsPage from './pages/SmartAds';
 import WhatsAppMarketingPage from './pages/WhatsAppMarketing';
 import TechAgentPage from './pages/TechAgent';
@@ -265,8 +263,6 @@ const App: React.FC = () => {
               if (tab === 'market_explorer') navigate(`/market-explorer${query ? `?q=${query}` : ''}`); // Simplified query handling or just pass state
               else handleNavigate(tab);
             }} />} />
-            <Route path="/pickup-scheduling" element={<PickupSchedulingPage onNavigate={handleNavigate} />} />
-            <Route path="/connect" element={<ConnectPage />} />
             <Route path="/horoscope" element={<BusinessHoroscope onNavigate={handleNavigate} />} />
             <Route path="/marketing-tools" element={<MarketingTools onNavigate={handleNavigate} />} />
             <Route path="/whatsapp-marketing" element={<WhatsAppMarketingPage onNavigate={handleNavigate} />} />

@@ -338,6 +338,7 @@ export interface DashboardStats {
 }
 
 export interface AdSuggestion {
+  id: string;
   platform: string;
   headline: string;
   copy: string;

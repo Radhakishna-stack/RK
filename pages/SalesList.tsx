@@ -6,6 +6,7 @@ import { Invoice } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { InvoicePreview } from '../components/InvoicePreview';
+import { DateFilter, DateRange } from '../components/ui/DateFilter';
 
 interface SalesListPageProps {
     onNavigate: (tab: string) => void;
@@ -15,7 +16,8 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+    const [dateStart, setDateStart] = useState<string | null>(null);
+    const [dateEnd, setDateEnd] = useState<string | null>(null);
 
     // View invoice modal state
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -35,7 +37,7 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
 
             // Load company settings for invoice preview
             const settings = await dbService.getSettings();
-            setCompanyName(settings.general.firmName);
+            setCompanyName(settings.transaction.prefixes.firmName);
             setCompanyAddress(settings.general.businessAddress);
             setCompanyPhone(settings.general.businessPhone);
         } catch (error) {
@@ -61,25 +63,13 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
         let filtered = invoices;
 
         // Apply date filter
-        if (filter !== 'all') {
-            const now = new Date();
-            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (dateStart && dateEnd) {
+            const start = new Date(dateStart).setHours(0, 0, 0, 0);
+            const end = new Date(dateEnd).setHours(23, 59, 59, 999);
 
             filtered = filtered.filter(inv => {
-                const invDate = new Date(inv.date);
-
-                if (filter === 'today') {
-                    return invDate >= today;
-                } else if (filter === 'week') {
-                    const weekAgo = new Date(today);
-                    weekAgo.setDate(weekAgo.getDate() - 7);
-                    return invDate >= weekAgo;
-                } else if (filter === 'month') {
-                    const monthAgo = new Date(today);
-                    monthAgo.setMonth(monthAgo.getMonth() - 1);
-                    return invDate >= monthAgo;
-                }
-                return true;
+                const invDate = new Date(inv.date).getTime();
+                return invDate >= start && invDate <= end;
             });
         }
 
@@ -150,44 +140,20 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
                     </div>
                 </div>
 
-                {/* Filter Chips */}
-                <div className="px-4 pb-3 flex gap-2 overflow-x-auto">
-                    <button
-                        onClick={() => setFilter('all')}
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'all'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                    >
-                        All
-                    </button>
-                    <button
-                        onClick={() => setFilter('today')}
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'today'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                    >
-                        Today
-                    </button>
-                    <button
-                        onClick={() => setFilter('week')}
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'week'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                    >
-                        This Week
-                    </button>
-                    <button
-                        onClick={() => setFilter('month')}
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'month'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                    >
-                        This Month
-                    </button>
+                {/* Date Filter */}
+                <div className="px-4 pb-3 flex justify-between items-center">
+                    <DateFilter
+                        onChange={(start, end, range) => {
+                            setDateStart(start);
+                            setDateEnd(end);
+                        }}
+                        storageKey="salesList"
+                    />
+                    {(dateStart || dateEnd) && (
+                        <span className="text-xs text-slate-600">
+                            {filteredInvoices.length} result{filteredInvoices.length !== 1 ? 's' : ''}
+                        </span>
+                    )}
                 </div>
             </div>
 

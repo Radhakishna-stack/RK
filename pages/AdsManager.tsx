@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, Megaphone, Target, Copy, Check, RefreshCw } from 'lucide-react';
 import { dbService } from '../db';
-import { AdSuggestion } from '../types';
+import { AdSuggestion, InventoryItem } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -14,31 +14,35 @@ const AdsManagerPage: React.FC = () => {
    const generateAds = async () => {
       setLoading(true);
       try {
-         const suggestions = await dbService.generateAdSuggestions();
+         const inventory = await dbService.getInventory();
+         const suggestions = await dbService.getAdSuggestions(inventory);
          setAds(suggestions);
       } catch (err) {
          // Fallback ad suggestions
          setAds([
             {
                id: '1',
-               title: 'Special Service Offer',
-               description: '🏍️ Get 20% OFF on Full Service this Month! Expert technicians, genuine parts, and quick turnaround. Book now!',
+               headline: 'Special Service Offer',
+               copy: '🏍️ Get 20% OFF on Full Service this Month! Expert technicians, genuine parts, and quick turnaround. Book now!',
                platform: 'Facebook',
-               targetAudience: 'Bike owners in your area'
+               targetAudience: 'Bike owners in your area',
+               estimatedPerformance: 'High'
             },
             {
                id: '2',
-               title: 'Free Inspection',
-               description: 'Free bike inspection this weekend! Complete check-up, safety inspection, and expert advice. Visit us today!',
+               headline: 'Free Inspection',
+               copy: 'Free bike inspection this weekend! Complete check-up, safety inspection, and expert advice. Visit us today!',
                platform: 'Instagram',
-               targetAudience: 'Local bike enthusiasts'
+               targetAudience: 'Local bike enthusiasts',
+               estimatedPerformance: 'Medium'
             },
             {
                id: '3',
-               title: 'Genuine Parts Available',
-               description: '✨ 100% Genuine Spare Parts in Stock! Best prices guaranteed. Fast service. Your bike deserves the best!',
+               headline: 'Genuine Parts Available',
+               copy: '✨ 100% Genuine Spare Parts in Stock! Best prices guaranteed. Fast service. Your bike deserves the best!',
                platform: 'WhatsApp',
-               targetAudience: 'Existing customers'
+               targetAudience: 'Existing customers',
+               estimatedPerformance: 'High'
             }
          ]);
       } finally {
@@ -106,12 +110,12 @@ const AdsManagerPage: React.FC = () => {
                            <div className="flex items-start justify-between">
                               <div className="flex-1">
                                  <div className="flex items-center gap-2 mb-2">
-                                    <h4 className="font-bold text-slate-900">{ad.title}</h4>
+                                    <h4 className="font-bold text-slate-900">{ad.headline}</h4>
                                     <Badge variant="info" size="sm">
                                        {ad.platform}
                                     </Badge>
                                  </div>
-                                 <p className="text-sm text-slate-700 mb-2">{ad.description}</p>
+                                 <p className="text-sm text-slate-700 mb-2">{ad.copy}</p>
                                  <p className="text-xs text-slate-500">
                                     Target: {ad.targetAudience}
                                  </p>
@@ -122,7 +126,7 @@ const AdsManagerPage: React.FC = () => {
                               <Button
                                  size="sm"
                                  variant="secondary"
-                                 onClick={() => copyToClipboard(ad.description, ad.id)}
+                                 onClick={() => copyToClipboard(ad.copy, ad.id)}
                                  className="flex-1"
                               >
                                  {copiedId === ad.id ? (

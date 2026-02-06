@@ -1,6 +1,6 @@
 
 
-import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, PickupBooking, PickupSlot, StaffLocation, PickupStatus, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole, PaymentReceipt } from './types';
+import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole, PaymentReceipt } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { encryptPassword } from './auth';
 
@@ -18,10 +18,7 @@ const LS_KEYS = {
   STOCK_TXNS: 'mg_stock_txns',
   TRANSACTIONS: 'mg_transactions',
   SALESMEN: 'mg_salesmen',
-  PICKUP_BOOKINGS: 'mg_pickups',
-  PICKUP_SLOTS: 'mg_slots',
   WA_STATUS: 'mg_wa_status',
-  STAFF_LOCS: 'mg_staff_locs',
   RECYCLE_BIN: 'mg_recycle_bin',
   BANK_ACCOUNTS: 'mg_bank_accounts',
   USERS: 'mg_users',
@@ -255,6 +252,25 @@ export const dbService = {
     }
   },
 
+  getAdSuggestions: async (inventory: InventoryItem[]): Promise<AdSuggestion[]> => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      if (!apiKey) return [];
+      const ai = new GoogleGenAI({ apiKey });
+      const itemsList = inventory.map(i => `${i.name} (${i.category})`).join(', ');
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash-exp',
+        contents: `Based on these inventory items: ${itemsList}, suggest 3 promotional ads. Focus on bike maintenance and technical precision.`
+      });
+      // Mocked parsing for now
+      return [
+        { id: generateUniqueId('AD'), headline: 'Monsoon Special', copy: response.text || 'Prepare your bike for rains!', platform: 'WhatsApp', targetAudience: 'Bike Owners', estimatedPerformance: 'High' }
+      ];
+    } catch (e) {
+      return [];
+    }
+  },
+
   getBankAccounts: async (): Promise<BankAccount[]> => {
     const local = localStorage.getItem(LS_KEYS.BANK_ACCOUNTS);
     if (!local) {
@@ -289,29 +305,6 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.ROLE_PERMISSIONS, JSON.stringify(updated));
   },
 
-  getStaffLocations: async (): Promise<StaffLocation[]> => {
-    const local = localStorage.getItem(LS_KEYS.STAFF_LOCS);
-    return local ? JSON.parse(local) : [];
-  },
-
-  updateStaffLocation: async (staffId: string, lat: number, lng: number): Promise<void> => {
-    const current = await dbService.getStaffLocations();
-    const staffName = (await dbService.getSalesmen()).find(s => s.id === staffId)?.name || 'Unknown';
-
-    // Remove old entry for this staff if exists
-    const others = current.filter(s => s.staffId !== staffId);
-
-    const newLoc: StaffLocation = {
-      staffId,
-      staffName,
-      lat,
-      lng,
-      lastUpdated: new Date().toISOString(),
-      bookingId: 'IDLE' // Default, can be updated if we track active booking
-    };
-
-    localStorage.setItem(LS_KEYS.STAFF_LOCS, JSON.stringify([...others, newLoc]));
-  },
 
   getAccountBalance: async (accountId: string): Promise<number> => {
     const accounts = await dbService.getBankAccounts();
@@ -353,39 +346,6 @@ export const dbService = {
   /**
    * AI Resolver for location links that don't have coordinates in the URL (like short links)
    */
-  resolveLocationViaAI: async (text: string): Promise<{ lat: number, lng: number, address: string } | { error: string } | null> => {
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Precisely identify GPS coordinates for: "${text}". Result must be valid JSON with lat, lng, address.`,
-        config: {
-          tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              lat: { type: Type.NUMBER },
-              lng: { type: Type.NUMBER },
-              address: { type: Type.STRING }
-            },
-            required: ["lat", "lng", "address"]
-          }
-        }
-      });
-
-      const result = JSON.parse(response.text || '{}');
-      if (result.lat && result.lng) return result;
-      return null;
-    } catch (e: any) {
-      console.error("AI Location Resolution Failed", e);
-      // Specific detection for Rate Limit / Quota Exhaustion
-      if (e?.message?.includes('429') || e?.message?.includes('RESOURCE_EXHAUSTED')) {
-        return { error: 'QUOTA_EXCEEDED' };
-      }
-      return null;
-    }
-  },
 
   sendWhatsApp: (phone: string, message: string) => {
     const formatted = phone.replace(/\D/g, '');
@@ -837,38 +797,6 @@ export const dbService = {
     };
   },
 
-  getAdSuggestions: async (businessName: string): Promise<AdSuggestion[]> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Generate 3 professional motor bike service advertisements for "${businessName}". 
-      Focus on high-performance bikes like Royal Enfield, KTM, and Hero/Honda commuters. 
-      Services to highlight: Ceramic Coating, Full Engine Overhaul, Computerized Scan, and Rider Safety Checks. 
-      Format for Instagram/Facebook with technical yet catchy copy.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              platform: { type: Type.STRING },
-              headline: { type: Type.STRING },
-              copy: { type: Type.STRING },
-              targetAudience: { type: Type.STRING },
-              estimatedPerformance: { type: Type.STRING },
-            },
-            required: ["platform", "headline", "copy", "targetAudience", "estimatedPerformance"],
-          }
-        }
-      }
-    });
-    try {
-      return JSON.parse(response.text || '[]');
-    } catch {
-      return [];
-    }
-  },
 
   generateAdImage: async (prompt: string): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -921,47 +849,6 @@ export const dbService = {
   getWADeviceStatus: () => JSON.parse(localStorage.getItem(LS_KEYS.WA_STATUS) || '{"connected": false}'),
   setWADeviceStatus: (status: any) => localStorage.setItem(LS_KEYS.WA_STATUS, JSON.stringify(status)),
 
-  getPickupBookings: async (): Promise<PickupBooking[]> => JSON.parse(localStorage.getItem(LS_KEYS.PICKUP_BOOKINGS) || '[]'),
-  addPickupBooking: async (data: any): Promise<PickupBooking> => {
-    const current = await dbService.getPickupBookings();
-    const newBooking = { ...data, id: 'B' + Date.now(), status: PickupStatus.SCHEDULED, createdAt: new Date().toISOString() };
-    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify([...current, newBooking]));
-
-    if (data.slotId) {
-      const slots = await dbService.getPickupSlots();
-      const updated = slots.map(s => s.id === data.slotId ? { ...s, bookedCount: s.bookedCount + 1 } : s);
-      localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(updated));
-    }
-    return newBooking;
-  },
-  updatePickupStatus: async (id: string, status: PickupStatus, staffId?: string, staffName?: string): Promise<void> => {
-    const current = await dbService.getPickupBookings();
-    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify(current.map(b => b.id === id ? { ...b, status, staffId, staffName } : b)));
-
-    if (staffId) {
-      const salesmen = await dbService.getSalesmen();
-      localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify(salesmen.map(s => s.id === staffId ? { ...s, status: status === PickupStatus.DELIVERED ? 'Available' : 'On Task' } : s)));
-    }
-  },
-
-
-  getSlotsByDate: async (date: string): Promise<PickupSlot[]> => {
-    const slots = await dbService.getPickupSlots();
-    return slots.filter(s => s.date === date);
-  },
-  initSlotsForDate: async (date: string, capacity: number): Promise<void> => {
-    const current = await dbService.getPickupSlots();
-    const filtered = current.filter(s => s.date !== date);
-    const timeRanges = ["9-11", "11-1", "2-4", "4-6"];
-    const newSlots = timeRanges.map((tr, i) => ({
-      id: `S-${date}-${i}`,
-      date,
-      timeRange: tr,
-      capacity,
-      bookedCount: 0
-    }));
-    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify([...filtered, ...newSlots]));
-  },
 
   getSalesmen: async (): Promise<Salesman[]> => JSON.parse(localStorage.getItem(LS_KEYS.SALESMEN) || '[]'),
   addSalesman: async (data: any): Promise<Salesman> => {
@@ -982,47 +869,7 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify(current.filter(s => s.id !== id)));
   },
 
-  getLiveStaffTracking: async (bookingId: string): Promise<StaffLocation | null> => {
-    const locs: StaffLocation[] = JSON.parse(localStorage.getItem(LS_KEYS.STAFF_LOCS) || '[]');
-    // Assuming we want to find the staff dealing with this booking, but the current schema for StaffLocation
-    // might not strictly link to bookingId in a 1:1 map if it's just latest location.
-    // However, the array 'locs' contains items with 'bookingId'.
-    return locs.find(l => l.bookingId === bookingId) || null;
-  },
 
-  parseLocationFromLink: (text: string): { lat: number, lng: number, address?: string } | null => {
-    if (!text) return null;
-
-    // Normalize input
-    const cleanText = text.replace(/["']/g, '').trim();
-
-    // 1. Direct coordinates (18.52, 73.85)
-    const directRegex = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
-    const directMatch = cleanText.match(directRegex);
-    if (directMatch) return { lat: parseFloat(directMatch[1]), lng: parseFloat(directMatch[2]) };
-
-    // 2. Google Maps Desktop (@lat,lng)
-    const desktopRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const desktopMatch = cleanText.match(desktopRegex);
-    if (desktopMatch) return { lat: parseFloat(desktopMatch[1]), lng: parseFloat(desktopMatch[2]) };
-
-    // 3. Expanded Query Pattern (q= or query= or ll= or search/)
-    const queryRegex = /[?&/](q|query|ll|search\/)(=?)(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const queryMatch = cleanText.match(queryRegex);
-    if (queryMatch) return { lat: parseFloat(queryMatch[3]), lng: parseFloat(queryMatch[4]) };
-
-    // 4. Place/Dir Pattern (/place/lat,lng or /dir/lat,lng)
-    const placeRegex = /\/(place|dir)\/(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const placeMatch = cleanText.match(placeRegex);
-    if (placeMatch) return { lat: parseFloat(placeMatch[2]), lng: parseFloat(placeMatch[3]) };
-
-    // 5. Street View pattern (cbll=lat,lng)
-    const streetRegex = /[?&]cbll=(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const streetMatch = cleanText.match(streetRegex);
-    if (streetMatch) return { lat: parseFloat(streetMatch[1]), lng: parseFloat(streetMatch[2]) };
-
-    return null;
-  },
 
   getRecycleBin: async (): Promise<RecycleBinItem[]> => {
     const local = localStorage.getItem(LS_KEYS.RECYCLE_BIN);
@@ -1039,6 +886,12 @@ export const dbService = {
     }
     return filteredBin;
   },
+
+  getRecycleBinItems: async (): Promise<RecycleBinItem[]> => dbService.getRecycleBin(),
+
+  restoreFromRecycleBin: async (binId: string): Promise<void> => dbService.restoreFromBin(binId),
+
+  permanentlyDelete: async (binId: string): Promise<void> => dbService.purgeFromBin(binId),
 
   moveToRecycleBin: async (type: RecycleBinCategory, data: any): Promise<void> => {
     const bin = await dbService.getRecycleBin();
@@ -1219,28 +1072,6 @@ export const dbService = {
     return newReceipt;
   },
 
-  // Pickup Slots
-  getPickupSlots: async (): Promise<PickupSlot[]> => {
-    const data = localStorage.getItem(LS_KEYS.PICKUP_SLOTS);
-    return data ? JSON.parse(data) : [];
-  },
-
-  addPickupSlot: async (slot: PickupSlot): Promise<void> => {
-    const slots = await dbService.getPickupSlots();
-    slots.push(slot);
-    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(slots));
-  },
-
-  deletePickupSlot: async (id: string): Promise<void> => {
-    const slots = await dbService.getPickupSlots();
-    localStorage.setItem(LS_KEYS.PICKUP_SLOTS, JSON.stringify(slots.filter(s => s.id !== id)));
-  },
-
-  updatePickupBooking: async (id: string, updates: Partial<PickupBooking>): Promise<void> => {
-    const bookings = await dbService.getPickupBookings();
-    const updatedBookings = bookings.map(b => b.id === id ? { ...b, ...updates } : b);
-    localStorage.setItem(LS_KEYS.PICKUP_BOOKINGS, JSON.stringify(updatedBookings));
-  },
 
   getPaymentReceiptById: async (id: string): Promise<PaymentReceipt | undefined> => {
     const receipts = await dbService.getPaymentReceipts();
@@ -1298,5 +1129,340 @@ export const dbService = {
         localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(updatedTxns));
       }
     }
+  },
+
+  // ============================================
+  // TALLY EXPORT & BULK DATA MANAGEMENT
+  // ============================================
+
+  /**
+   * Export data to Tally XML format
+   */
+  exportToTallyXML: async (): Promise<string> => {
+    const [invoices, expenses, settings] = await Promise.all([
+      dbService.getInvoices(),
+      dbService.getExpenses(),
+      dbService.getSettings()
+    ]);
+
+    const companyName = settings.transaction.prefixes.firmName || 'MOTO GEAR SRK';
+    const currentDate = new Date().toISOString().split('T')[0];
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ENVELOPE>
+  <HEADER>
+    <TALLYREQUEST>Import Data</TALLYREQUEST>
+  </HEADER>
+  <BODY>
+    <IMPORTDATA>
+      <REQUESTDESC>
+        <REPORTNAME>All Masters</REPORTNAME>
+      </REQUESTDESC>
+      <REQUESTDATA>
+        <TALLYMESSAGE xmlns:UDF="TallyUDF">
+`;
+
+    // Export Sales Vouchers (Invoices)
+    invoices.forEach(inv => {
+      const invDate = new Date(inv.date).toISOString().split('T')[0].replace(/-/g, '');
+      xml += `          <VOUCHER REMOTEID="" VCHKEY="" VCHTYPE="Sales" ACTION="Create" OBJVIEW="Invoice Voucher View">
+            <DATE>${invDate}</DATE>
+            <VOUCHERTYPENAME>Sales</VOUCHERTYPENAME>
+            <VOUCHERNUMBER>${inv.id}</VOUCHERNUMBER>
+            <PARTYLEDGERNAME>${inv.customerName}</PARTYLEDGERNAME>
+            <PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW>
+            <ALLLEDGERENTRIES.LIST>
+              <LEDGERNAME>${inv.customerName}</LEDGERNAME>
+              <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+              <AMOUNT>-${inv.finalAmount.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>
+            <ALLLEDGERENTRIES.LIST>
+              <LEDGERNAME>Sales</LEDGERNAME>
+              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+              <AMOUNT>${inv.finalAmount.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>
+          </VOUCHER>
+`;
+    });
+
+    // Export Payment Vouchers (Expenses)
+    expenses.forEach(exp => {
+      const expDate = new Date(exp.date).toISOString().split('T')[0].replace(/-/g, '');
+      xml += `          <VOUCHER REMOTEID="" VCHKEY="" VCHTYPE="Payment" ACTION="Create" OBJVIEW="Accounting Voucher View">
+            <DATE>${expDate}</DATE>
+            <VOUCHERTYPENAME>Payment</VOUCHERTYPENAME>
+            <VOUCHERNUMBER>${exp.id}</VOUCHERNUMBER>
+            <PERSISTEDVIEW>Accounting Voucher View</PERSISTEDVIEW>
+            <ALLLEDGERENTRIES.LIST>
+              <LEDGERNAME>${exp.category}</LEDGERNAME>
+              <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+              <AMOUNT>-${exp.amount.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>
+            <ALLLEDGERENTRIES.LIST>
+              <LEDGERNAME>Cash</LEDGERNAME>
+              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+              <AMOUNT>${exp.amount.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>
+          </VOUCHER>
+`;
+    });
+
+    xml += `        </TALLYMESSAGE>
+      </REQUESTDATA>
+    </IMPORTDATA>
+  </BODY>
+</ENVELOPE>`;
+
+    return xml;
+  },
+
+  /**
+   * Export data to Tally CSV format
+   */
+  exportToTallyCSV: async (): Promise<{ customers: string, inventory: string, invoices: string, expenses: string }> => {
+    const [customers, inventory, invoices, expenses] = await Promise.all([
+      dbService.getCustomers(),
+      dbService.getInventory(),
+      dbService.getInvoices(),
+      dbService.getExpenses()
+    ]);
+
+    // Customers CSV
+    let customersCSV = 'Name,Phone,Bike Number,City,GSTIN,Opening Balance\n';
+    customers.forEach(c => {
+      customersCSV += `"${c.name}","${c.phone}","${c.bikeNumber}","${c.city || ''}","${c.gstin || ''}",0\n`;
+    });
+
+    // Inventory CSV
+    let inventoryCSV = 'Item Name,Category,Stock,Unit Price,Purchase Price,Item Code,GST Rate,HSN\n';
+    inventory.forEach(i => {
+      inventoryCSV += `"${i.name}","${i.category}",${i.stock},${i.unitPrice},${i.purchasePrice},"${i.itemCode}",${i.gstRate || 0},"${i.hsn || ''}"\n`;
+    });
+
+    // Invoices CSV
+    let invoicesCSV = 'Invoice No,Date,Customer Name,Bike Number,Total Amount,Tax Amount,Payment Status\n';
+    invoices.forEach(inv => {
+      const date = new Date(inv.date).toISOString().split('T')[0];
+      invoicesCSV += `"${inv.id}","${date}","${inv.customerName}","${inv.bikeNumber}",${inv.finalAmount},${inv.taxAmount || 0},"${inv.paymentStatus}"\n`;
+    });
+
+    // Expenses CSV
+    let expensesCSV = 'Expense ID,Date,Description,Category,Amount,Payment Mode\n';
+    expenses.forEach(exp => {
+      const date = new Date(exp.date).toISOString().split('T')[0];
+      expensesCSV += `"${exp.id}","${date}","${exp.description}","${exp.category}",${exp.amount},"${exp.paymentMode}"\n`;
+    });
+
+    return { customers: customersCSV, inventory: inventoryCSV, invoices: invoicesCSV, expenses: expensesCSV };
+  },
+
+  /**
+   * Export all data to Excel-compatible CSV
+   */
+  exportAllDataToExcel: async (): Promise<string> => {
+    const [customers, inventory, invoices, expenses, complaints, transactions] = await Promise.all([
+      dbService.getCustomers(),
+      dbService.getInventory(),
+      dbService.getInvoices(),
+      dbService.getExpenses(),
+      dbService.getComplaints(),
+      dbService.getTransactions()
+    ]);
+
+    let csv = 'MOTO GEAR SRK - Complete Data Export\n';
+    csv += `Export Date: ${new Date().toISOString()}\n\n`;
+
+    // Customers Section
+    csv += '=== CUSTOMERS ===\n';
+    csv += 'ID,Name,Phone,Bike Number,City,Email,GSTIN,Loyalty Points,Created At\n';
+    customers.forEach(c => {
+      csv += `"${c.id}","${c.name}","${c.phone}","${c.bikeNumber}","${c.city || ''}","${c.email || ''}","${c.gstin || ''}",${c.loyaltyPoints},"${c.createdAt}"\n`;
+    });
+
+    csv += '\n=== INVENTORY ===\n';
+    csv += 'ID,Item Name,Category,Stock,Unit Price,Purchase Price,Item Code,GST Rate,HSN,Last Updated\n';
+    inventory.forEach(i => {
+      csv += `"${i.id}","${i.name}","${i.category}",${i.stock},${i.unitPrice},${i.purchasePrice},"${i.itemCode}",${i.gstRate || 0},"${i.hsn || ''}","${i.lastUpdated}"\n`;
+    });
+
+    csv += '\n=== INVOICES ===\n';
+    csv += 'ID,Date,Customer Name,Bike Number,Phone,Details,Total Amount,Tax,Payment Status,Payment Mode\n';
+    invoices.forEach(inv => {
+      csv += `"${inv.id}","${inv.date}","${inv.customerName}","${inv.bikeNumber}","${inv.customerPhone || ''}","${inv.details}",${inv.finalAmount},${inv.taxAmount || 0},"${inv.paymentStatus}","${inv.paymentMode}"\n`;
+    });
+
+    csv += '\n=== EXPENSES ===\n';
+    csv += 'ID,Date,Description,Category,Amount,Payment Mode\n';
+    expenses.forEach(exp => {
+      csv += `"${exp.id}","${exp.date}","${exp.description}","${exp.category}",${exp.amount},"${exp.paymentMode}"\n`;
+    });
+
+    return csv;
+  },
+
+  /**
+   * Get CSV templates for bulk import
+   */
+  getImportTemplates: (): { customers: string, inventory: string, invoices: string } => {
+    const customersTemplate = 'Name,Phone,Bike Number,City,Email,GSTIN\n' +
+      '"John Doe","9876543210","DL01AB1234","Delhi","john@example.com","29ABCDE1234F1Z5"\n' +
+      '"Jane Smith","9876543211","DL02CD5678","Noida","",""\n';
+
+    const inventoryTemplate = 'Item Name,Category,Stock,Unit Price,Purchase Price,Item Code,GST Rate,HSN\n' +
+      '"Engine Oil","Lubricants",50,450,350,"EO-001",18,"27101980"\n' +
+      '"Brake Pad","Spare Parts",30,800,600,"BP-002",18,"87083010"\n';
+
+    const invoicesTemplate = 'Customer Name,Bike Number,Phone,Details,Item Description,Item Amount,Payment Status\n' +
+      '"John Doe","DL01AB1234","9876543210","Regular Service","Oil Change,500","Paid"\n';
+
+    return { customers: customersTemplate, inventory: inventoryTemplate, invoices: invoicesTemplate };
+  },
+
+  /**
+   * Validate and parse CSV data for bulk import
+   */
+  validateCSVImport: async (csvData: string, type: 'customers' | 'inventory'): Promise<{ valid: boolean, errors: string[], data: any[] }> => {
+    const lines = csvData.trim().split('\n');
+    if (lines.length < 2) {
+      return { valid: false, errors: ['CSV file is empty or has no data rows'], data: [] };
+    }
+
+    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+    const errors: string[] = [];
+    const data: any[] = [];
+
+    if (type === 'customers') {
+      const requiredHeaders = ['Name', 'Phone', 'Bike Number'];
+      const missing = requiredHeaders.filter(h => !headers.includes(h));
+      if (missing.length > 0) {
+        return { valid: false, errors: [`Missing required columns: ${missing.join(', ')}`], data: [] };
+      }
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const values = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/^"|"$/g, '').trim()) || [];
+
+        const name = values[headers.indexOf('Name')] || '';
+        const phone = values[headers.indexOf('Phone')] || '';
+        const bikeNumber = values[headers.indexOf('Bike Number')] || '';
+
+        if (!name || !phone || !bikeNumber) {
+          errors.push(`Row ${i + 1}: Missing required fields (Name, Phone, or Bike Number)`);
+          continue;
+        }
+
+        data.push({
+          name,
+          phone,
+          bikeNumber: bikeNumber.toUpperCase(),
+          city: values[headers.indexOf('City')] || '',
+          email: values[headers.indexOf('Email')] || '',
+          gstin: values[headers.indexOf('GSTIN')] || ''
+        });
+      }
+    } else if (type === 'inventory') {
+      const requiredHeaders = ['Item Name', 'Category', 'Stock', 'Unit Price'];
+      const missing = requiredHeaders.filter(h => !headers.includes(h));
+      if (missing.length > 0) {
+        return { valid: false, errors: [`Missing required columns: ${missing.join(', ')}`], data: [] };
+      }
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const values = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/^"|"$/g, '').trim()) || [];
+
+        const name = values[headers.indexOf('Item Name')] || '';
+        const category = values[headers.indexOf('Category')] || '';
+        const stock = parseFloat(values[headers.indexOf('Stock')] || '0');
+        const unitPrice = parseFloat(values[headers.indexOf('Unit Price')] || '0');
+
+        if (!name || !category) {
+          errors.push(`Row ${i + 1}: Missing Item Name or Category`);
+          continue;
+        }
+
+        if (isNaN(stock) || isNaN(unitPrice)) {
+          errors.push(`Row ${i + 1}: Invalid numeric values for Stock or Unit Price`);
+          continue;
+        }
+
+        data.push({
+          name,
+          category,
+          stock,
+          unitPrice,
+          purchasePrice: parseFloat(values[headers.indexOf('Purchase Price')] || '0'),
+          itemCode: values[headers.indexOf('Item Code')] || '',
+          gstRate: parseFloat(values[headers.indexOf('GST Rate')] || '0'),
+          hsn: values[headers.indexOf('HSN')] || ''
+        });
+      }
+    }
+
+    return { valid: errors.length === 0, errors, data };
+  },
+
+  /**
+   * Bulk import customers from validated data
+   */
+  bulkImportCustomers: async (customersData: any[]): Promise<{ imported: number, skipped: number }> => {
+    const existingCustomers = await dbService.getCustomers();
+    let imported = 0;
+    let skipped = 0;
+
+    for (const customerData of customersData) {
+      // Check if customer already exists by bike number
+      const exists = existingCustomers.find(c => c.bikeNumber.toUpperCase() === customerData.bikeNumber.toUpperCase());
+
+      if (exists) {
+        skipped++;
+        continue;
+      }
+
+      await dbService.addCustomer(customerData);
+      imported++;
+    }
+
+    return { imported, skipped };
+  },
+
+  /**
+   * Bulk update inventory from validated data
+   */
+  bulkUpdateInventory: async (inventoryData: any[]): Promise<{ updated: number, created: number }> => {
+    const existingInventory = await dbService.getInventory();
+    let updated = 0;
+    let created = 0;
+
+    for (const itemData of inventoryData) {
+      // Check if item already exists by name or item code
+      const exists = existingInventory.find(i =>
+        i.name.toLowerCase() === itemData.name.toLowerCase() ||
+        (itemData.itemCode && i.itemCode === itemData.itemCode)
+      );
+
+      if (exists) {
+        // Update existing item
+        await dbService.updateInventory(exists.id, {
+          ...itemData,
+          lastUpdated: new Date().toISOString()
+        });
+        updated++;
+      } else {
+        // Create new item
+        await dbService.addInventoryItem({
+          ...itemData,
+          id: Date.now().toString() + Math.random().toString(36).substring(7),
+          lastUpdated: new Date().toISOString()
+        });
+        created++;
+      }
+    }
+
+    return { updated, created };
   }
 };

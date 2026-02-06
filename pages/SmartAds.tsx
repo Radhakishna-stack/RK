@@ -40,7 +40,7 @@ const SmartAdsPage: React.FC = () => {
       setLoading(true);
       setSelectedGoal(goalId);
       try {
-         await dbService.getAdSuggestions('Automobile'); // Mock call to wake up AI if needed
+         await dbService.getAdSuggestions([]); // Pass empty array as inventory
          const campaigns: Record<string, AdCampaign> = {
             awareness: { id: '1', title: 'Grand Opening Special', description: 'Showcase your premium bike service.', platform: 'Facebook & Instagram', budget: '₹5,000 - ₹10,000', reach: '10k - 15k people' },
             traffic: { id: '2', title: 'Weekend Service Drive', description: '50% off on first service!', platform: 'Google Ads', budget: '₹3,000 - ₹7,000', reach: '5k - 8k people' },

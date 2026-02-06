@@ -56,7 +56,9 @@ const GoogleProfilePage: React.FC = () => {
             return;
          }
 
-         const genai = new GoogleGenAI({ apiKey });
+         const genAI = new (window as any).GoogleGenAI(apiKey);
+         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
          const prompt = `Generate a professional, friendly reply to this customer review for a bike service workshop:
 Review (${review.rating}/5): "${review.text}"
 
@@ -66,12 +68,10 @@ Write a brief, warm response (2-3 sentences) that:
 - Invites them to return
 Keep it concise and professional.`;
 
-         const result = await genai.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: { temperature: 0.7, maxOutputTokens: 150 }
-         });
+         const result = await model.generateContent(prompt);
+         const responseText = result.response.text();
 
-         setReplyText(result.text || 'Thank you for your feedback!');
+         setReplyText(responseText || 'Thank you for your feedback!');
       } catch (err) {
          setReplyText('Thank you for your valuable feedback! We look forward to serving you again.');
       } finally {
@@ -149,8 +149,8 @@ Keep it concise and professional.`;
                                        <Star
                                           key={i}
                                           className={`w-4 h-4 ${i < review.rating
-                                                ? 'fill-yellow-400 text-yellow-400'
-                                                : 'text-slate-300'
+                                             ? 'fill-yellow-400 text-yellow-400'
+                                             : 'text-slate-300'
                                              }`}
                                        />
                                     ))}

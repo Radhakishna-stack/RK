@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, Sparkles, Database, Users, Package, TrendingUp, RefreshCw } from 'lucide-react';
 import { GoogleGenAI, Content } from "@google/genai";
 import { dbService } from '../db';
+import { ComplaintStatus } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -47,9 +48,6 @@ const TechAgentPage: React.FC = () => {
         return;
       }
 
-      const genai = new GoogleGenAI({ apiKey });
-
-      // Get business context
       const [customers, jobs, inventory, invoices] = await Promise.all([
         dbService.getCustomers(),
         dbService.getComplaints(),
@@ -60,27 +58,30 @@ const TechAgentPage: React.FC = () => {
       const context = `
 You are a helpful AI assistant for a bike service workshop. Here's the current business data:
 - Total Customers: ${customers.length}
-- Active Service Jobs: ${jobs.filter(j => j.status !== 'completed').length}
+- Active Service Jobs: ${jobs.filter(j => j.status !== ComplaintStatus.COMPLETED).length}
 - Inventory Items: ${inventory.length}
 - Total Invoices: ${invoices.length}
 
 Answer the user's question based on this context. Be concise and helpful.
 `;
 
-      const contents: Content[] = [
+      const conversationContents: Content[] = [
         { role: 'user', parts: [{ text: context }] },
         { role: 'user', parts: [{ text: userMessage }] }
       ];
 
-      const result = await genai.generateContent({
-        contents,
-        config: {
+      const genAI = new (window as any).GoogleGenAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+      const result = await model.generateContent({
+        contents: conversationContents,
+        generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 500
         }
       });
 
-      const response = result.text || 'I apologize, but I couldn\'t generate a response. Please try again.';
+      const response = result.response.text() || 'I apologize, but I couldn\'t generate a response. Please try again.';
       setMessages(prev => [...prev, { role: 'assistant', text: response }]);
     } catch (err) {
       setMessages(prev => [...prev, {

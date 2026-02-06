@@ -51,7 +51,7 @@ const FieldServiceManagerPage: React.FC<FieldServiceManagerProps> = ({ onNavigat
     }, []);
 
     const loadData = async () => {
-        const activeJobs = fieldServiceManager.getAllActiveJobs();
+        const activeJobs = fieldServiceManager.getAllJobs();
         const locations = fieldServiceManager.getAllEmployeeLocations();
         const salesmen = await dbService.getSalesmen();
         const customersList = await dbService.getCustomers();
@@ -85,7 +85,7 @@ const FieldServiceManagerPage: React.FC<FieldServiceManagerProps> = ({ onNavigat
         if (!mapRef.current) return;
 
         // Clear existing markers
-        Object.values(markersRef.current).forEach(marker => marker.remove());
+        Object.values(markersRef.current).forEach(marker => (marker as any).remove());
         markersRef.current = {};
 
         const bounds: L.LatLngBounds = L.latLngBounds([]);
