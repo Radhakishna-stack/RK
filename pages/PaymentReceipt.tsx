@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Search, Calendar, DollarSign, Smartphone, Save, History, Printer, CreditCard, MessageCircle, Edit2, Trash2 } from 'lucide-react';
 import { dbService } from '../db';
-import { Customer, PaymentReceipt } from '../types';
+import { Customer, PaymentReceipt, Invoice } from '../types';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
@@ -31,6 +31,7 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
 
     // Edit Mode State
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [unpaidInvoices, setUnpaidInvoices] = useState<Invoice[]>([]);
 
     useEffect(() => {
         loadData();
@@ -57,10 +58,23 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
         c.bikeNumber.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleSelectCustomer = (customer: Customer) => {
+    const handleSelectCustomer = async (customer: Customer) => {
         setSelectedCustomer(customer);
         setSearchTerm(customer.name);
         setShowCustomerList(false);
+
+        // Fetch unpaid invoices
+        try {
+            const allInvoices = await dbService.getInvoices();
+            const unpaid = allInvoices.filter(inv =>
+                inv.customerName === customer.name &&
+                inv.paymentStatus !== 'Paid' &&
+                inv.docType !== 'Estimate'
+            ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            setUnpaidInvoices(unpaid);
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     const handleEdit = (receipt: PaymentReceipt) => {
@@ -135,6 +149,7 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
         setUpiAmount('');
         setDescription('');
         setDate(new Date().toISOString().split('T')[0]);
+        setUnpaidInvoices([]);
     };
 
     const handleSave = async () => {
@@ -154,6 +169,64 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
 
         setSubmitting(true);
         try {
+            // Process Invoices (Auto-allocate)
+            let remainingPayment = total;
+            const updatedInvoices: string[] = [];
+
+            // distribute numeric amounts
+            let currentCash = cash;
+            let currentUpi = upi;
+
+            for (const invoice of unpaidInvoices) {
+                if (remainingPayment <= 0) break;
+
+                const invTotal = invoice.finalAmount;
+                const invPaid = (invoice.paymentCollections?.cash || 0) + (invoice.paymentCollections?.upi || 0);
+                const invBalance = invTotal - invPaid;
+
+                if (invBalance <= 0) continue;
+
+                const paymentForThis = Math.min(invBalance, remainingPayment);
+
+                // Determine how much cash/upi used for this specific invoice (approximate)
+                let cashForThis = 0;
+                let upiForThis = 0;
+
+                if (currentCash >= paymentForThis) {
+                    cashForThis = paymentForThis;
+                    currentCash -= paymentForThis;
+                } else {
+                    cashForThis = currentCash;
+                    currentCash = 0;
+                    upiForThis = paymentForThis - cashForThis;
+                    currentUpi -= upiForThis;
+                }
+
+                if (paymentForThis > 0) {
+                    // Update invoice
+                    const newCollections = {
+                        cash: (invoice.paymentCollections?.cash || 0) + cashForThis,
+                        upi: (invoice.paymentCollections?.upi || 0) + upiForThis,
+                        upiAccountId: invoice.paymentCollections?.upiAccountId // Keep existing or update?
+                    };
+
+                    const newTotalPaid = newCollections.cash + newCollections.upi;
+                    const newStatus = newTotalPaid >= invTotal ? 'Paid' : 'Pending';
+
+                    await dbService.updateInvoice(invoice.id, {
+                        ...invoice,
+                        paymentCollections: newCollections,
+                        paymentStatus: newStatus,
+                        paymentMode: newCollections.cash > 0 && newCollections.upi > 0 ? 'Cash+UPI' : newCollections.cash > 0 ? 'Cash' : newCollections.upi > 0 ? 'UPI' : 'None'
+                    });
+
+                    updatedInvoices.push(invoice.id);
+                    remainingPayment -= paymentForThis;
+                }
+            }
+
+            const autoDescription = updatedInvoices.length > 0 ? ` (Covers: ${updatedInvoices.join(', ')})` : '';
+
             if (editingId) {
                 await dbService.updatePaymentReceipt(editingId, {
                     customerId: selectedCustomer.id,
@@ -164,7 +237,7 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                     upiAmount: upi,
                     totalAmount: total,
                     date: date,
-                    description: description
+                    description: description + autoDescription
                 });
                 alert('Receipt Updated Successfully!');
             } else {
@@ -177,9 +250,9 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                     upiAmount: upi,
                     totalAmount: total,
                     date: date,
-                    description: description
+                    description: description + autoDescription
                 });
-                alert('Payment Receipt Saved Successfully!');
+                alert(`Payment Receipt Saved! Updated ${updatedInvoices.length} invoices.`);
             }
 
             resetForm();
@@ -392,6 +465,32 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                                     </div>
                                 )}
                             </div>
+
+                            {/* Unpaid Invoices Display */}
+                            {unpaidInvoices.length > 0 && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                    <h3 className="text-sm font-bold text-amber-800 mb-2">Unpaid Invoices</h3>
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                        {unpaidInvoices.map(inv => {
+                                            const paid = (inv.paymentCollections?.cash || 0) + (inv.paymentCollections?.upi || 0);
+                                            const bal = inv.finalAmount - paid;
+                                            return (
+                                                <div key={inv.id} className="flex justify-between text-sm bg-white p-2 rounded border border-amber-100">
+                                                    <div>
+                                                        <span className="font-semibold text-slate-700">{inv.id}</span>
+                                                        <span className="text-slate-500 mx-2">{new Date(inv.date).toLocaleDateString()}</span>
+                                                    </div>
+                                                    <span className="font-bold text-amber-600">₹{bal.toLocaleString()}</span>
+                                                </div>
+                                            );
+                                        })}
+                                        <div className="pt-2 border-t border-amber-200 flex justify-between font-bold text-amber-900">
+                                            <span>Total Due:</span>
+                                            <span>₹{unpaidInvoices.reduce((sum, inv) => sum + (inv.finalAmount - ((inv.paymentCollections?.cash || 0) + (inv.paymentCollections?.upi || 0))), 0).toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Amount Inputs */}
                             <div className="grid grid-cols-2 gap-4 pt-2">

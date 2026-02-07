@@ -307,7 +307,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
         accountId: 'CASH-01', // Default account
         paymentMode: cash > 0 && upi > 0 ? 'Cash+UPI' : cash > 0 ? 'Cash' : upi > 0 ? 'UPI' : 'None',
         date: invoiceDate,
-        docType: defaultDocType,
+        docType: defaultDocType as 'Sale' | 'Estimate',
         odometerReading: odometerReading ? parseInt(odometerReading) : undefined,
         serviceReminderDate: serviceReminderDate || undefined,
         paymentCollections: { cash, upi, upiAccountId: selectedUpiAccount }
