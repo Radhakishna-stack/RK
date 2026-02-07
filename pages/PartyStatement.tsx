@@ -50,7 +50,11 @@ const PartyStatementPage: React.FC<PartyStatementPageProps> = ({ onNavigate }) =
    const handleSearch = (val: string) => {
       setSearchTerm(val);
       if (val.trim()) {
-         const filtered = customers.filter(c => c.name.toLowerCase().includes(val.toLowerCase()));
+         const filtered = customers.filter(c =>
+            c.name.toLowerCase().includes(val.toLowerCase()) ||
+            c.phone?.includes(val) ||
+            c.bikeNumber.toLowerCase().includes(val.toLowerCase())
+         );
          setFilteredCustomers(filtered);
          setShowDropdown(filtered.length > 0);
       } else {
@@ -74,15 +78,13 @@ const PartyStatementPage: React.FC<PartyStatementPageProps> = ({ onNavigate }) =
             dbService.getPaymentReceipts()
          ]);
 
-         // Filter by Customer
+         // Filter by Customer - Use unique identifiers (ID and bikeNumber)
          const customerInvoices = invoices.filter(i =>
-            i.customerName.toLowerCase() === selectedCustomer.name.toLowerCase() ||
             i.bikeNumber === selectedCustomer.bikeNumber
          );
 
          const customerReceipts = receipts.filter(r =>
-            r.customerId === selectedCustomer.id ||
-            r.customerName.toLowerCase() === selectedCustomer.name.toLowerCase()
+            r.customerId === selectedCustomer.id
          );
 
          // Convert to Ledger Entries
@@ -348,3 +350,4 @@ const PartyStatementPage: React.FC<PartyStatementPageProps> = ({ onNavigate }) =
 };
 
 export default PartyStatementPage;
+```
