@@ -28,6 +28,7 @@ import BillingPage from './pages/Billing';
 import SalesListPage from './pages/SalesList';
 import EstimatePage from './pages/Estimate';
 import PurchasePage from './pages/Purchase';
+import PurchaseEntryPage from './pages/PurchaseEntry';
 import InventoryPage from './pages/Inventory';
 import ExpensesPage from './pages/Expenses';
 import RemindersPage from './pages/Reminders';
@@ -280,6 +281,7 @@ const App: React.FC = () => {
             <Route path="/estimate/new" element={<BillingPage onNavigate={handleNavigate} defaultDocType="Estimate" />} />
             <Route path="/estimate" element={<EstimatePage onNavigate={handleNavigate} />} />
             <Route path="/purchase" element={<ProtectedRoute feature="purchase"><PurchasePage onNavigate={handleNavigate} /></ProtectedRoute>} />
+            <Route path="/purchase/new" element={<ProtectedRoute feature="purchase"><PurchaseEntryPage onNavigate={handleNavigate} /></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute feature="customers"><CustomersPage onNavigate={handleNavigate} /></ProtectedRoute>} />
             <Route path="/visitors" element={<VisitorsPage onNavigate={handleNavigate} />} />
             <Route path="/stock-wanting" element={<StockWantingPage onNavigate={handleNavigate} />} />
