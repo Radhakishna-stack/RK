@@ -51,19 +51,17 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
          // Fetch transactions for summary
          const transactions = await dbService.getTransactions();
 
-         // Calculate Cash Balance
-         const cashIn = transactions
-            .filter(t => t.type === 'cash-in')
-            .reduce((sum, t) => sum + t.amount, 0);
-         const cashOut = transactions
-            .filter(t => t.type === 'cash-out')
-            .reduce((sum, t) => sum + t.amount, 0);
-         setCashBalance(cashIn - cashOut);
+         // Calculate Cash Balance from Cash account
+         const cashAccount = data.find(acc => acc.type === 'Cash');
+         if (cashAccount) {
+            const cashBal = await dbService.getAccountBalance(cashAccount.id);
+            setCashBalance(cashBal);
+         } else {
+            setCashBalance(0);
+         }
 
-         // Calculate Pending Cheques
-         const pending = transactions
-            .filter(t => (t.type === 'cheque-received' || t.type === 'cheque-issued') && t.status === 'pending')
-            .reduce((sum, t) => sum + t.amount, 0);
+         // Calculate Pending Cheques (if this feature exists)
+         const pending = 0; // Placeholder - implement if cheque tracking is needed
          setPendingCheques(pending);
 
       } catch (err) {
