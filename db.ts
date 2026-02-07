@@ -593,6 +593,91 @@ export const dbService = {
 
     return newInv;
   },
+
+  /**
+   * Update an existing invoice
+   */
+  updateInvoice: async (invoiceId: string, data: Partial<Invoice>): Promise<void> => {
+    const currentInvoices = await dbService.getInvoices();
+    const invoiceIndex = currentInvoices.findIndex(inv => inv.id === invoiceId);
+
+    if (invoiceIndex === -1) {
+      throw new Error(`Invoice ${invoiceId} not found`);
+    }
+
+    const existingInvoice = currentInvoices[invoiceIndex];
+
+    // Update customer if details changed
+    if (data.customerName || data.bikeNumber || data.customerPhone) {
+      await upsertCustomer({
+        customerName: data.customerName || existingInvoice.customerName,
+        bikeNumber: data.bikeNumber || existingInvoice.bikeNumber,
+        customerPhone: data.customerPhone || existingInvoice.customerPhone
+      });
+    }
+
+    // Merge updates with existing invoice
+    const updatedInvoice = {
+      ...existingInvoice,
+      ...data,
+      id: invoiceId, // Prevent ID from being changed
+      date: data.date || existingInvoice.date
+    };
+
+    // Update invoices list
+    currentInvoices[invoiceIndex] = updatedInvoice;
+    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify(currentInvoices));
+
+    // Handle payment collection changes
+    if (data.paymentCollections) {
+      const accounts = await dbService.getBankAccounts();
+      const { cash, upi } = data.paymentCollections;
+
+      // Note: In a real app, you'd want to handle transaction updates more carefully
+      // For now, we'll delete old transactions and create new ones
+      const existingTransactions = await dbService.getTransactions();
+
+      // Remove old transactions for this invoice
+      const filteredTransactions = existingTransactions.filter(t =>
+        !t.description.includes(`Invoice ${invoiceId}`)
+      );
+      localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(filteredTransactions));
+
+      // Create new Cash transaction if cash amount > 0
+      if (cash && cash > 0) {
+        const cashAccount = accounts.find(a => a.type === 'Cash');
+        if (cashAccount) {
+          await dbService.addTransaction({
+            entityId: data.bikeNumber || existingInvoice.bikeNumber,
+            accountId: cashAccount.id,
+            type: 'IN',
+            amount: cash,
+            paymentMode: 'Cash',
+            description: `Payment for Invoice ${invoiceId} - ${data.customerName || existingInvoice.customerName}`
+          });
+        }
+      }
+
+      // Create new UPI transaction if UPI amount > 0
+      if (upi && upi > 0) {
+        let upiAccount = accounts.find(a => a.id === data.paymentCollections.upiAccountId);
+        if (!upiAccount) {
+          upiAccount = accounts.find(a => a.type === 'UPI' || a.type === 'Wallet') || accounts.find(a => a.type !== 'Cash');
+        }
+
+        if (upiAccount) {
+          await dbService.addTransaction({
+            entityId: data.bikeNumber || existingInvoice.bikeNumber,
+            accountId: upiAccount.id,
+            type: 'IN',
+            amount: upi,
+            paymentMode: 'UPI',
+            description: `Payment for Invoice ${invoiceId} - ${data.customerName || existingInvoice.customerName}`
+          });
+        }
+      }
+    }
+  },
   updateInvoicePaymentStatus: async (id: string, status: 'Paid' | 'Pending' | 'Unpaid'): Promise<void> => {
     const current = await dbService.getInvoices();
     localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify(current.map(i => i.id === id ? { ...i, paymentStatus: status } : i)));

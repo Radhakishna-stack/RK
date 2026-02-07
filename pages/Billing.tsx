@@ -63,6 +63,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
   // UX state
   const [isSaving, setIsSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -110,6 +111,10 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
             setCashAmount(editingInvoice.paymentCollections.cash?.toString() || '');
             setUpiAmount(editingInvoice.paymentCollections.upi?.toString() || '');
           }
+
+          // Store the invoice ID for updating
+          setEditingInvoiceId(editingInvoice.id);
+          setInvoiceNumber(editingInvoice.id); // Use existing invoice number
 
           // Clear the editing invoice from storage
           localStorage.removeItem('editingInvoice');
@@ -297,7 +302,23 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
         paymentCollections: { cash, upi, upiAccountId: selectedUpiAccount }
       };
 
-      const newInvoice = await dbService.generateInvoice(invoiceData);
+      let newInvoice: Invoice;
+
+      if (editingInvoiceId) {
+        // Update existing invoice
+        await dbService.updateInvoice(editingInvoiceId, invoiceData);
+        // Fetch the updated invoice
+        const allInvoices = await dbService.getInvoices();
+        const updatedInvoice = allInvoices.find(inv => inv.id === editingInvoiceId);
+        if (updatedInvoice) {
+          newInvoice = updatedInvoice;
+        } else {
+          throw new Error('Failed to fetch updated invoice');
+        }
+      } else {
+        // Create new invoice
+        newInvoice = await dbService.generateInvoice(invoiceData);
+      }
 
       if (saveAndNew) {
         // Reset form
@@ -315,6 +336,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
         const settings = await dbService.getSettings();
         const prefix = settings.transaction.prefixes[defaultDocType === 'Estimate' ? 'estimate' : 'sale'] || (defaultDocType === 'Estimate' ? 'EST-' : 'INV-');
         setInvoiceNumber(prefix + Date.now());
+        setEditingInvoiceId(null); // Clear editing state
 
         alert(`${defaultDocType} saved! Ready for next.`);
       } else {
@@ -368,6 +390,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
 
             setShowPreview(false);
             setSavedInvoice(null);
+            setEditingInvoiceId(null); // Clear editing state
           }}
           companyName={companyName}
           companyAddress={companyAddress}
