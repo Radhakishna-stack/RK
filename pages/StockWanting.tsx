@@ -14,9 +14,12 @@ interface StockWantingPageProps {
 
 const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
   const [items, setItems] = useState<StockWantingItem[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
 
   // Live Entry State (The bottom row)
   const [newEntry, setNewEntry] = useState({
@@ -30,6 +33,7 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     loadData();
+    loadInventory();
   }, []);
 
   const loadData = async () => {
@@ -41,6 +45,15 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadInventory = async () => {
+    try {
+      const data = await dbService.getInventory();
+      setInventory(data);
+    } catch (err) {
+      console.error('Failed to load inventory:', err);
     }
   };
 
@@ -74,7 +87,34 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
       alert("Error saving row");
     } finally {
       setIsSubmitting(false);
+      setShowSuggestions(false);
     }
+  };
+
+  const handleItemNameChange = (value: string) => {
+    setNewEntry({ ...newEntry, itemName: value });
+
+    if (value.trim().length >= 2) {
+      const filtered = inventory.filter(item =>
+        item.itemName.toLowerCase().includes(value.toLowerCase()) ||
+        (item.partNumber && item.partNumber.toLowerCase().includes(value.toLowerCase()))
+      ).slice(0, 8);
+
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectInventoryItem = (item: any) => {
+    setNewEntry({
+      ...newEntry,
+      partNumber: item.partNumber || '',
+      itemName: item.itemName,
+      rate: item.sellingPrice?.toString() || item.price?.toString() || ''
+    });
+    setShowSuggestions(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -253,15 +293,43 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
                       onKeyDown={e => e.key === 'Enter' && handleCommitEntry()}
                     />
                   </td>
-                  <td className="px-4 py-3 border-r border-blue-100">
+                  <td className="px-4 py-3 border-r border-blue-100 relative">
                     <input
                       type="text"
                       placeholder="ENTER ITEM DESCRIPTION..."
                       className="w-full bg-transparent border-b border-transparent focus:border-blue-400 outline-none px-2 py-1 text-[11px] font-black uppercase text-slate-700 transition-all placeholder:text-slate-300"
                       value={newEntry.itemName}
-                      onChange={e => setNewEntry({ ...newEntry, itemName: e.target.value })}
+                      onChange={e => handleItemNameChange(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleCommitEntry()}
+                      onFocus={() => newEntry.itemName.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     />
+                    {showSuggestions && suggestions.length > 0 && (
+                      <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border-2 border-blue-400 rounded-2xl shadow-2xl max-h-64 overflow-y-auto">
+                        {suggestions.map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectInventoryItem(item);
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 flex items-center justify-between gap-3"
+                          >
+                            <div className="flex-1">
+                              <div className="text-[11px] font-black text-slate-900 uppercase">{item.itemName}</div>
+                              {item.partNumber && (
+                                <div className="text-[9px] font-mono text-blue-600 mt-1">{item.partNumber}</div>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="text-[10px] font-black text-green-600">₹{(item.sellingPrice || item.price || 0).toLocaleString()}</div>
+                              <div className="text-[8px] text-slate-500">Stock: {item.quantity}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 border-r border-blue-100">
                     <input
