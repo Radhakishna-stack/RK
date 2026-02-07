@@ -26,6 +26,7 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [suggestions, setSuggestions] = useState<Customer[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [editingJob, setEditingJob] = useState<Complaint | null>(null);
   const [formData, setFormData] = useState({
     bikeNumber: '',
     customerName: '',
@@ -112,18 +113,30 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await dbService.addComplaint({
-        ...formData,
-        estimatedCost: parseInt(formData.estimatedCost) || 0,
-        odometerReading: parseInt(formData.odometerReading) || 0,
-        photoUrls: images
-      });
+      if (editingJob) {
+        // Update existing job
+        await dbService.updateComplaint(editingJob.id, {
+          ...formData,
+          estimatedCost: parseInt(formData.estimatedCost) || 0,
+          odometerReading: parseInt(formData.odometerReading) || 0,
+          photoUrls: images
+        });
+      } else {
+        // Create new job
+        await dbService.addComplaint({
+          ...formData,
+          estimatedCost: parseInt(formData.estimatedCost) || 0,
+          odometerReading: parseInt(formData.odometerReading) || 0,
+          photoUrls: images
+        });
+      }
       await loadData();
       setIsModalOpen(false);
+      setEditingJob(null);
       setFormData({ bikeNumber: '', customerName: '', customerPhone: '', city: '', details: '', estimatedCost: '', dueDate: '', odometerReading: '' });
       setImages([]);
     } catch (err) {
-      alert('Failed to create job. Please try again.');
+      alert(`Failed to ${editingJob ? 'update' : 'create'} job. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -132,6 +145,33 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
   const handleStatusChange = async (id: string, newStatus: ComplaintStatus) => {
     await dbService.updateComplaintStatus(id, newStatus);
     loadData();
+  };
+
+  const handleEdit = (job: Complaint) => {
+    setEditingJob(job);
+    setFormData({
+      bikeNumber: job.bikeNumber,
+      customerName: job.customerName,
+      customerPhone: job.customerPhone || '',
+      city: job.city || '',
+      details: job.details,
+      estimatedCost: job.estimatedCost?.toString() || '',
+      dueDate: job.dueDate || '',
+      odometerReading: job.odometerReading?.toString() || ''
+    });
+    setImages(job.photoUrls || []);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this service job? This action cannot be undone.')) {
+      try {
+        await dbService.deleteComplaint(id);
+        await loadData();
+      } catch (err) {
+        alert('Failed to delete job. Please try again.');
+      }
+    }
   };
 
   const filteredComplaints = complaints.filter(complaint => {
@@ -250,6 +290,8 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
               key={job.id}
               job={job}
               onStatusChange={handleStatusChange}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
             />
           ))
         )}
@@ -258,8 +300,13 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
       {/* Add Job Modal */}
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Create New Job"
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingJob(null);
+          setFormData({ bikeNumber: '', customerName: '', customerPhone: '', city: '', details: '', estimatedCost: '', dueDate: '', odometerReading: '' });
+          setImages([]);
+        }}
+        title={editingJob ? 'Edit Service Job' : 'Create New Job'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -495,7 +542,7 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
               isLoading={isSubmitting}
               className="flex-1"
             >
-              Create Job
+              {editingJob ? 'Update Job' : 'Create Job'}
             </Button>
           </div>
         </form>
@@ -553,7 +600,9 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
 const JobCard: React.FC<{
   job: Complaint;
   onStatusChange: (id: string, status: ComplaintStatus) => void;
-}> = ({ job, onStatusChange }) => {
+  onEdit: (job: Complaint) => void;
+  onDelete: (id: string) => void;
+}> = ({ job, onStatusChange, onEdit, onDelete }) => {
   const getStatusBadge = (status: ComplaintStatus) => {
     switch (status) {
       case ComplaintStatus.PENDING:
@@ -602,31 +651,51 @@ const JobCard: React.FC<{
           </div>
         )}
 
-        {/* Status Actions */}
-        {job.status !== ComplaintStatus.COMPLETED && job.status !== ComplaintStatus.CANCELLED && (
-          <div className="pt-3 border-t border-slate-100 flex gap-2">
-            {job.status === ComplaintStatus.PENDING && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => onStatusChange(job.id, ComplaintStatus.IN_PROGRESS)}
-                className="flex-1"
-              >
-                Start Work
-              </Button>
-            )}
-            {job.status === ComplaintStatus.IN_PROGRESS && (
-              <Button
-                size="sm"
-                onClick={() => onStatusChange(job.id, ComplaintStatus.COMPLETED)}
-                className="flex-1"
-              >
-                <CheckCircle className="w-4 h-4 mr-1" />
-                Mark Complete
-              </Button>
-            )}
-          </div>
-        )}
+        {/* Actions */}
+        <div className="pt-3 border-t border-slate-100 flex gap-2">
+          {/* Status Actions */}
+          {job.status !== ComplaintStatus.COMPLETED && job.status !== ComplaintStatus.CANCELLED && (
+            <>
+              {job.status === ComplaintStatus.PENDING && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onStatusChange(job.id, ComplaintStatus.IN_PROGRESS)}
+                  className="flex-1"
+                >
+                  Start Work
+                </Button>
+              )}
+              {job.status === ComplaintStatus.IN_PROGRESS && (
+                <Button
+                  size="sm"
+                  onClick={() => onStatusChange(job.id, ComplaintStatus.COMPLETED)}
+                  className="flex-1"
+                >
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  Mark Complete
+                </Button>
+              )}
+            </>
+          )}
+
+          {/* Edit & Delete Actions */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onEdit(job)}
+          >
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onDelete(job.id)}
+            className="text-red-600 hover:bg-red-50"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
     </Card>
   );

@@ -472,6 +472,18 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify([newComplaint, ...currentComplaints]));
     return newComplaint;
   },
+  updateComplaint: async (id: string, data: Partial<Complaint>): Promise<void> => {
+    const current = await dbService.getComplaints();
+    const index = current.findIndex(c => c.id === id);
+
+    if (index === -1) {
+      throw new Error(`Complaint ${id} not found`);
+    }
+
+    // Merge updates with existing complaint
+    current[index] = { ...current[index], ...data, id }; // Preserve ID
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(current));
+  },
   updateComplaintStatus: async (id: string, status: ComplaintStatus): Promise<void> => {
     const current = await dbService.getComplaints();
     localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(current.map(c => c.id === id ? { ...c, status } : c)));

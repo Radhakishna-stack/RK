@@ -350,4 +350,3 @@ const PartyStatementPage: React.FC<PartyStatementPageProps> = ({ onNavigate }) =
 };
 
 export default PartyStatementPage;
-```
