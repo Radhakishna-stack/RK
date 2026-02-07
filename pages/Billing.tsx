@@ -112,9 +112,20 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
             setUpiAmount(editingInvoice.paymentCollections.upi?.toString() || '');
           }
 
-          // Store the invoice ID for updating
-          setEditingInvoiceId(editingInvoice.id);
-          setInvoiceNumber(editingInvoice.id); // Use existing invoice number
+          // Check if we are editing the same document type or converting
+          const isSameType = (editingInvoice.docType || 'Sale') === defaultDocType;
+
+          if (isSameType) {
+            // Store the invoice ID for updating existing document
+            setEditingInvoiceId(editingInvoice.id);
+            setInvoiceNumber(editingInvoice.id);
+          } else {
+            // Converting (e.g. Estimate -> Sale)
+            // Generate new ID for the new document type
+            const prefix = settings.transaction.prefixes[defaultDocType === 'Estimate' ? 'estimate' : 'sale'] || (defaultDocType === 'Estimate' ? 'EST-' : 'INV-');
+            setInvoiceNumber(prefix + Date.now());
+            // Do NOT set editingInvoiceId, so it creates a new record
+          }
 
           // Clear the editing invoice from storage
           localStorage.removeItem('editingInvoice');
@@ -422,12 +433,12 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Invoice No.</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">{defaultDocType === 'Estimate' ? 'Estimate No.' : 'Invoice No.'}</label>
                     <Input
                       type="text"
                       value={invoiceNumber}
                       onChange={(e) => setInvoiceNumber(e.target.value)}
-                      placeholder="INV-001"
+                      placeholder={defaultDocType === 'Estimate' ? 'EST-001' : 'INV-001'}
                     />
                   </div>
 
@@ -592,67 +603,69 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
               </div>
             </Card>
 
-            {/* Payment Collection */}
-            <Card>
-              <div className="space-y-4">
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Wallet className="w-5 h-5 text-blue-600" />
-                  Payment Collection
-                </h2>
+            {/* Payment Collection - Only for Sales */}
+            {defaultDocType !== 'Estimate' && (
+              <Card>
+                <div className="space-y-4">
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-blue-600" />
+                    Payment Collection
+                  </h2>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Cash Amount</label>
-                    <Input
-                      type="number"
-                      value={cashAmount}
-                      onChange={(e) => setCashAmount(e.target.value)}
-                      placeholder="0"
-                      icon={<Banknote className="w-5 h-5" />}
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Cash Amount</label>
+                      <Input
+                        type="number"
+                        value={cashAmount}
+                        onChange={(e) => setCashAmount(e.target.value)}
+                        placeholder="0"
+                        icon={<Banknote className="w-5 h-5" />}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">UPI Amount</label>
+                      <Input
+                        type="number"
+                        value={upiAmount}
+                        onChange={(e) => setUpiAmount(e.target.value)}
+                        placeholder="0"
+                        icon={<Wallet className="w-5 h-5" />}
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">UPI Amount</label>
-                    <Input
-                      type="number"
-                      value={upiAmount}
-                      onChange={(e) => setUpiAmount(e.target.value)}
-                      placeholder="0"
-                      icon={<Wallet className="w-5 h-5" />}
-                    />
+                  {/* Payment Summary */}
+                  <div className="pt-3 border-t border-slate-200">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm text-slate-600">Invoice Total:</span>
+                      <span className="text-sm font-semibold text-slate-900">₹{totalAmount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm text-slate-600">Total Collected:</span>
+                      <span className="text-sm font-semibold text-blue-600">₹{totalCollected.toLocaleString()}</span>
+                    </div>
+                    {remainingBalance > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-amber-600">Remaining Balance:</span>
+                        <span className="text-sm font-bold text-amber-600">₹{remainingBalance.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {remainingBalance < 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-red-600">Excess Amount:</span>
+                        <span className="text-sm font-bold text-red-600">₹{Math.abs(remainingBalance).toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {/* Payment Summary */}
-                <div className="pt-3 border-t border-slate-200">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm text-slate-600">Invoice Total:</span>
-                    <span className="text-sm font-semibold text-slate-900">₹{totalAmount.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm text-slate-600">Total Collected:</span>
-                    <span className="text-sm font-semibold text-blue-600">₹{totalCollected.toLocaleString()}</span>
-                  </div>
-                  {remainingBalance > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-amber-600">Remaining Balance:</span>
-                      <span className="text-sm font-bold text-amber-600">₹{remainingBalance.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {remainingBalance < 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-red-600">Excess Amount:</span>
-                      <span className="text-sm font-bold text-red-600">₹{Math.abs(remainingBalance).toLocaleString()}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
+              </Card>
+            )}
           </div>
 
           {/* Sticky Footer */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-slate-200 shadow-2xl z-20">
+          < div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-slate-200 shadow-2xl z-20" >
             <div className="px-4 py-4 space-y-4">
               {/* Total Display */}
               <div className="flex items-center justify-between">
@@ -677,14 +690,15 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
                   className="w-full"
                 >
                   <Save className="w-4 h-4 mr-2" />
-                  {isSaving ? 'Saving...' : 'Save'}
+                  {isSaving ? 'Saving...' : `Save ${defaultDocType}`}
                 </Button>
               </div>
             </div>
-          </div>
+          </div >
         </>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 };
 

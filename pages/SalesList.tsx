@@ -60,7 +60,7 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
     };
 
     const getFilteredInvoices = () => {
-        let filtered = invoices;
+        let filtered = invoices.filter(inv => inv.docType !== 'Estimate');
 
         // Apply date filter
         if (dateStart && dateEnd) {
