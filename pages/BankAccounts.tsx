@@ -248,78 +248,76 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
          <Modal
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
-            title="Add Bank Account"
+            title="NEW PAYMENT NODE"
             size="md"
          >
-            <form onSubmit={handleSubmit} className="space-y-4">
-               <Input
-                  label="Bank Name"
-                  type="text"
-                  required
-                  placeholder="e.g., State Bank of India"
-                  value={formData.bankName}
-                  onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                  icon={<Landmark className="w-5 h-5" />}
-               />
+            <div className="mb-2 text-sm font-semibold text-slate-500 uppercase tracking-wide">
+               Bank or Wallet Integration
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+               <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-500 uppercase tracking-wide">
+                     Account Display Name
+                  </label>
+                  <Input
+                     type="text"
+                     required
+                     placeholder="E.G. PHONEPE SHOP / HDFC MAIN"
+                     value={formData.bankName}
+                     onChange={(e) => setFormData({ ...formData, bankName: e.target.value.toUpperCase() })}
+                     className="text-slate-600 placeholder:text-slate-400"
+                  />
+               </div>
 
-               <Input
-                  label="Account Number"
-                  type="text"
-                  required
-                  placeholder="Enter account number"
-                  value={formData.accountNumber}
-                  onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-               />
-
-               <Input
-                  label="Current Balance"
-                  type="number"
-                  required
-                  placeholder="₹ 0"
-                  value={formData.balance}
-                  onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
-               />
-
-               <div className="space-y-1.5">
-                  <label className="block text-sm font-semibold text-slate-700">
+               <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-500 uppercase tracking-wide">
                      Account Type
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                     {['Savings', 'Current', 'UPI', 'Wallet'].map((type) => (
-                        <button
-                           key={type}
-                           type="button"
-                           onClick={() => setFormData({ ...formData, accountType: type })}
-                           className={`
-                    p-3 rounded-xl font-semibold text-sm transition-all
-                    ${formData.accountType === type
-                                 ? 'bg-blue-600 text-white shadow-md'
-                                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}
-                  `}
-                        >
-                           {type}
-                        </button>
-                     ))}
+                  <select
+                     value={formData.accountType}
+                     onChange={(e) => setFormData({ ...formData, accountType: e.target.value })}
+                     className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  >
+                     <option value="Cash">CASH</option>
+                     <option value="UPI">DIGITAL WALLET / UPI</option>
+                     <option value="Savings">SAVINGS ACCOUNT</option>
+                     <option value="Current">CURRENT ACCOUNT</option>
+                     <option value="Wallet">WALLET</option>
+                  </select>
+               </div>
+
+               <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-500 uppercase tracking-wide">
+                     Opening Balance (₹)
+                  </label>
+                  <div className="relative">
+                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">₹</span>
+                     <input
+                        type="number"
+                        step="0.01"
+                        required
+                        placeholder="0.00"
+                        value={formData.balance}
+                        onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-mono text-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                     />
                   </div>
                </div>
 
-               <div className="border-t border-slate-200 pt-4 mt-6 flex gap-3">
-                  <Button
-                     type="button"
-                     variant="ghost"
-                     onClick={() => setIsModalOpen(false)}
-                     className="flex-1"
-                  >
-                     Cancel
-                  </Button>
-                  <Button
-                     type="submit"
-                     isLoading={isSubmitting}
-                     className="flex-1"
-                  >
-                     Add Account
-                  </Button>
-               </div>
+               <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-sm uppercase tracking-wide hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+               >
+                  <div className="w-5 h-5 border-2 border-white rounded-full flex items-center justify-center">
+                     {isSubmitting ? (
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                     ) : (
+                        <div className="w-2 h-2 bg-white rounded-full" />
+                     )}
+                  </div>
+                  {isSubmitting ? 'REGISTERING...' : 'CONFIRM REGISTRATION'}
+               </button>
             </form>
          </Modal>
       </div>
