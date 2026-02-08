@@ -181,156 +181,146 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                 alert('Failed to delete receipt');
             }
         }
-    };
+    }
+};
 
-    const resetForm = () => {
-        setEditingId(null);
-        setSelectedCustomer(null);
-        setSearchTerm('');
-        setCashAmount('');
-        setUpiAmount('');
-        setDescription('');
-        setDate(new Date().toISOString().split('T')[0]);
-        setUnpaidInvoices([]);
-    };
+const handleSave = async () => {
+    if (!selectedCustomer) {
+        alert('Please select a customer');
+        return;
+    }
 
-    const handleSave = async () => {
-        if (!selectedCustomer) {
-            alert('Please select a customer');
-            return;
-        }
+    const cash = parseFloat(cashAmount) || 0;
+    const upi = parseFloat(upiAmount) || 0;
+    const total = cash + upi;
 
-        const cash = parseFloat(cashAmount) || 0;
-        const upi = parseFloat(upiAmount) || 0;
-        const total = cash + upi;
+    if (total <= 0) {
+        alert('Please enter an amount greater than 0');
+        return;
+    }
 
-        if (total <= 0) {
-            alert('Please enter an amount greater than 0');
-            return;
-        }
+    setSubmitting(true);
+    try {
+        // Process Invoices (Auto-allocate)
+        let remainingPayment = total;
+        const updatedInvoices: string[] = [];
 
-        setSubmitting(true);
-        try {
-            // Process Invoices (Auto-allocate)
-            let remainingPayment = total;
-            const updatedInvoices: string[] = [];
+        // distribute numeric amounts
+        let currentCash = cash;
+        let currentUpi = upi;
 
-            // distribute numeric amounts
-            let currentCash = cash;
-            let currentUpi = upi;
+        for (const invoice of unpaidInvoices) {
+            if (remainingPayment <= 0) break;
 
-            for (const invoice of unpaidInvoices) {
-                if (remainingPayment <= 0) break;
+            const invTotal = invoice.finalAmount;
+            const invPaid = (invoice.paymentCollections?.cash || 0) + (invoice.paymentCollections?.upi || 0);
+            const invBalance = invTotal - invPaid;
 
-                const invTotal = invoice.finalAmount;
-                const invPaid = (invoice.paymentCollections?.cash || 0) + (invoice.paymentCollections?.upi || 0);
-                const invBalance = invTotal - invPaid;
+            if (invBalance <= 0) continue;
 
-                if (invBalance <= 0) continue;
+            const paymentForThis = Math.min(invBalance, remainingPayment);
 
-                const paymentForThis = Math.min(invBalance, remainingPayment);
+            // Determine how much cash/upi used for this specific invoice (approximate)
+            let cashForThis = 0;
+            let upiForThis = 0;
 
-                // Determine how much cash/upi used for this specific invoice (approximate)
-                let cashForThis = 0;
-                let upiForThis = 0;
-
-                if (currentCash >= paymentForThis) {
-                    cashForThis = paymentForThis;
-                    currentCash -= paymentForThis;
-                } else {
-                    cashForThis = currentCash;
-                    currentCash = 0;
-                    upiForThis = paymentForThis - cashForThis;
-                    currentUpi -= upiForThis;
-                }
-
-                if (paymentForThis > 0) {
-                    // Update invoice
-                    const newCollections = {
-                        cash: (invoice.paymentCollections?.cash || 0) + cashForThis,
-                        upi: (invoice.paymentCollections?.upi || 0) + upiForThis,
-                        upiAccountId: invoice.paymentCollections?.upiAccountId // Keep existing or update?
-                    };
-
-                    const newTotalPaid = newCollections.cash + newCollections.upi;
-                    const newStatus = newTotalPaid >= invTotal ? 'Paid' : 'Pending';
-
-                    await dbService.updateInvoice(invoice.id, {
-                        ...invoice,
-                        paymentCollections: newCollections,
-                        paymentStatus: newStatus,
-                        paymentMode: newCollections.cash > 0 && newCollections.upi > 0 ? 'Cash+UPI' : newCollections.cash > 0 ? 'Cash' : newCollections.upi > 0 ? 'UPI' : 'None'
-                    });
-
-                    updatedInvoices.push(invoice.id);
-                    remainingPayment -= paymentForThis;
-                }
-            }
-
-            const autoDescription = updatedInvoices.length > 0 ? ` (Covers: ${updatedInvoices.join(', ')})` : '';
-
-            if (editingId) {
-                await dbService.updatePaymentReceipt(editingId, {
-                    customerId: selectedCustomer.id,
-                    customerName: selectedCustomer.name,
-                    customerPhone: selectedCustomer.phone,
-                    bikeNumber: selectedCustomer.bikeNumber,
-                    cashAmount: cash,
-                    upiAmount: upi,
-                    totalAmount: total,
-                    date: date,
-                    description: description + autoDescription
-                });
-                alert('Receipt Updated Successfully!');
+            if (currentCash >= paymentForThis) {
+                cashForThis = paymentForThis;
+                currentCash -= paymentForThis;
             } else {
-                await dbService.addPaymentReceipt({
-                    customerId: selectedCustomer.id,
-                    customerName: selectedCustomer.name,
-                    customerPhone: selectedCustomer.phone,
-                    bikeNumber: selectedCustomer.bikeNumber,
-                    cashAmount: cash,
-                    upiAmount: upi,
-                    totalAmount: total,
-                    date: date,
-                    description: description + autoDescription
-                });
-                alert(`Payment Receipt Saved! Updated ${updatedInvoices.length} invoices.`);
+                cashForThis = currentCash;
+                currentCash = 0;
+                upiForThis = paymentForThis - cashForThis;
+                currentUpi -= upiForThis;
             }
 
-            resetForm();
+            if (paymentForThis > 0) {
+                // Update invoice
+                const newCollections = {
+                    cash: (invoice.paymentCollections?.cash || 0) + cashForThis,
+                    upi: (invoice.paymentCollections?.upi || 0) + upiForThis,
+                    upiAccountId: invoice.paymentCollections?.upiAccountId // Keep existing or update?
+                };
 
-            // Reload receipts
-            const receiptsData = await dbService.getPaymentReceipts();
-            setRecentReceipts(receiptsData);
-            applyDateFilter(receiptsData, dateStart, dateEnd);
+                const newTotalPaid = newCollections.cash + newCollections.upi;
+                const newStatus = newTotalPaid >= invTotal ? 'Paid' : 'Pending';
 
-        } catch (error) {
-            console.error('Error saving receipt:', error);
-            alert('Failed to save receipt');
-        } finally {
-            setSubmitting(false);
+                await dbService.updateInvoice(invoice.id, {
+                    ...invoice,
+                    paymentCollections: newCollections,
+                    paymentStatus: newStatus,
+                    paymentMode: newCollections.cash > 0 && newCollections.upi > 0 ? 'Cash+UPI' : newCollections.cash > 0 ? 'Cash' : newCollections.upi > 0 ? 'UPI' : 'None'
+                });
+
+                updatedInvoices.push(invoice.id);
+                remainingPayment -= paymentForThis;
+            }
         }
-    };
 
-    const handleShare = (receipt: PaymentReceipt) => {
-        const message = `*PAYMENT RECEIPT*\n\n` +
-            `Receipt No: ${receipt.receiptNumber}\n` +
-            `Date: ${new Date(receipt.date).toLocaleDateString('en-IN')}\n` +
-            `Customer: ${receipt.customerName}\n\n` +
-            `*Amount Received: ₹${receipt.totalAmount.toLocaleString('en-IN')}*\n` +
-            (receipt.cashAmount > 0 ? `Cash: ₹${receipt.cashAmount.toLocaleString('en-IN')}\n` : '') +
-            (receipt.upiAmount > 0 ? `UPI: ₹${receipt.upiAmount.toLocaleString('en-IN')}\n` : '') +
-            (receipt.description ? `\nNote: ${receipt.description}\n` : '') +
-            `\nThank you for your business!`;
+        const autoDescription = updatedInvoices.length > 0 ? ` (Covers: ${updatedInvoices.join(', ')})` : '';
 
-        const phone = receipt.customerPhone.replace(/\D/g, '');
-        const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+        if (editingId) {
+            await dbService.updatePaymentReceipt(editingId, {
+                customerId: selectedCustomer.id,
+                customerName: selectedCustomer.name,
+                customerPhone: selectedCustomer.phone,
+                bikeNumber: selectedCustomer.bikeNumber,
+                cashAmount: cash,
+                upiAmount: upi,
+                totalAmount: total,
+                date: date,
+                description: description + autoDescription
+            });
+            alert('Receipt Updated Successfully!');
+        } else {
+            await dbService.addPaymentReceipt({
+                customerId: selectedCustomer.id,
+                customerName: selectedCustomer.name,
+                customerPhone: selectedCustomer.phone,
+                bikeNumber: selectedCustomer.bikeNumber,
+                cashAmount: cash,
+                upiAmount: upi,
+                totalAmount: total,
+                date: date,
+                description: description + autoDescription
+            });
+            alert(`Payment Receipt Saved! Updated ${updatedInvoices.length} invoices.`);
+        }
 
-        window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
-    };
+        resetForm();
 
-    const handlePrint = (receipt: PaymentReceipt) => {
-        const printContent = `
+        // Reload receipts
+        const receiptsData = await dbService.getPaymentReceipts();
+        setRecentReceipts(receiptsData);
+        applyDateFilter(receiptsData, dateStart, dateEnd);
+
+    } catch (error) {
+        console.error('Error saving receipt:', error);
+        alert('Failed to save receipt');
+    } finally {
+        setSubmitting(false);
+    }
+};
+
+const handleShare = (receipt: PaymentReceipt) => {
+    const message = `*PAYMENT RECEIPT*\n\n` +
+        `Receipt No: ${receipt.receiptNumber}\n` +
+        `Date: ${new Date(receipt.date).toLocaleDateString('en-IN')}\n` +
+        `Customer: ${receipt.customerName}\n\n` +
+        `*Amount Received: ₹${receipt.totalAmount.toLocaleString('en-IN')}*\n` +
+        (receipt.cashAmount > 0 ? `Cash: ₹${receipt.cashAmount.toLocaleString('en-IN')}\n` : '') +
+        (receipt.upiAmount > 0 ? `UPI: ₹${receipt.upiAmount.toLocaleString('en-IN')}\n` : '') +
+        (receipt.description ? `\nNote: ${receipt.description}\n` : '') +
+        `\nThank you for your business!`;
+
+    const phone = receipt.customerPhone.replace(/\D/g, '');
+    const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+
+    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, '_blank');
+};
+
+const handlePrint = (receipt: PaymentReceipt) => {
+    const printContent = `
       <html>
         <head>
           <title>Payment Receipt - ${receipt.receiptNumber}</title>
@@ -406,354 +396,354 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
       </html>
     `;
 
-        const win = window.open('', '_blank', 'width=400,height=600');
-        if (win) {
-            win.document.write(printContent);
-            win.document.close();
-        }
-    };
+    const win = window.open('', '_blank', 'width=400,height=600');
+    if (win) {
+        win.document.write(printContent);
+        win.document.close();
+    }
+};
 
-    return (
-        <div className="space-y-6 max-w-4xl mx-auto pb-10">
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-6">
-                <button
-                    onClick={() => onNavigate('home')}
-                    className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-                >
-                    <ArrowLeft className="w-6 h-6 text-slate-700" />
-                </button>
-                <div className="flex-1">
-                    <h1 className="text-2xl font-bold text-slate-900">Payment Voucher</h1>
-                    <p className="text-sm text-slate-600">Unified payment management for Receipts & Payments</p>
-                </div>
+return (
+    <div className="space-y-6 max-w-4xl mx-auto pb-10">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+            <button
+                onClick={() => onNavigate('home')}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+            >
+                <ArrowLeft className="w-6 h-6 text-slate-700" />
+            </button>
+            <div className="flex-1">
+                <h1 className="text-2xl font-bold text-slate-900">Payment Voucher</h1>
+                <p className="text-sm text-slate-600">Unified payment management for Receipts & Payments</p>
             </div>
+        </div>
 
-            {/* Voucher Type Toggle */}
-            <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-200 flex gap-2">
-                <button
-                    onClick={() => {
-                        setVoucherType('receipt');
-                        resetForm();
-                    }}
-                    className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all ${voucherType === 'receipt'
-                        ? 'bg-green-600 text-white shadow-md'
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                        }`}
-                >
-                    💰 Receipt (Money IN)
-                </button>
-                <button
-                    onClick={() => {
-                        setVoucherType('payment');
-                        resetForm();
-                    }}
-                    className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all ${voucherType === 'payment'
-                        ? 'bg-red-600 text-white shadow-md'
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                        }`}
-                >
-                    💸 Payment (Money OUT)
-                </button>
-            </div>
+        {/* Voucher Type Toggle */}
+        <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-200 flex gap-2">
+            <button
+                onClick={() => {
+                    setVoucherType('receipt');
+                    resetForm();
+                }}
+                className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all ${voucherType === 'receipt'
+                    ? 'bg-green-600 text-white shadow-md'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+            >
+                💰 Receipt (Money IN)
+            </button>
+            <button
+                onClick={() => {
+                    setVoucherType('payment');
+                    resetForm();
+                }}
+                className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all ${voucherType === 'payment'
+                    ? 'bg-red-600 text-white shadow-md'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+            >
+                💸 Payment (Money OUT)
+            </button>
+        </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Payment Entry Form */}
-                <div className="space-y-6">
-                    <Card>
-                        <div className="space-y-4">
-                            <h2 className="font-semibold text-lg text-slate-900 border-b pb-2 mb-4">
-                                {editingId ? 'Edit Payment Receipt' : 'New Payment'}
-                            </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Payment Entry Form */}
+            <div className="space-y-6">
+                <Card>
+                    <div className="space-y-4">
+                        <h2 className="font-semibold text-lg text-slate-900 border-b pb-2 mb-4">
+                            {editingId ? 'Edit Payment Receipt' : 'New Payment'}
+                        </h2>
 
-                            {/* Date Selection */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
-                                <div className="relative">
-                                    <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                                    <input
-                                        type="date"
-                                        value={date}
-                                        onChange={(e) => setDate(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Customer Selection */}
+                        {/* Date Selection */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
                             <div className="relative">
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Customer</label>
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search by name, phone or bike..."
-                                        value={searchTerm}
-                                        onChange={(e) => {
-                                            setSearchTerm(e.target.value);
-                                            setShowCustomerList(true);
-                                            // Only clear selectedCustomer if user initiates typing to search NEW one
-                                            // In edit mode we want to keep it until they change it.
-                                            // But if they type, it implies change. We'll handle this carefully.
-                                            if (searchTerm !== e.target.value) {
-                                                setSelectedCustomer(null);
-                                            }
-                                        }}
-                                        onFocus={() => setShowCustomerList(true)}
-                                        className={`w-full pl-10 pr-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 ${!selectedCustomer && searchTerm && filteredCustomers.length === 0 ? 'border-red-300' : 'border-slate-200'
-                                            }`}
-                                    />
-                                    {selectedCustomer && (
-                                        <div className="absolute right-3 top-2 text-green-600">
-                                            <span className="text-xs font-bold bg-green-100 px-2 py-1 rounded-full">✓ Selected</span>
-                                        </div>
-                                    )}
-                                </div>
+                                <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                <input
+                                    type="date"
+                                    value={date}
+                                    onChange={(e) => setDate(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                        </div>
 
-                                {/* Dropdown List */}
-                                {showCustomerList && searchTerm && !selectedCustomer && filteredCustomers.length > 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                                        {filteredCustomers.map((customer) => (
-                                            <button
-                                                key={customer.id}
-                                                onClick={() => handleSelectCustomer(customer)}
-                                                className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0"
-                                            >
-                                                <div className="font-medium text-slate-900">{customer.name}</div>
-                                                <div className="text-xs text-slate-500 flex justify-between">
-                                                    <span>{customer.phone}</span>
-                                                    <span>{customer.bikeNumber}</span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {showCustomerList && searchTerm && !selectedCustomer && filteredCustomers.length === 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-center text-sm text-slate-500">
-                                        No customers found. Please add customer first.
+                        {/* Customer Selection */}
+                        <div className="relative">
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Customer</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by name, phone or bike..."
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setShowCustomerList(true);
+                                        // Only clear selectedCustomer if user initiates typing to search NEW one
+                                        // In edit mode we want to keep it until they change it.
+                                        // But if they type, it implies change. We'll handle this carefully.
+                                        if (searchTerm !== e.target.value) {
+                                            setSelectedCustomer(null);
+                                        }
+                                    }}
+                                    onFocus={() => setShowCustomerList(true)}
+                                    className={`w-full pl-10 pr-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 ${!selectedCustomer && searchTerm && filteredCustomers.length === 0 ? 'border-red-300' : 'border-slate-200'
+                                        }`}
+                                />
+                                {selectedCustomer && (
+                                    <div className="absolute right-3 top-2 text-green-600">
+                                        <span className="text-xs font-bold bg-green-100 px-2 py-1 rounded-full">✓ Selected</span>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Unpaid Invoices Display */}
-                            {unpaidInvoices.length > 0 && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                                    <h3 className="text-sm font-bold text-amber-800 mb-2">Unpaid Invoices</h3>
-                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                                        {unpaidInvoices.map(inv => {
-                                            const paid = (inv.paymentCollections?.cash || 0) + (inv.paymentCollections?.upi || 0);
-                                            const bal = inv.finalAmount - paid;
-                                            return (
-                                                <div key={inv.id} className="flex justify-between text-sm bg-white p-2 rounded border border-amber-100">
-                                                    <div>
-                                                        <span className="font-semibold text-slate-700">{inv.id}</span>
-                                                        <span className="text-slate-500 mx-2">{new Date(inv.date).toLocaleDateString()}</span>
-                                                    </div>
-                                                    <span className="font-bold text-amber-600">₹{bal.toLocaleString()}</span>
-                                                </div>
-                                            );
-                                        })}
-                                        <div className="pt-2 border-t border-amber-200 flex justify-between font-bold text-amber-900">
-                                            <span>Total Due:</span>
-                                            <span>₹{unpaidInvoices.reduce((sum, inv) => sum + (inv.finalAmount - ((inv.paymentCollections?.cash || 0) + (inv.paymentCollections?.upi || 0))), 0).toLocaleString()}</span>
-                                        </div>
-                                    </div>
+                            {/* Dropdown List */}
+                            {showCustomerList && searchTerm && !selectedCustomer && filteredCustomers.length > 0 && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                    {filteredCustomers.map((customer) => (
+                                        <button
+                                            key={customer.id}
+                                            onClick={() => handleSelectCustomer(customer)}
+                                            className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0"
+                                        >
+                                            <div className="font-medium text-slate-900">{customer.name}</div>
+                                            <div className="text-xs text-slate-500 flex justify-between">
+                                                <span>{customer.phone}</span>
+                                                <span>{customer.bikeNumber}</span>
+                                            </div>
+                                        </button>
+                                    ))}
                                 </div>
                             )}
 
-                            {/* Amount Inputs */}
-                            <div className="grid grid-cols-2 gap-4 pt-2">
-                                <div>
-                                    <label className="block text-sm font-medium text-green-700 mb-1">Cash Amount</label>
-                                    <div className="relative">
-                                        <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-green-600" />
-                                        <input
-                                            type="number"
-                                            placeholder="0"
-                                            value={cashAmount}
-                                            onChange={(e) => setCashAmount(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 font-medium"
-                                        />
-                                    </div>
+                            {showCustomerList && searchTerm && !selectedCustomer && filteredCustomers.length === 0 && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-center text-sm text-slate-500">
+                                    No customers found. Please add customer first.
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-blue-700 mb-1">UPI / Online</label>
-                                    <div className="relative">
-                                        <Smartphone className="absolute left-3 top-2.5 w-4 h-4 text-blue-600" />
-                                        <input
-                                            type="number"
-                                            placeholder="0"
-                                            value={upiAmount}
-                                            onChange={(e) => setUpiAmount(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Total Display */}
-                            <div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-100">
-                                <span className="font-semibold text-slate-700">Total Received:</span>
-                                <span className="text-2xl font-bold text-slate-900">
-                                    ₹{((parseFloat(cashAmount) || 0) + (parseFloat(upiAmount) || 0)).toLocaleString('en-IN')}
-                                </span>
-                            </div>
-
-                            {/* Description */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Notes / Description</label>
-                                <textarea
-                                    placeholder="e.g. Advance for service, Spare parts payment..."
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
-                                ></textarea>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="pt-4 flex gap-3">
-                                {editingId && (
-                                    <button
-                                        onClick={resetForm}
-                                        className="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all"
-                                    >
-                                        Cancel Edit
-                                    </button>
-                                )}
-                                <button
-                                    onClick={handleSave}
-                                    disabled={submitting || (!selectedCustomer)}
-                                    className={`flex-[2] py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${submitting || !selectedCustomer
-                                        ? 'bg-slate-400 cursor-not-allowed'
-                                        : 'bg-blue-600 hover:bg-blue-700 hover:shadow-xl hover:-translate-y-1'
-                                        }`}
-                                >
-                                    {submitting ? (
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        <>
-                                            <Save className="w-5 h-5" />
-                                            {editingId ? 'Update Receipt' : 'Save Receipt'}
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-
+                            )}
                         </div>
-                    </Card>
-                </div>
 
-                {/* Recent Receipts List */}
-                <div>
-                    <div className="mb-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h2 className="font-bold text-slate-900 flex items-center gap-2">
-                                <History className="w-5 h-5 text-slate-500" />
-                                Recent Receipts
-                            </h2>
+                        {/* Unpaid Invoices Display */}
+                        {unpaidInvoices.length > 0 && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                <h3 className="text-sm font-bold text-amber-800 mb-2">Unpaid Invoices</h3>
+                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                    {unpaidInvoices.map(inv => {
+                                        const paid = (inv.paymentCollections?.cash || 0) + (inv.paymentCollections?.upi || 0);
+                                        const bal = inv.finalAmount - paid;
+                                        return (
+                                            <div key={inv.id} className="flex justify-between text-sm bg-white p-2 rounded border border-amber-100">
+                                                <div>
+                                                    <span className="font-semibold text-slate-700">{inv.id}</span>
+                                                    <span className="text-slate-500 mx-2">{new Date(inv.date).toLocaleDateString()}</span>
+                                                </div>
+                                                <span className="font-bold text-amber-600">₹{bal.toLocaleString()}</span>
+                                            </div>
+                                        );
+                                    })}
+                                    <div className="pt-2 border-t border-amber-200 flex justify-between font-bold text-amber-900">
+                                        <span>Total Due:</span>
+                                        <span>₹{unpaidInvoices.reduce((sum, inv) => sum + (inv.finalAmount - ((inv.paymentCollections?.cash || 0) + (inv.paymentCollections?.upi || 0))), 0).toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Amount Inputs */}
+                        <div className="grid grid-cols-2 gap-4 pt-2">
+                            <div>
+                                <label className="block text-sm font-medium text-green-700 mb-1">Cash Amount</label>
+                                <div className="relative">
+                                    <DollarSign className="absolute left-3 top-2.5 w-4 h-4 text-green-600" />
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={cashAmount}
+                                        onChange={(e) => setCashAmount(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 font-medium"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-blue-700 mb-1">UPI / Online</label>
+                                <div className="relative">
+                                    <Smartphone className="absolute left-3 top-2.5 w-4 h-4 text-blue-600" />
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={upiAmount}
+                                        onChange={(e) => setUpiAmount(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Total Display */}
+                        <div className="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-100">
+                            <span className="font-semibold text-slate-700">Total Received:</span>
+                            <span className="text-2xl font-bold text-slate-900">
+                                ₹{((parseFloat(cashAmount) || 0) + (parseFloat(upiAmount) || 0)).toLocaleString('en-IN')}
+                            </span>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Notes / Description</label>
+                            <textarea
+                                placeholder="e.g. Advance for service, Spare parts payment..."
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                            ></textarea>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="pt-4 flex gap-3">
+                            {editingId && (
+                                <button
+                                    onClick={resetForm}
+                                    className="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all"
+                                >
+                                    Cancel Edit
+                                </button>
+                            )}
                             <button
-                                onClick={loadData}
-                                className="text-sm text-blue-600 font-semibold hover:underline"
+                                onClick={handleSave}
+                                disabled={submitting || (!selectedCustomer)}
+                                className={`flex-[2] py-3 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${submitting || !selectedCustomer
+                                    ? 'bg-slate-400 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700 hover:shadow-xl hover:-translate-y-1'
+                                    }`}
                             >
-                                Refresh
+                                {submitting ? (
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        <Save className="w-5 h-5" />
+                                        {editingId ? 'Update Receipt' : 'Save Receipt'}
+                                    </>
+                                )}
                             </button>
                         </div>
-                        <DateFilter
-                            onChange={(start, end) => {
-                                setDateStart(start);
-                                setDateEnd(end);
-                                applyDateFilter(recentReceipts, start, end);
-                            }}
-                            storageKey="paymentReceipts"
-                        />
+
                     </div>
+                </Card>
+            </div>
 
-                    <div className="space-y-3">
-                        {loading ? (
-                            <div className="text-center py-8 bg-white rounded-xl shadow-sm">
-                                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                                <p className="text-sm text-slate-500">Loading history...</p>
-                            </div>
-                        ) : filteredReceipts.length === 0 ? (
-                            <div className="text-center py-10 bg-white rounded-xl shadow-sm border border-slate-100">
-                                <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                                    <CreditCard className="w-6 h-6 text-slate-300" />
-                                </div>
-                                <p className="text-slate-500 font-medium">No receipts generated yet</p>
-                                <p className="text-xs text-slate-400 mt-1">Create your first payment receipt</p>
-                            </div>
-                        ) : (
-                            filteredReceipts.map((receipt) => (
-                                <Card key={receipt.id} padding="sm" className={`hover:shadow-md transition-shadow ${editingId === receipt.id ? 'ring-2 ring-blue-500' : ''}`}>
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="font-bold text-slate-900">{receipt.customerName}</span>
-                                                <span className="text-xs text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded-md">
-                                                    {receipt.receiptNumber}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-500 mb-2">
-                                                {new Date(receipt.date).toLocaleDateString('en-IN')} • {receipt.customerPhone}
-                                            </p>
+            {/* Recent Receipts List */}
+            <div>
+                <div className="mb-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h2 className="font-bold text-slate-900 flex items-center gap-2">
+                            <History className="w-5 h-5 text-slate-500" />
+                            Recent Receipts
+                        </h2>
+                        <button
+                            onClick={loadData}
+                            className="text-sm text-blue-600 font-semibold hover:underline"
+                        >
+                            Refresh
+                        </button>
+                    </div>
+                    <DateFilter
+                        onChange={(start, end) => {
+                            setDateStart(start);
+                            setDateEnd(end);
+                            applyDateFilter(recentReceipts, start, end);
+                        }}
+                        storageKey="paymentReceipts"
+                    />
+                </div>
 
-                                            <div className="flex gap-2 text-xs">
-                                                {receipt.cashAmount > 0 && (
-                                                    <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded flex items-center gap-1">
-                                                        <DollarSign className="w-3 h-3" /> ₹{receipt.cashAmount}
-                                                    </span>
-                                                )}
-                                                {receipt.upiAmount > 0 && (
-                                                    <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded flex items-center gap-1">
-                                                        <Smartphone className="w-3 h-3" /> ₹{receipt.upiAmount}
-                                                    </span>
-                                                )}
-                                            </div>
+                <div className="space-y-3">
+                    {loading ? (
+                        <div className="text-center py-8 bg-white rounded-xl shadow-sm">
+                            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                            <p className="text-sm text-slate-500">Loading history...</p>
+                        </div>
+                    ) : filteredReceipts.length === 0 ? (
+                        <div className="text-center py-10 bg-white rounded-xl shadow-sm border border-slate-100">
+                            <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <CreditCard className="w-6 h-6 text-slate-300" />
+                            </div>
+                            <p className="text-slate-500 font-medium">No receipts generated yet</p>
+                            <p className="text-xs text-slate-400 mt-1">Create your first payment receipt</p>
+                        </div>
+                    ) : (
+                        filteredReceipts.map((receipt) => (
+                            <Card key={receipt.id} padding="sm" className={`hover:shadow-md transition-shadow ${editingId === receipt.id ? 'ring-2 ring-blue-500' : ''}`}>
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-bold text-slate-900">{receipt.customerName}</span>
+                                            <span className="text-xs text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded-md">
+                                                {receipt.receiptNumber}
+                                            </span>
                                         </div>
+                                        <p className="text-xs text-slate-500 mb-2">
+                                            {new Date(receipt.date).toLocaleDateString('en-IN')} • {receipt.customerPhone}
+                                        </p>
 
-                                        <div className="flex flex-col items-end gap-2">
-                                            <span className="font-bold text-slate-900">₹{receipt.totalAmount.toLocaleString('en-IN')}</span>
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    onClick={() => handleShare(receipt)}
-                                                    className="text-slate-400 hover:text-green-600 p-1.5 hover:bg-green-50 rounded-lg transition-colors"
-                                                    title="Share on WhatsApp"
-                                                >
-                                                    <MessageCircle className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handlePrint(receipt)}
-                                                    className="text-slate-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
-                                                    title="Print Receipt"
-                                                >
-                                                    <Printer className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleEdit(receipt)}
-                                                    className="text-slate-400 hover:text-amber-600 p-1.5 hover:bg-amber-50 rounded-lg transition-colors"
-                                                    title="Edit Receipt"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => handleDelete(receipt.id, e)}
-                                                    className="text-slate-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Delete Receipt"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
+                                        <div className="flex gap-2 text-xs">
+                                            {receipt.cashAmount > 0 && (
+                                                <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded flex items-center gap-1">
+                                                    <DollarSign className="w-3 h-3" /> ₹{receipt.cashAmount}
+                                                </span>
+                                            )}
+                                            {receipt.upiAmount > 0 && (
+                                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded flex items-center gap-1">
+                                                    <Smartphone className="w-3 h-3" /> ₹{receipt.upiAmount}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
-                                </Card>
-                            ))
-                        )}
-                    </div>
+
+                                    <div className="flex flex-col items-end gap-2">
+                                        <span className="font-bold text-slate-900">₹{receipt.totalAmount.toLocaleString('en-IN')}</span>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => handleShare(receipt)}
+                                                className="text-slate-400 hover:text-green-600 p-1.5 hover:bg-green-50 rounded-lg transition-colors"
+                                                title="Share on WhatsApp"
+                                            >
+                                                <MessageCircle className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handlePrint(receipt)}
+                                                className="text-slate-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
+                                                title="Print Receipt"
+                                            >
+                                                <Printer className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleEdit(receipt)}
+                                                className="text-slate-400 hover:text-amber-600 p-1.5 hover:bg-amber-50 rounded-lg transition-colors"
+                                                title="Edit Receipt"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDelete(receipt.id, e)}
+                                                className="text-slate-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Delete Receipt"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+                        ))
+                    )}
                 </div>
             </div>
         </div>
-    );
+    </div>
+);
 };
 
 export default PaymentReceiptPage;
