@@ -57,6 +57,13 @@ const PurchaseEntryPage: React.FC<PurchaseEntryPageProps> = ({ onNavigate }) => 
         loadData();
     }, []);
 
+    useEffect(() => {
+        // Clear paid amount when switching to Credit
+        if (paymentStatus === 'Credit') {
+            setPaidAmount('');
+        }
+    }, [paymentStatus]);
+
     const loadData = async () => {
         try {
             const [inventoryData, customersData, transactions] = await Promise.all([

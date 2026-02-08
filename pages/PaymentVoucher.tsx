@@ -12,9 +12,14 @@ interface PaymentReceiptPageProps {
 }
 
 const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) => {
+    // Voucher Type Toggle: 'receipt' (Money IN from Customer) vs 'payment' (Money OUT to Supplier)
+    const [voucherType, setVoucherType] = useState<'receipt' | 'payment'>('receipt');
+
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [suppliers, setSuppliers] = useState<Customer[]>([]); // Reuse Customer type for suppliers
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+    const [selectedSupplier, setSelectedSupplier] = useState<Customer | null>(null);
     const [showCustomerList, setShowCustomerList] = useState(false);
 
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -32,21 +37,58 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
     // Edit Mode State
     const [editingId, setEditingId] = useState<string | null>(null);
     const [unpaidInvoices, setUnpaidInvoices] = useState<Invoice[]>([]);
+    const [unpaidPurchases, setUnpaidPurchases] = useState<any[]>([]); // Purchase transactions
 
     useEffect(() => {
         loadData();
     }, []);
 
+    const resetForm = () => {
+        setSelectedCustomer(null);
+        setSelectedSupplier(null);
+        setSearchTerm('');
+        setCashAmount('');
+        setUpiAmount('');
+        setDescription('');
+        setEditingId(null);
+        setUnpaidInvoices([]);
+        setUnpaidPurchases([]);
+        setShowCustomerList(false);
+    };
+
     const loadData = async () => {
         setLoading(true);
         try {
-            const customersData = await dbService.getCustomers();
+            const [customersData, receiptsData, transactions] = await Promise.all([
+                dbService.getCustomers(),
+                dbService.getPaymentReceipts(),
+                dbService.getTransactions()
+            ]);
+
             setCustomers(customersData);
-            const receiptsData = await dbService.getPaymentReceipts();
             setRecentReceipts(receiptsData);
-            setFilteredReceipts(receiptsData.slice(0, 10)); // Default: show last 10
-        } catch (error) {
-            console.error('Error loading data:', error);
+            setFilteredReceipts(receiptsData);
+
+            // Extract unique suppliers from purchase transactions
+            const supplierNames = transactions
+                .filter(t => t.type === 'purchase' && t.entityId)
+                .map(t => t.entityId)
+                .filter((v, i, a) => a.indexOf(v) === i); // Unique
+
+            // Convert supplier names to Customer-like objects for UI consistency
+            const supplierObjs = supplierNames.map((name, idx) => ({
+                id: `SUP-${idx}`,
+                name: name,
+                phone: '',
+                bikeNumber: '',
+                loyaltyPoints: 0,
+                createdAt: new Date().toISOString()
+            } as Customer));
+
+            setSuppliers(supplierObjs);
+
+        } catch (err) {
+            console.error(err);
         } finally {
             setLoading(false);
         }
@@ -381,10 +423,38 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate }) =
                 >
                     <ArrowLeft className="w-6 h-6 text-slate-700" />
                 </button>
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Payment Receipt</h1>
-                    <p className="text-sm text-slate-600">Record customer payments (Cash & UPI)</p>
+                <div className="flex-1">
+                    <h1 className="text-2xl font-bold text-slate-900">Payment Voucher</h1>
+                    <p className="text-sm text-slate-600">Unified payment management for Receipts & Payments</p>
                 </div>
+            </div>
+
+            {/* Voucher Type Toggle */}
+            <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-200 flex gap-2">
+                <button
+                    onClick={() => {
+                        setVoucherType('receipt');
+                        resetForm();
+                    }}
+                    className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all ${voucherType === 'receipt'
+                        ? 'bg-green-600 text-white shadow-md'
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        }`}
+                >
+                    💰 Receipt (Money IN)
+                </button>
+                <button
+                    onClick={() => {
+                        setVoucherType('payment');
+                        resetForm();
+                    }}
+                    className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all ${voucherType === 'payment'
+                        ? 'bg-red-600 text-white shadow-md'
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        }`}
+                >
+                    💸 Payment (Money OUT)
+                </button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

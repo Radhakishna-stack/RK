@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Search, Filter, Eye, Edit, Calendar, X } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Filter, Eye, Edit, Calendar, X, Trash2 } from 'lucide-react';
 import { dbService } from '../db';
 import { Invoice } from '../types';
 import { Card } from '../components/ui/Card';
@@ -57,6 +57,22 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
         localStorage.setItem('editingInvoice', JSON.stringify(invoice));
         // Navigate to billing page which will load the invoice for editing
         onNavigate('billing');
+    };
+
+    const handleDeleteInvoice = async (invoice: Invoice) => {
+        if (!confirm(`Delete invoice ${invoice.id}? This will revert stock changes and remove associated transactions.`)) {
+            return;
+        }
+
+        try {
+            await dbService.deleteInvoice(invoice.id);
+            // Reload invoices
+            await loadInvoices();
+            alert('Invoice deleted successfully');
+        } catch (error) {
+            console.error('Error deleting invoice:', error);
+            alert('Failed to delete invoice. Please try again.');
+        }
     };
 
     const getFilteredInvoices = () => {
@@ -217,6 +233,13 @@ const SalesListPage: React.FC<SalesListPageProps> = ({ onNavigate }) => {
                                 >
                                     <Edit className="w-4 h-4" />
                                     Edit
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteInvoice(invoice)}
+                                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete
                                 </button>
                             </div>
                         </Card>
