@@ -56,7 +56,7 @@ import FieldJobs from './pages/FieldJobs';
 import FieldServiceManagerPage from './pages/FieldServiceManager';
 import MorePage from './pages/More';
 import LoginPage from './pages/Login';
-import PaymentReceiptPage from './pages/PaymentReceipt';
+import PaymentVoucherPage from './pages/PaymentVoucher';
 import { AuthSession, User } from './types';
 import { getSession, login, logout, validateCredentials } from './auth';
 import { canAccessRoute } from './permissions';
@@ -298,7 +298,8 @@ const App: React.FC = () => {
             <Route path="/bank-accounts" element={<BankAccountsPage onNavigate={handleNavigate} />} />
             <Route path="/cash-in-hand" element={<CashInHandPage onNavigate={handleNavigate} />} />
 
-            <Route path="/payment-receipt" element={<PaymentReceiptPage onNavigate={handleNavigate} />} />
+            <Route path="/payment-voucher" element={<PaymentVoucherPage onNavigate={handleNavigate} />} />
+            <Route path="/payment-receipt" element={<Navigate to="/payment-voucher" replace />} />
 
             <Route path="/settings/permissions" element={<SettingsPage onNavigate={handleNavigate} initialSection="permissions" />} />
             <Route path="/settings/*" element={<SettingsPage onNavigate={handleNavigate} />} />

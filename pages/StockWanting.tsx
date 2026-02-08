@@ -91,14 +91,33 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
     }
   };
 
+  // 2) Autocomplete Logic
   const handleItemNameChange = (value: string) => {
     setNewEntry({ ...newEntry, itemName: value });
 
-    if (value.trim().length >= 2) {
+    if (value.trim().length >= 1) { // Start searching after 1 char
       const filtered = inventory.filter(item =>
         item.itemName.toLowerCase().includes(value.toLowerCase()) ||
-        (item.partNumber && item.partNumber.toLowerCase().includes(value.toLowerCase()))
-      ).slice(0, 8);
+        (item.partNumber && item.partNumber.toLowerCase().includes(value.toLowerCase())) ||
+        (item.itemCode && item.itemCode.toLowerCase().includes(value.toLowerCase())) // Also check itemCode
+      ).slice(0, 10); // Show top 10
+
+      setSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  // 3) Handle Part Number Input logic (Reverse lookup)
+  const handlePartNumberChange = (value: string) => {
+    setNewEntry({ ...newEntry, partNumber: value });
+
+    if (value.trim().length >= 2) {
+      const filtered = inventory.filter(item =>
+        (item.partNumber && item.partNumber.toLowerCase().includes(value.toLowerCase())) ||
+        (item.itemCode && item.itemCode.toLowerCase().includes(value.toLowerCase()))
+      ).slice(0, 10);
 
       setSuggestions(filtered);
       setShowSuggestions(filtered.length > 0);
@@ -110,9 +129,9 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
   const selectInventoryItem = (item: any) => {
     setNewEntry({
       ...newEntry,
-      partNumber: item.partNumber || '',
-      itemName: item.itemName,
-      rate: item.sellingPrice?.toString() || item.price?.toString() || ''
+      partNumber: item.partNumber || item.itemCode || '',
+      itemName: item.itemName || item.name, // Handle different field names
+      rate: item.sellingPrice?.toString() || item.unitPrice?.toString() || ''
     });
     setShowSuggestions(false);
   };
@@ -289,8 +308,10 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
                       placeholder="PART #"
                       className="w-full bg-transparent border-b border-transparent focus:border-blue-400 outline-none px-2 py-1 text-[11px] font-black uppercase text-blue-700 transition-all placeholder:text-blue-200"
                       value={newEntry.partNumber}
-                      onChange={e => setNewEntry({ ...newEntry, partNumber: e.target.value })}
+                      onChange={e => handlePartNumberChange(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleCommitEntry()}
+                      onFocus={() => newEntry.partNumber.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     />
                   </td>
                   <td className="px-4 py-3 border-r border-blue-100 relative">

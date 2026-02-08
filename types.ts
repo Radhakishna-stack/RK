@@ -192,6 +192,7 @@ export interface InvoiceItem {
   id: string;
   description: string;
   amount: number;
+  quantity: number; // Added for stock tracking
   gstRate?: number;
   inventoryItemId?: string;
 }

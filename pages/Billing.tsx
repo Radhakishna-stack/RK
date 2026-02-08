@@ -148,18 +148,23 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
     }
   };
 
+  // New State for Quantity
+  const [newItemQuantity, setNewItemQuantity] = useState('1');
+
   const handleAddItem = () => {
     if (!newItemDescription || !newItemAmount) return;
 
     const newItem = {
       id: Date.now().toString(),
       description: newItemDescription,
-      amount: parseFloat(newItemAmount)
+      amount: parseFloat(newItemAmount),
+      quantity: parseInt(newItemQuantity) || 1
     };
 
     setInvoiceItems([...invoiceItems, newItem]);
     setNewItemDescription('');
     setNewItemAmount('');
+    setNewItemQuantity('1'); // Reset to 1
   };
 
   const handleRemoveItem = useCallback((id: string) => {
@@ -577,7 +582,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
                 {/* Add New Item */}
                 <div className="p-4 border-2 border-dashed border-slate-200 rounded-2xl space-y-3">
                   <h4 className="text-sm font-semibold text-slate-700">Add New Item</h4>
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+                  <div className="grid grid-cols-[1fr_80px_100px_auto] gap-2">
                     <input
                       type="text"
                       placeholder="Item description..."
@@ -588,11 +593,19 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
                     />
                     <input
                       type="number"
+                      placeholder="Qty"
+                      value={newItemQuantity}
+                      onChange={(e) => setNewItemQuantity(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddItem()}
+                      className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                    <input
+                      type="number"
                       placeholder="Amount"
                       value={newItemAmount}
                       onChange={(e) => setNewItemAmount(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleAddItem()}
-                      className="w-32 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                     <Button size="sm" onClick={handleAddItem}>
                       <Plus className="w-4 h-4 mr-1" />

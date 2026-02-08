@@ -164,6 +164,12 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate }) => {
                     onClick={() => onNavigate('whatsapp_marketing')}
                 />
                 <MenuItem
+                    icon={<Banknote className="w-6 h-6 text-green-600" />}
+                    label="Payment Voucher"
+                    description="Receipts & Payments"
+                    onClick={() => onNavigate('payment_voucher')}
+                />
+                <MenuItem
                     icon={<Chrome />}
                     label="Google Profile"
                     description="Business listing"

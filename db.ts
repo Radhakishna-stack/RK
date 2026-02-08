@@ -517,6 +517,18 @@ export const dbService = {
     const newInv = { ...data, id: 'I' + Date.now(), date: data.date || new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...currentInvoices]));
 
+    // Stock Deduction Logic (Only for Sales)
+    if (data.docType === 'Sale' && data.items && data.items.length > 0) {
+      const inventory = await dbService.getInventory();
+      for (const item of data.items) {
+        // Find Inventory Item by exact name match
+        const invItem = inventory.find(i => i.name.toLowerCase() === item.description.toLowerCase());
+        if (invItem) {
+          await dbService.updateStock(invItem.id, -(item.quantity || 1), 'Sale');
+        }
+      }
+    }
+
     // Handle payment collections (Cash and UPI)
     if (data.paymentCollections) {
       const { cash, upi } = data.paymentCollections;
@@ -697,7 +709,33 @@ export const dbService = {
   deleteInvoice: async (id: string): Promise<void> => {
     const current = await dbService.getInvoices();
     const itemToDelete = current.find(i => i.id === id);
+
     if (itemToDelete) {
+      // 1. Revert Stock Changes (Add back to inventory)
+      // Only if it's a Sale (not Estimate)
+      if (itemToDelete.docType === 'Sale' && itemToDelete.items) {
+        for (const item of itemToDelete.items) {
+          // Find inventory item by name/code to add stock back
+          // We assume item.description contains the name or we need an ID. 
+          // Current InvoiceItem structure might not have ID, so we search by name.
+          const inventory = await dbService.getInventory();
+          const invItem = inventory.find(i => i.name === item.description);
+
+          if (invItem) {
+            await dbService.updateStock(invItem.id, item.quantity, 'Sale Return');
+            // Note: 'Sale Return' adds stock
+          }
+        }
+      }
+
+      // 2. Remove associated transactions (Cash/UPI payments)
+      const transactions = await dbService.getTransactions();
+      const filteredTransactions = transactions.filter(t =>
+        !t.description.includes(`Invoice ${id}`)
+      );
+      localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(filteredTransactions));
+
+      // 3. Move to Recycle Bin & Delete Invoice
       await dbService.moveToRecycleBin('Invoice', itemToDelete);
       localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify(current.filter(i => i.id !== id)));
     }
