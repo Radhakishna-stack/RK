@@ -29,7 +29,10 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
     rate: ''
   });
 
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+
   const partNoRef = useRef<HTMLInputElement>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -94,6 +97,7 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
   // 2) Autocomplete Logic
   const handleItemNameChange = (value: string) => {
     setNewEntry({ ...newEntry, itemName: value });
+    setSelectedIndex(-1);
 
     if (value.trim().length >= 1) { // Start searching after 1 char
       const filtered = inventory.filter(item =>
@@ -112,6 +116,7 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
   // 3) Handle Part Number Input logic (Reverse lookup)
   const handlePartNumberChange = (value: string) => {
     setNewEntry({ ...newEntry, partNumber: value });
+    setSelectedIndex(-1);
 
     if (value.trim().length >= 2) {
       const filtered = inventory.filter(item =>
@@ -134,6 +139,34 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
       rate: item.sellingPrice?.toString() || item.unitPrice?.toString() || ''
     });
     setShowSuggestions(false);
+    setSelectedIndex(-1);
+    // Auto-focus quantity
+    setTimeout(() => quantityRef.current?.focus(), 50);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions || suggestions.length === 0) {
+      if (e.key === 'Enter') handleCommitEntry();
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev > 0 ? prev - 1 : -1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
+        selectInventoryItem(suggestions[selectedIndex]);
+      } else {
+        handleCommitEntry();
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -309,7 +342,7 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
                       className="w-full bg-transparent border-b border-transparent focus:border-blue-400 outline-none px-2 py-1 text-[11px] font-black uppercase text-blue-700 transition-all placeholder:text-blue-200"
                       value={newEntry.partNumber}
                       onChange={e => handlePartNumberChange(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleCommitEntry()}
+                      onKeyDown={handleKeyDown}
                       onFocus={() => newEntry.partNumber.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
                       onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     />
@@ -321,7 +354,7 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
                       className="w-full bg-transparent border-b border-transparent focus:border-blue-400 outline-none px-2 py-1 text-[11px] font-black uppercase text-slate-700 transition-all placeholder:text-slate-300"
                       value={newEntry.itemName}
                       onChange={e => handleItemNameChange(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleCommitEntry()}
+                      onKeyDown={handleKeyDown}
                       onFocus={() => newEntry.itemName.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
                       onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     />
@@ -335,7 +368,7 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
                               e.preventDefault();
                               selectInventoryItem(item);
                             }}
-                            className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 flex items-center justify-between gap-3"
+                            className={`w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 flex items-center justify-between gap-3 ${idx === selectedIndex ? 'bg-blue-100 ring-2 ring-inset ring-blue-200' : ''}`}
                           >
                             <div className="flex-1">
                               <div className="text-[11px] font-black text-slate-900 uppercase">{item.itemName}</div>
@@ -354,6 +387,7 @@ const StockWantingPage: React.FC<StockWantingPageProps> = ({ onNavigate }) => {
                   </td>
                   <td className="px-4 py-3 border-r border-blue-100">
                     <input
+                      ref={quantityRef}
                       type="number"
                       placeholder="QTY"
                       className="w-full bg-transparent border-b border-transparent focus:border-blue-400 outline-none px-2 py-1 text-[11px] font-black text-center text-slate-700 transition-all placeholder:text-slate-300"
