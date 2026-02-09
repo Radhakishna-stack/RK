@@ -235,6 +235,14 @@ export interface BankAccount {
   createdAt: string;
 }
 
+export interface PurchaseItem {
+  id: string;
+  inventoryId?: string;
+  name: string;
+  quantity: number;
+  price: number;
+}
+
 export interface Transaction {
   id: string;
   entityId: string; // Party ID or description
@@ -249,6 +257,7 @@ export interface Transaction {
   chequeNumber?: string;
   partyName?: string;
   bankName?: string;
+  items?: PurchaseItem[]; // Added for Purchase editing
 }
 
 export interface StockTransaction {

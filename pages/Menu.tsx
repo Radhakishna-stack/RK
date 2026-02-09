@@ -6,7 +6,7 @@ import {
   Crown, Monitor, TrendingUp, Settings,
   Headphones, Star, ChevronRight, ClipboardCheck, ChevronDown, ChevronUp,
   MapPin, Megaphone, Smartphone, Zap, Sparkles, Wand2, User, ShieldCheck,
-  UserCheck, Bot, FileText, ArrowDownCircle, BadgeCheck, Globe,
+  UserCheck, Bot, FileText, ArrowDownCircle, ArrowUpCircle, BadgeCheck, Globe,
   ClipboardList, ShoppingBag, ListChecks, History, Users, BarChart3, Bell
 } from 'lucide-react';
 
@@ -142,6 +142,12 @@ const MenuPage: React.FC<MenuPageProps> = ({ onNavigate, userRole, setUserRole }
           label="Payment In (Receipt)"
           desc="Record Customer Payments"
           onClick={() => onNavigate('payment_in')}
+        />
+        <MenuItem
+          icon={<ArrowUpCircle />}
+          label="Payment Out (Voucher)"
+          desc="Record Supplier Payments"
+          onClick={() => onNavigate('payment_out')}
         />
         <MenuItem
           icon={<FileText />}

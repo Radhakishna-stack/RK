@@ -29,6 +29,7 @@ const PurchaseEntryPage: React.FC<PurchaseEntryPageProps> = ({ onNavigate }) => 
 
     // Edit Mode State
     const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+    const [originalTransaction, setOriginalTransaction] = useState<Transaction | null>(null);
 
     // Supplier Autocomplete
     const [filteredSuppliers, setFilteredSuppliers] = useState<Customer[]>([]);
@@ -80,25 +81,45 @@ const PurchaseEntryPage: React.FC<PurchaseEntryPageProps> = ({ onNavigate }) => 
                 const txn = transactions.find(t => t.id === editId);
                 if (txn) {
                     setEditingTransactionId(editId);
+                    setOriginalTransaction(txn);
                     setDate(txn.date.split('T')[0]);
 
-                    // Extract supplier and ref from description roughly
-                    // Description: "Purchase from Supplier (Ref: INV123): Item1 (Qty x Price), Item2..."
-                    // This is brittle but works for now. 
-                    // ideally we should store structure in txn metadata or separate Table
+                    // Try to get Supplier Name from entityId first
+                    let extractedSupplierName = txn.entityId || '';
+                    let extractedInvoiceNumber = '';
+
+                    // Legacy Parsing Fallback
                     const descMatch = txn.description.match(/Purchase from (.*?) \(Ref: (.*?)\):/);
                     if (descMatch) {
-                        setSupplierName(descMatch[1]);
-                        setInvoiceNumber(descMatch[2]);
+                        if (!extractedSupplierName) extractedSupplierName = descMatch[1];
+                        extractedInvoiceNumber = descMatch[2];
                     } else {
-                        // Fallback simple parsing
                         const simpleMatch = txn.description.match(/Purchase from (.*?):/);
-                        if (simpleMatch) setSupplierName(simpleMatch[1]);
+                        if (simpleMatch && !extractedSupplierName) extractedSupplierName = simpleMatch[1];
                     }
 
-                    // We can't easily reconstruct exact items from string description without parsing
-                    // For now, we might leave items empty or try to parse if structure is strict.
-                    // Given the requirement "Edit completely", user might need to re-enter items 
+                    setSupplierName(extractedSupplierName);
+                    setInvoiceNumber(extractedInvoiceNumber);
+
+                    // Restore Items if available
+                    if (txn.items && txn.items.length > 0) {
+                        setItems(txn.items.map(i => ({
+                            id: i.id,
+                            inventoryId: i.inventoryId,
+                            name: i.name,
+                            quantity: i.quantity,
+                            price: i.price
+                        })));
+                    }
+
+                    // Restore Payment Info
+                    if (txn.paymentMode === 'Credit') {
+                        setPaymentStatus('Credit');
+                    } else {
+                        setPaymentStatus('Paid');
+                        setPaymentMode((txn.paymentMode as 'Cash' | 'UPI') || 'Cash');
+                        setPaidAmount(txn.amount.toString());
+                    }
                     // OR we improve Transaction structure to store `items` JSON.
                     // Assuming for now user re-enters or we just support editing metadata/amount?
                     // "give option to edit completely" -> implies re-doing.
@@ -203,71 +224,86 @@ const PurchaseEntryPage: React.FC<PurchaseEntryPageProps> = ({ onNavigate }) => 
 
     const handleSave = async () => {
         if (!supplierName || items.length === 0) {
-            alert('Please enter supplier and adds least one item');
+            alert('Please enter supplier and add at least one item');
             return;
         }
 
         setIsSaving(true);
         try {
+            // 0. Handle Stock Reversion (Edit Mode)
+            if (originalTransaction && originalTransaction.items) {
+                for (const oldItem of originalTransaction.items) {
+                    if (oldItem.inventoryId) {
+                        // Revert stock: Subtract the quantity that was added
+                        await dbService.updateStock(oldItem.inventoryId, -(oldItem.quantity), 'Purchase Correction');
+                    }
+                }
+            }
+
             // 1. Handle Stock Updates & Auto-Creation
+            const processedItems = [];
             for (const item of items) {
                 let itemId = item.inventoryId;
 
                 // Auto-Add Logic: If item is new (no ID), create it first
                 if (!itemId) {
-                    const newItem = await dbService.addInventoryItem({
-                        name: item.name,
-                        stock: 0, // Will update below
-                        purchasePrice: item.price,
-                        unitPrice: item.price * 1.2, // Default markup 20%? or just same
-                        category: 'General',
-                        itemCode: '', // Optional
-                    });
-                    itemId = newItem.id;
+                    // Double check if name exists now (race condition or missed match)
+                    const existing = await dbService.getInventory().then(inv => inv.find(i => i.name.toLowerCase() === item.name.toLowerCase()));
+                    if (existing) {
+                        itemId = existing.id;
+                    } else {
+                        const newItem = await dbService.addInventoryItem({
+                            name: item.name,
+                            stock: 0, // Will update below
+                            purchasePrice: item.price,
+                            unitPrice: item.price * 1.3, // 30% Markup default
+                            category: 'General',
+                            itemCode: '',
+                        });
+                        itemId = newItem.id;
+                    }
                 }
 
-                // Update Stock
+                // Update Stock (Add new quantity)
                 if (itemId) {
                     await dbService.updateStock(itemId, item.quantity, 'Purchase');
-                    // Update latest purchase price
-                    // We need a way to update item details without full overwrite? 
-                    // dbService.updateInventoryItem helper needed? 
-                    // For now, we trust updateStock handles qoh. 
-                    // Future: Update Purchase Price in Item Master
                 }
+
+                processedItems.push({
+                    id: item.id,
+                    inventoryId: itemId,
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price
+                });
             }
 
-            // 2. Handle Financials (Credit vs Paid)
-            // If Credit: Transaction Type 'Purchase' (implies money out eventually, but for now just a bill)
-            // But system treats 'Purchase' type as just a record? 
-            // We need to reflect "Balance Due".
-            // Since we don't have double-entry ledger fully, 
-            // We usually record a "Purchase" transaction.
-
-            // Logic Requirement: "calculate the purchase order balance due as due and dont calculate as negative balance in accounts"
-            // "update bank accounts as this module"
-
-            // If PAID: Record Payment Out from Cash/Bank.
-            // If CREDIT: Record Purchase (Bill) but NO Payment Out.
-
+            // 2. Handle Financials
             const itemDetails = items.map(i => `${i.name} (${i.quantity} x ${i.price})`).join(', ');
-
-            // Create the main Purchase Record (The Bill)
-            // We treat this as a "Bill" transaction
-            const purchaseTxn = await dbService.addTransaction({
-                type: 'purchase', // This is just a label in current system
+            const txnData = {
+                type: 'purchase' as any,
                 amount: totalAmount,
                 category: 'Inventory Purchase',
                 description: `Purchase from ${supplierName} ${invoiceNumber ? `(Ref: ${invoiceNumber})` : ''}: ${itemDetails}`,
                 date: date,
                 paymentMode: paymentStatus === 'Credit' ? 'Credit' : paymentMode,
-                // We need to link this to Supplier?
-                // entityId column usually used for BikeNumber. We can reuse for Supplier Name?
-                entityId: supplierName
-            });
+                entityId: supplierName,
+                items: processedItems // Store structured items
+            };
 
-            // If PAID, we need to DEDUCT money from Cash/Bank
-            if (paymentStatus === 'Paid') {
+            let savedTxnId = editingTransactionId;
+
+            if (editingTransactionId) {
+                await dbService.updateTransaction(editingTransactionId, txnData);
+            } else {
+                const newTxn = await dbService.addTransaction(txnData);
+                savedTxnId = newTxn.id;
+            }
+
+            // 3. Handle Payment (Outgoing)
+            // Simplified: If switching to Paid, add OUT txn. If switching to Credit, we don't delete old OUT txn (too risky).
+            // We just ensure new record is consistent.
+            if (paymentStatus === 'Paid' && savedTxnId) {
                 const accounts = await dbService.getBankAccounts();
                 let accountId = '';
 
@@ -275,17 +311,16 @@ const PurchaseEntryPage: React.FC<PurchaseEntryPageProps> = ({ onNavigate }) => 
                     const cashAcc = accounts.find(a => a.type === 'Cash');
                     if (cashAcc) accountId = cashAcc.id;
                 } else {
-                    // UPI / Bank
-                    const bankAcc = accounts.find(a => a.type === 'UPI' || a.type === 'Bank');
+                    const bankAcc = accounts.find(a => a.type === 'UPI' || a.type === 'Bank' as any);
                     if (bankAcc) accountId = bankAcc.id;
                 }
 
                 if (accountId) {
                     await dbService.addTransaction({
-                        type: 'OUT', // Money Out
+                        type: 'OUT',
                         amount: parseFloat(paidAmount) || totalAmount,
                         category: 'Supplier Payment',
-                        description: `Payment for Purchase ${purchaseTxn.id} to ${supplierName}`,
+                        description: `Payment for Purchase ${savedTxnId} to ${supplierName}`,
                         date: date,
                         accountId: accountId,
                         entityId: supplierName,

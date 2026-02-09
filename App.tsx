@@ -154,7 +154,10 @@ const App: React.FC = () => {
         'new_estimate': '/estimate/new',
         'bank_accounts': '/money',
         'cash_in_hand': '/cash-in-hand',
-        'payment_receipt': '/payment-receipt',
+        'payment_voucher': '/payment-voucher', // Keep for backward compatibility
+        'payment_receipt': '/payment-voucher',
+        'payment_in': '/payment-voucher',
+        'payment_out': '/payment-out',
         'employee_panel': '/employee-panel',
         'stock_wanting': '/stock-wanting',
         'new_sale': '/billing',
@@ -298,8 +301,9 @@ const App: React.FC = () => {
             <Route path="/bank-accounts" element={<BankAccountsPage onNavigate={handleNavigate} />} />
             <Route path="/cash-in-hand" element={<CashInHandPage onNavigate={handleNavigate} />} />
 
-            <Route path="/payment-voucher" element={<PaymentVoucherPage onNavigate={handleNavigate} />} />
+            <Route path="/payment-voucher" element={<PaymentVoucherPage onNavigate={handleNavigate} initialMode="receipt" />} />
             <Route path="/payment-receipt" element={<Navigate to="/payment-voucher" replace />} />
+            <Route path="/payment-out" element={<PaymentVoucherPage onNavigate={handleNavigate} initialMode="payment" />} />
 
             <Route path="/settings/permissions" element={<SettingsPage onNavigate={handleNavigate} initialSection="permissions" />} />
             <Route path="/settings/*" element={<SettingsPage onNavigate={handleNavigate} />} />
