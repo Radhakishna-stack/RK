@@ -222,7 +222,7 @@ export interface Invoice {
   odometerReading?: number;
   docType?: 'Sale' | 'Estimate';
   serviceReminderDate?: string;
-  paymentCollections?: { cash: number; upi: number }; // Track split payment amounts
+  paymentCollections?: { cash: number; upi: number; upiAccountId?: string }; // Track split payment amounts
 }
 
 export interface BankAccount {

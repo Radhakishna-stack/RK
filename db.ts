@@ -748,7 +748,14 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify([...current, newItem]));
     return newItem;
   },
-  bulkUpdateInventory: async (updates: Partial<InventoryItem>[]): Promise<{ updated: number, created: number }> => {
+
+  updateInventory: async (id: string, updates: Partial<InventoryItem>): Promise<void> => {
+    const current = await dbService.getInventory();
+    const updated = current.map(i => i.id === id ? { ...i, ...updates, lastUpdated: new Date().toISOString() } : i);
+    localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(updated));
+  },
+
+  bulkUpdateInventory: async (updates: any[]): Promise<{ updated: number, created: number }> => {
     const current = await dbService.getInventory();
     let updatedCount = 0;
     let createdCount = 0;
@@ -756,22 +763,30 @@ export const dbService = {
     const updatedInventory = [...current];
 
     for (const update of updates) {
-      // Use itemCode as primary key for bulk updates
-      const index = updatedInventory.findIndex(i => i.itemCode === update.itemCode);
+      // Check if item already exists by name or item code
+      const index = updatedInventory.findIndex(i =>
+        (update.itemCode && i.itemCode === update.itemCode) ||
+        (update.name && i.name.toLowerCase() === update.name.toLowerCase())
+      );
+
       if (index !== -1) {
-        updatedInventory[index] = { ...updatedInventory[index], ...update, lastUpdated: new Date().toISOString() };
+        updatedInventory[index] = {
+          ...updatedInventory[index],
+          ...update,
+          lastUpdated: new Date().toISOString()
+        };
         updatedCount++;
       } else {
-        // Option: Create if not exists
+        // Create new item
         const newItem: InventoryItem = {
           id: 'S' + Date.now() + Math.random().toString(36).substr(2, 5),
           name: update.name || 'NEW ITEM',
           category: update.category || 'MISC',
-          stock: update.stock || 0,
-          unitPrice: update.unitPrice || 0,
-          purchasePrice: update.purchasePrice || 0,
+          stock: parseFloat(update.stock) || 0,
+          unitPrice: parseFloat(update.unitPrice) || 0,
+          purchasePrice: parseFloat(update.purchasePrice) || 0,
           itemCode: update.itemCode || '',
-          gstRate: update.gstRate || 0,
+          gstRate: parseFloat(update.gstRate) || 0,
           hsn: update.hsn || '',
           lastUpdated: new Date().toISOString()
         };
@@ -897,39 +912,74 @@ export const dbService = {
   },
 
   getDashboardStats: async (): Promise<DashboardStats> => {
-    const [c, j, i, e, txns, accounts] = await Promise.all([
-      dbService.getCustomers(),
-      dbService.getComplaints(),
-      dbService.getInvoices(),
-      dbService.getExpenses(),
-      dbService.getTransactions(),
-      dbService.getBankAccounts()
-    ]);
+    try {
+      const [c, j, i, e, txns, accounts] = await Promise.all([
+        dbService.getCustomers(),
+        dbService.getComplaints(),
+        dbService.getInvoices(),
+        dbService.getExpenses(),
+        dbService.getTransactions(),
+        dbService.getBankAccounts()
+      ]);
 
-    const totalRev = txns.filter(t => t.type === 'IN').reduce((s, t) => s + t.amount, 0);
-    const pend = i.filter(inv => inv.paymentStatus === 'Unpaid').reduce((s, inv) => s + inv.finalAmount, 0);
-    const exp = e.reduce((s, ex) => s + ex.amount, 0);
+      const totalRev = txns.filter(t => t.type === 'IN').reduce((s, t) => s + t.amount, 0);
+      const pend = i.filter(inv => inv.paymentStatus === 'Unpaid').reduce((s, inv) => s + inv.finalAmount, 0);
+      const exp = e.reduce((s, ex) => s + ex.amount, 0);
 
-    let cashBal = 0;
-    let bankBal = 0;
+      // Calculate balances in-memory to avoid N+1 fetches
+      let cashBal = 0;
+      let bankBal = 0;
 
-    for (const acc of accounts) {
-      const balance = await dbService.getAccountBalance(acc.id);
-      if (acc.type === 'Cash') cashBal += balance;
-      else bankBal += balance;
+      // Create a map of account balances
+      const accountBalances = new Map<string, number>();
+
+      // Initialize with opening balances
+      accounts.forEach(acc => {
+        accountBalances.set(acc.id, acc.openingBalance || 0);
+      });
+
+      // Apply transactions
+      txns.forEach(t => {
+        const currentBal = accountBalances.get(t.accountId) || 0;
+        const change = t.type === 'IN' ? t.amount : -t.amount;
+        accountBalances.set(t.accountId, currentBal + change);
+      });
+
+      // Sum up based on account type
+      accounts.forEach(acc => {
+        const balance = accountBalances.get(acc.id) || 0;
+        if (acc.type === 'Cash') {
+          cashBal += balance;
+        } else {
+          bankBal += balance;
+        }
+      });
+
+      return {
+        totalCustomers: c.length,
+        totalComplaints: j.length,
+        totalInvoices: i.length,
+        totalReceived: totalRev,
+        totalPending: pend,
+        totalExpenses: exp,
+        netProfit: totalRev - exp,
+        cashInHand: cashBal,
+        bankBalance: bankBal
+      };
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      return {
+        totalCustomers: 0,
+        totalComplaints: 0,
+        totalInvoices: 0,
+        totalReceived: 0,
+        totalPending: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+        cashInHand: 0,
+        bankBalance: 0
+      };
     }
-
-    return {
-      totalCustomers: c.length,
-      totalComplaints: j.length,
-      totalInvoices: i.length,
-      totalReceived: totalRev,
-      totalPending: pend,
-      totalExpenses: exp,
-      netProfit: totalRev - exp,
-      cashInHand: cashBal,
-      bankBalance: bankBal
-    };
   },
 
 
@@ -1565,39 +1615,5 @@ export const dbService = {
     return { imported, skipped };
   },
 
-  /**
-   * Bulk update inventory from validated data
-   */
-  bulkUpdateInventory: async (inventoryData: any[]): Promise<{ updated: number, created: number }> => {
-    const existingInventory = await dbService.getInventory();
-    let updated = 0;
-    let created = 0;
 
-    for (const itemData of inventoryData) {
-      // Check if item already exists by name or item code
-      const exists = existingInventory.find(i =>
-        i.name.toLowerCase() === itemData.name.toLowerCase() ||
-        (itemData.itemCode && i.itemCode === itemData.itemCode)
-      );
-
-      if (exists) {
-        // Update existing item
-        await dbService.updateInventory(exists.id, {
-          ...itemData,
-          lastUpdated: new Date().toISOString()
-        });
-        updated++;
-      } else {
-        // Create new item
-        await dbService.addInventoryItem({
-          ...itemData,
-          id: Date.now().toString() + Math.random().toString(36).substring(7),
-          lastUpdated: new Date().toISOString()
-        });
-        created++;
-      }
-    }
-
-    return { updated, created };
-  }
 };
