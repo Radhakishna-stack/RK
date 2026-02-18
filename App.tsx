@@ -50,7 +50,6 @@ import RecycleBinPage from './pages/RecycleBin';
 import GoogleProfilePage from './pages/GoogleProfile';
 import BankAccountsPage from './pages/BankAccounts';
 import CashInHandPage from './pages/CashInHand';
-import PickupSchedulingPage from './pages/PickupScheduling';
 
 import FieldJobs from './pages/FieldJobs';
 import FieldServiceManagerPage from './pages/FieldServiceManager';
@@ -296,7 +295,6 @@ const App: React.FC = () => {
             <Route path="/utilities" element={<UtilitiesPage onNavigate={handleNavigate} />} />
             <Route path="/recycle-bin" element={<RecycleBinPage onNavigate={handleNavigate} />} />
             <Route path="/salesmen" element={<SalesmanTrackingPage onNavigate={handleNavigate} />} />
-            <Route path="/pickup-scheduling" element={<PickupSchedulingPage onNavigate={handleNavigate} />} />
             <Route path="/field-jobs" element={<FieldJobs onNavigate={handleNavigate} employeeId={authSession?.user.id || ''} employeeName={authSession?.user.name || ''} />} />
             <Route path="/field-service-manager" element={<FieldServiceManagerPage onNavigate={handleNavigate} />} />
 

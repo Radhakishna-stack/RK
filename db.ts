@@ -1190,6 +1190,10 @@ export const dbService = {
     syncToCloud('deleteSalesman', { id });
   },
 
+  // Staff location tracking (stub - returns empty, no GPS tracking implemented yet)
+  getStaffLocations: async (): Promise<any[]> => {
+    return JSON.parse(localStorage.getItem('staff_locations') || '[]');
+  },
 
 
   getRecycleBin: async (): Promise<RecycleBinItem[]> => {

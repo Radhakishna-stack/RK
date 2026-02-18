@@ -54,6 +54,7 @@ export interface Complaint {
   createdAt: string;
   dueDate?: string;
   odometerReading?: number;
+  city?: string;
 }
 
 export enum PickupStatus {
@@ -305,6 +306,15 @@ export interface Salesman {
   totalSalesValue: number;
   joinDate: string;
   status?: 'Available' | 'On Task' | 'Offline';
+  targetArea?: string;
+}
+
+export interface StaffLocation {
+  staffId: string;
+  staffName: string;
+  lat: number;
+  lng: number;
+  lastUpdated: string;
 }
 
 export interface ServiceReminder {
