@@ -57,6 +57,7 @@ import FieldServiceManagerPage from './pages/FieldServiceManager';
 import MorePage from './pages/More';
 import LoginPage from './pages/Login';
 import PaymentVoucherPage from './pages/PaymentVoucher';
+import CloudSyncPage from './pages/CloudSync';
 import { AuthSession, User } from './types';
 import { getSession, login, logout, validateCredentials } from './auth';
 import { canAccessRoute } from './permissions';
@@ -163,7 +164,8 @@ const App: React.FC = () => {
         'new_sale': '/billing',
         'recycle_bin': '/recycle-bin',
         'field_jobs': '/field-jobs',
-        'field_service_manager': '/field-service-manager'
+        'field_service_manager': '/field-service-manager',
+        'cloud_sync': '/cloud-sync'
       };
       targetPath = routeMap[path] || `/${path}`;
     }
@@ -307,6 +309,7 @@ const App: React.FC = () => {
 
             <Route path="/settings/permissions" element={<SettingsPage onNavigate={handleNavigate} initialSection="permissions" />} />
             <Route path="/settings/*" element={<SettingsPage onNavigate={handleNavigate} />} />
+            <Route path="/cloud-sync" element={<CloudSyncPage onNavigate={handleNavigate} />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" />} />

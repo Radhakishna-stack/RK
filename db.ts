@@ -1,8 +1,118 @@
 
-
 import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole, PaymentReceipt } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { encryptPassword } from './auth';
+
+// ============================================
+// Google Sheets Sync Layer
+// ============================================
+
+const GAS_URL_KEY = 'gas_url';
+
+function getGasUrl(): string {
+  return localStorage.getItem(GAS_URL_KEY) || '';
+}
+
+function isCloudEnabled(): boolean {
+  return !!getGasUrl();
+}
+
+/**
+ * Fire-and-forget: POST to Google Apps Script in background.
+ * Does NOT block the UI. Errors are silently logged.
+ */
+function syncToCloud(action: string, data?: any): void {
+  const url = getGasUrl();
+  if (!url) return;
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action, data: data || {} }),
+  }).catch(err => console.warn('[CloudSync]', action, 'failed:', err.message));
+}
+
+/**
+ * Fetch data from Google Sheets cloud. Returns null if not configured or fails.
+ */
+async function fetchFromCloud(action: string, data?: any): Promise<any | null> {
+  const url = getGasUrl();
+  if (!url) return null;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action, data: data || {} }),
+    });
+    const result = await res.json();
+    if (result.success) return result.data;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Migrate all localStorage data to Google Sheets in one go.
+ */
+async function migrateToCloud(): Promise<string> {
+  const url = getGasUrl();
+  if (!url) return 'No GAS URL configured. Set it first in Settings.';
+
+  const entities = [
+    { lsKey: 'mg_customers', sheet: 'Customers', fields: ['id', 'name', 'phone', 'bikeNumber', 'city', 'email', 'address', 'gstin', 'loyaltyPoints', 'createdAt'] },
+    { lsKey: 'mg_invoices', sheet: 'Invoices', fields: (item: any) => [item.id, item.complaintId || '', item.bikeNumber || '', item.customerName || '', item.customerPhone || '', item.details || '', JSON.stringify(item.items || []), item.estimatedCost || 0, item.finalAmount || 0, item.taxAmount || 0, item.subTotal || 0, item.paymentStatus || '', item.accountId || '', item.paymentMode || '', item.date || '', item.odometerReading || '', item.docType || 'Sale', item.serviceReminderDate || '', item.paymentCollections?.cash || 0, item.paymentCollections?.upi || 0, item.paymentCollections?.upiAccountId || ''] },
+    { lsKey: 'mg_inventory', sheet: 'Inventory', fields: ['id', 'name', 'category', 'stock', 'unitPrice', 'purchasePrice', 'itemCode', 'gstRate', 'hsn', 'lastUpdated'] },
+    { lsKey: 'mg_transactions', sheet: 'Transactions', fields: (item: any) => [item.id, item.entityId || '', item.accountId || '', item.type || '', item.amount || 0, item.paymentMode || '', item.date || '', item.description || '', item.category || '', item.status || '', item.chequeNumber || '', item.partyName || '', item.bankName || '', JSON.stringify(item.items || [])] },
+    { lsKey: 'mg_expenses', sheet: 'Expenses', fields: ['id', 'description', 'amount', 'category', 'date', 'paymentMode', 'transactionId', 'accountId'] },
+    { lsKey: 'mg_bank_accounts', sheet: 'BankAccounts', fields: ['id', 'name', 'bankName', 'accountNumber', 'type', 'openingBalance', 'createdAt'] },
+    { lsKey: 'mg_payment_receipts', sheet: 'PaymentReceipts', fields: ['id', 'receiptNumber', 'customerId', 'customerName', 'customerPhone', 'bikeNumber', 'cashAmount', 'upiAmount', 'totalAmount', 'date', 'description', 'createdAt'] },
+    { lsKey: 'mg_complaints', sheet: 'Complaints', fields: (item: any) => [item.id, item.bikeNumber || '', item.customerName || '', item.customerPhone || '', item.details || '', (item.photoUrls || []).join(','), item.estimatedCost || 0, item.status || '', item.createdAt || '', item.dueDate || '', item.odometerReading || ''] },
+    { lsKey: 'mg_stock_wanting', sheet: 'StockWanting', fields: ['id', 'partNumber', 'itemName', 'quantity', 'rate', 'createdAt'] },
+    { lsKey: 'mg_visitors', sheet: 'Visitors', fields: (item: any) => [item.id, item.name || '', item.bikeNumber || '', item.phone || '', item.remarks || '', item.type || '', (item.photoUrls || []).join(','), item.createdAt || ''] },
+    { lsKey: 'mg_reminders', sheet: 'ServiceReminders', fields: ['id', 'bikeNumber', 'customerName', 'phone', 'reminderDate', 'serviceType', 'status', 'lastNotified', 'message', 'serviceDate'] },
+    { lsKey: 'mg_users', sheet: 'Users', fields: ['id', 'username', 'password', 'role', 'name', 'phone', 'createdAt', 'isActive'] },
+    { lsKey: 'mg_salesmen', sheet: 'Salesmen', fields: ['id', 'name', 'phone', 'target', 'salesCount', 'totalSalesValue', 'joinDate', 'status'] },
+  ];
+
+  const results: string[] = [];
+  let total = 0;
+
+  for (const entity of entities) {
+    const raw = localStorage.getItem(entity.lsKey);
+    if (!raw) continue;
+    try {
+      const items = JSON.parse(raw);
+      if (!Array.isArray(items) || !items.length) continue;
+
+      const rows = items.map((item: any) => {
+        if (typeof entity.fields === 'function') return entity.fields(item);
+        return entity.fields.map(f => {
+          let val = (item as any)[f];
+          if (Array.isArray(val)) val = val.join(',');
+          if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+          return val ?? '';
+        });
+      });
+
+      await fetchFromCloud('bulkImport', { sheetName: entity.sheet, rows });
+      total += items.length;
+      results.push(`✅ ${entity.sheet}: ${items.length} rows`);
+    } catch (err: any) {
+      results.push(`❌ ${entity.sheet}: ${err.message}`);
+    }
+  }
+
+  // Migrate settings
+  const settings = localStorage.getItem('mg_settings');
+  if (settings) {
+    await fetchFromCloud('setConfig', { key: 'app_settings', value: settings });
+    results.push('✅ Settings migrated');
+  }
+
+  return `Migration complete! ${total} records migrated.\n\n${results.join('\n')}`;
+}
 
 const LS_KEYS = {
   CUSTOMERS: 'mg_customers',
@@ -285,6 +395,7 @@ export const dbService = {
     const current = await dbService.getBankAccounts();
     const newBank = { ...data, id: 'BANK-' + Date.now(), createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify([...current, newBank]));
+    syncToCloud('addBankAccount', newBank);
     return newBank;
   },
 
@@ -292,6 +403,7 @@ export const dbService = {
     if (id === 'CASH-01') throw new Error("Cannot delete primary Cash account");
     const current = await dbService.getBankAccounts();
     localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify(current.filter(b => b.id !== id)));
+    syncToCloud('deleteBankAccount', { id });
   },
 
   getAllRolePermissions: async (): Promise<Record<string, RolePermissions>> => {
@@ -358,6 +470,7 @@ export const dbService = {
     const current = await dbService.getCustomers();
     const newUser = { ...data, id: 'C' + Date.now(), loyaltyPoints: 0, createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify([...current, newUser]));
+    syncToCloud('addCustomer', newUser);
     return newUser;
   },
   updateCustomerLoyalty: async (id: string, points: number): Promise<void> => {
@@ -370,6 +483,7 @@ export const dbService = {
     if (itemToDelete) {
       await dbService.moveToRecycleBin('Customer', itemToDelete);
       localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(current.filter(c => c.id !== id)));
+      syncToCloud('deleteCustomer', { id });
     }
   },
 
@@ -385,6 +499,7 @@ export const dbService = {
       accountId: data.accountId || 'CASH-01'
     };
     localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify([newTxn, ...current]));
+    syncToCloud('addTransaction', newTxn);
     return newTxn;
   },
 
@@ -394,12 +509,14 @@ export const dbService = {
     if (index !== -1) {
       transactions[index] = { ...transactions[index], ...updates };
       localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(transactions));
+      syncToCloud('updateTransaction', transactions[index]);
     }
   },
 
   deleteTransaction: async (id: string): Promise<void> => {
     const transactions = await dbService.getTransactions();
     localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(transactions.filter(t => t.id !== id)));
+    syncToCloud('deleteTransaction', { id });
   },
 
   getCustomerBalance: async (bikeNumber: string, customerName: string): Promise<number> => {
@@ -427,6 +544,7 @@ export const dbService = {
     const current = await dbService.getVisitors();
     const newVisitor = { ...data, id: 'V' + Date.now(), createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.VISITORS, JSON.stringify([newVisitor, ...current]));
+    syncToCloud('addVisitor', newVisitor);
     return newVisitor;
   },
   deleteVisitor: async (id: string): Promise<void> => {
@@ -435,6 +553,7 @@ export const dbService = {
     if (itemToDelete) {
       await dbService.moveToRecycleBin('Visitor', itemToDelete);
       localStorage.setItem(LS_KEYS.VISITORS, JSON.stringify(current.filter(v => v.id !== id)));
+      syncToCloud('deleteVisitor', { id });
     }
   },
 
@@ -443,11 +562,13 @@ export const dbService = {
     const current = await dbService.getStockWanting();
     const newItem = { ...data, id: 'W' + Date.now(), createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.STOCK_WANTING, JSON.stringify([...current, newItem]));
+    syncToCloud('addStockWanting', newItem);
     return newItem;
   },
   deleteStockWantingItem: async (id: string): Promise<void> => {
     const current = await dbService.getStockWanting();
     localStorage.setItem(LS_KEYS.STOCK_WANTING, JSON.stringify(current.filter(i => i.id !== id)));
+    syncToCloud('deleteStockWanting', { id });
   },
 
   getComplaints: async (): Promise<Complaint[]> => JSON.parse(localStorage.getItem(LS_KEYS.COMPLAINTS) || '[]'),
@@ -470,6 +591,7 @@ export const dbService = {
 
     // Save complaint
     localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify([newComplaint, ...currentComplaints]));
+    syncToCloud('addComplaint', newComplaint);
     return newComplaint;
   },
   updateComplaint: async (id: string, data: Partial<Complaint>): Promise<void> => {
@@ -483,6 +605,7 @@ export const dbService = {
     // Merge updates with existing complaint
     current[index] = { ...current[index], ...data, id }; // Preserve ID
     localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(current));
+    syncToCloud('updateComplaint', current[index]);
   },
   updateComplaintStatus: async (id: string, status: ComplaintStatus): Promise<void> => {
     const current = await dbService.getComplaints();
@@ -498,6 +621,7 @@ export const dbService = {
     if (itemToDelete) {
       await dbService.moveToRecycleBin('Complaint', itemToDelete);
       localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(current.filter(c => c.id !== id)));
+      syncToCloud('deleteComplaint', { id });
     }
   },
 
@@ -516,6 +640,7 @@ export const dbService = {
     // Handle Invoice creation
     const newInv = { ...data, id: 'I' + Date.now(), date: data.date || new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...currentInvoices]));
+    syncToCloud('addInvoice', newInv);
 
     // Stock Deduction Logic (Only for Sales)
     if (data.docType === 'Sale' && data.items && data.items.length > 0) {
@@ -651,6 +776,7 @@ export const dbService = {
     // Update invoices list
     currentInvoices[invoiceIndex] = updatedInvoice;
     localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify(currentInvoices));
+    syncToCloud('updateInvoice', updatedInvoice);
 
     // Handle payment collection changes
     if (data.paymentCollections) {
@@ -746,6 +872,7 @@ export const dbService = {
     const current = await dbService.getInventory();
     const newItem = { ...data, id: 'S' + Date.now(), lastUpdated: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify([...current, newItem]));
+    syncToCloud('addInventoryItem', newItem);
     return newItem;
   },
 
@@ -804,6 +931,7 @@ export const dbService = {
     if (itemToDelete) {
       await dbService.moveToRecycleBin('Inventory', itemToDelete);
       localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify(current.filter(i => i.id !== id)));
+      syncToCloud('deleteInventoryItem', { id });
     }
   },
   updateStock: async (id: string, delta: number, note: string): Promise<void> => {
@@ -813,6 +941,8 @@ export const dbService = {
     const txns = JSON.parse(localStorage.getItem(LS_KEYS.STOCK_TXNS) || '[]');
     txns.push({ id: 'T' + Date.now(), itemId: id, type: delta > 0 ? 'IN' : 'OUT', quantity: Math.abs(delta), date: new Date().toISOString(), note });
     localStorage.setItem(LS_KEYS.STOCK_TXNS, JSON.stringify(txns));
+    syncToCloud('updateStock', { id, delta });
+    syncToCloud('addStockTransaction', { itemId: id, type: delta > 0 ? 'IN' : 'OUT', quantity: Math.abs(delta), note });
   },
   getStockTransactions: async (itemId: string): Promise<StockTransaction[]> => {
     const txns = JSON.parse(localStorage.getItem(LS_KEYS.STOCK_TXNS) || '[]');
@@ -858,6 +988,7 @@ export const dbService = {
     };
 
     localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify([newExp, ...current]));
+    syncToCloud('addExpense', newExp);
     return newExp;
   },
 
@@ -872,6 +1003,7 @@ export const dbService = {
 
       await dbService.moveToRecycleBin('Expense', itemToDelete);
       localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(current.filter(e => e.id !== id)));
+      syncToCloud('deleteExpense', { id });
     }
   },
 
@@ -896,6 +1028,7 @@ export const dbService = {
     const current = await dbService.getReminders();
     const newRem = { ...data, id: 'R' + Date.now(), status: 'Pending' };
     localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify([...current, newRem]));
+    syncToCloud('addReminder', newRem);
     return newRem;
   },
   updateReminderStatus: async (id: string, status: 'Pending' | 'Sent'): Promise<void> => {
@@ -909,6 +1042,7 @@ export const dbService = {
   deleteReminder: async (id: string): Promise<void> => {
     const current = await dbService.getReminders();
     localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify(current.filter(r => r.id !== id)));
+    syncToCloud('deleteReminder', { id });
   },
 
   getDashboardStats: async (): Promise<DashboardStats> => {
@@ -1047,11 +1181,13 @@ export const dbService = {
       status: 'Available'
     };
     localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify([...current, newStaff]));
+    syncToCloud('addSalesman', newStaff);
     return newStaff;
   },
   deleteSalesman: async (id: string): Promise<void> => {
     const current = await dbService.getSalesmen();
     localStorage.setItem(LS_KEYS.SALESMEN, JSON.stringify(current.filter(s => s.id !== id)));
+    syncToCloud('deleteSalesman', { id });
   },
 
 
@@ -1230,6 +1366,7 @@ export const dbService = {
     };
 
     localStorage.setItem(LS_KEYS.PAYMENT_RECEIPTS, JSON.stringify([newReceipt, ...current]));
+    syncToCloud('addPaymentReceipt', newReceipt);
 
     // Create transaction entries for cash and UPI
     if (data.cashAmount > 0) {
@@ -1266,6 +1403,7 @@ export const dbService = {
   deletePaymentReceipt: async (id: string): Promise<void> => {
     const receipts = await dbService.getPaymentReceipts();
     localStorage.setItem(LS_KEYS.PAYMENT_RECEIPTS, JSON.stringify(receipts.filter(r => r.id !== id)));
+    syncToCloud('deletePaymentReceipt', { id });
   },
 
   updatePaymentReceipt: async (id: string, updates: Partial<PaymentReceipt>): Promise<void> => {
@@ -1615,5 +1753,78 @@ export const dbService = {
     return { imported, skipped };
   },
 
+  // ============================================
+  // GOOGLE SHEETS CLOUD SYNC
+  // ============================================
+
+  /** Check if cloud sync is configured */
+  isCloudEnabled,
+
+  /** Get the current Google Apps Script URL */
+  getGasUrl,
+
+  /** Set the Google Apps Script web app URL */
+  setGasUrl: (url: string): void => {
+    localStorage.setItem(GAS_URL_KEY, url);
+  },
+
+  /** One-time migration: push all localStorage data to Google Sheets */
+  migrateToCloud,
+
+  /** 
+   * Pull all data FROM Google Sheets INTO localStorage (cloud → local).
+   * Use this to sync a new device with existing cloud data.
+   */
+  pullFromCloud: async (): Promise<string> => {
+    if (!isCloudEnabled()) return 'Cloud not configured';
+
+    const pulls = [
+      { action: 'getCustomers', key: LS_KEYS.CUSTOMERS },
+      { action: 'getInvoices', key: LS_KEYS.INVOICES },
+      { action: 'getInventory', key: LS_KEYS.INVENTORY },
+      { action: 'getTransactions', key: LS_KEYS.TRANSACTIONS },
+      { action: 'getExpenses', key: LS_KEYS.EXPENSES },
+      { action: 'getBankAccounts', key: LS_KEYS.BANK_ACCOUNTS },
+      { action: 'getPaymentReceipts', key: LS_KEYS.PAYMENT_RECEIPTS },
+      { action: 'getComplaints', key: LS_KEYS.COMPLAINTS },
+      { action: 'getStockWanting', key: LS_KEYS.STOCK_WANTING },
+      { action: 'getVisitors', key: LS_KEYS.VISITORS },
+      { action: 'getReminders', key: LS_KEYS.REMINDERS },
+      { action: 'getUsers', key: LS_KEYS.USERS },
+      { action: 'getSalesmen', key: LS_KEYS.SALESMEN },
+    ];
+
+    const results: string[] = [];
+    for (const { action, key } of pulls) {
+      try {
+        const data = await fetchFromCloud(action);
+        if (data && Array.isArray(data)) {
+          localStorage.setItem(key, JSON.stringify(data));
+          results.push(`✅ ${action}: ${data.length} items`);
+        } else {
+          results.push(`⚠️ ${action}: no data`);
+        }
+      } catch (err: any) {
+        results.push(`❌ ${action}: ${err.message}`);
+      }
+    }
+
+    // Pull settings
+    try {
+      const settings = await fetchFromCloud('getConfig', { key: 'app_settings' });
+      if (settings) {
+        localStorage.setItem(LS_KEYS.SETTINGS, JSON.stringify(settings));
+        results.push('✅ Settings pulled');
+      }
+    } catch { results.push('⚠️ Settings: skipped'); }
+
+    return `Cloud sync complete!\n\n${results.join('\n')}`;
+  },
+
+  /**
+   * Sync a single entity write to the cloud in background.
+   * This is called internally by write operations when cloud is enabled.
+   */
+  syncToCloud,
 
 };

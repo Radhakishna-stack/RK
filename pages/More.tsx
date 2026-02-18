@@ -5,7 +5,7 @@ import {
     Truck, UserCheck, ClipboardCheck, Receipt, ArrowDownCircle,
     ShoppingCart, ClipboardList, Wallet, Calendar, BarChart3,
     MapPin, Bot, Shield, CreditCard, Banknote, CheckSquare,
-    Megaphone, Chrome, Binary, Trash2, ChevronRight, LayoutGrid
+    Megaphone, Chrome, Binary, Trash2, ChevronRight, LayoutGrid, Cloud
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 
@@ -253,6 +253,13 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate }) => {
                     label="Recycle Bin"
                     description="Restore deleted items"
                     onClick={() => onNavigate('recycle_bin')}
+                />
+                <MenuItem
+                    icon={<Cloud />}
+                    label="Cloud Sync"
+                    description="Google Sheets backup"
+                    onClick={() => onNavigate('cloud_sync')}
+                    highlight
                 />
             </Section>
         </div>
