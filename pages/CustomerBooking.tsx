@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MapPin, Send, Bike, User, Phone, FileText, CheckCircle, Loader2, AlertCircle, Navigation } from 'lucide-react';
 
 // ⚙️ CONFIG: Change this to your shop's WhatsApp number (with country code, no + or spaces)
-const SHOP_WHATSAPP_NUMBER = '919876543210';
+const SHOP_WHATSAPP_NUMBER = '919182110128';
 
 const CustomerBooking: React.FC = () => {
     const [form, setForm] = useState({
