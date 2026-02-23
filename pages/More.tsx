@@ -149,68 +149,7 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate }) => {
                 />
             </Section>
 
-            {/* Marketing Section */}
-            <Section title="Marketing" icon={<Megaphone className="w-5 h-5" />}>
-                <MenuItem
-                    icon={<MessagesSquare />}
-                    label="WhatsApp Marketing"
-                    description="Bulk messaging"
-                    onClick={() => onNavigate('whatsapp_marketing')}
-                />
-                <MenuItem
-                    icon={<Banknote className="w-6 h-6 text-green-600" />}
-                    label="Payment Voucher"
-                    description="Receipts & Payments"
-                    onClick={() => onNavigate('payment_voucher')}
-                />
-                <MenuItem
-                    icon={<Chrome />}
-                    label="Google Profile"
-                    description="Business listing"
-                    onClick={() => onNavigate('google_profile')}
-                />
-                <MenuItem
-                    icon={<Megaphone />}
-                    label="Ad Campaigns"
-                    description="Manage ads"
-                    onClick={() => onNavigate('ads')}
-                />
-                <MenuItem
-                    icon={<MapPin />}
-                    label="Market Research"
-                    description="Local insights"
-                    onClick={() => onNavigate('market_explorer')}
-                />
-            </Section>
 
-            {/* AI Tools Section */}
-            <Section title="AI Powered" icon={<Sparkles className="w-5 h-5" />}>
-                <MenuItem
-                    icon={<Bot />}
-                    label="Tech Agent"
-                    description="AI assistant"
-                    onClick={() => onNavigate('tech_agent')}
-                    highlight
-                />
-                <MenuItem
-                    icon={<Sparkles />}
-                    label="Business Insights"
-                    description="AI predictions"
-                    onClick={() => onNavigate('horoscope')}
-                />
-                <MenuItem
-                    icon={<Sparkles />}
-                    label="Smart Ads"
-                    description="AI ad generation"
-                    onClick={() => onNavigate('smart_ads')}
-                />
-                <MenuItem
-                    icon={<Sparkles />}
-                    label="Marketing Tools"
-                    description="AI marketing"
-                    onClick={() => onNavigate('marketing_tools')}
-                />
-            </Section>
 
             {/* Reports Section */}
             <Section title="Reports & Analytics" icon={<BarChart3 className="w-5 h-5" />}>

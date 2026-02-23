@@ -35,19 +35,11 @@ import RemindersPage from './pages/Reminders';
 import SettingsPage from './pages/Settings';
 import SaleReportPage from './pages/SaleReport';
 import PartyStatementPage from './pages/PartyStatement';
-import AdsManagerPage from './pages/AdsManager';
 import UtilitiesPage from './pages/Utilities';
-import BusinessHoroscope from './pages/BusinessHoroscope';
-import MarketingTools from './pages/MarketingTools';
 import SalesmanTrackingPage from './pages/SalesmanTracking';
-import MarketExplorerPage from './pages/MarketExplorer';
 import EmployeePanel from './pages/EmployeePanel';
 import StaffControlCenter from './pages/StaffControlCenter';
-import SmartAdsPage from './pages/SmartAds';
-import WhatsAppMarketingPage from './pages/WhatsAppMarketing';
-import TechAgentPage from './pages/TechAgent';
 import RecycleBinPage from './pages/RecycleBin';
-import GoogleProfilePage from './pages/GoogleProfile';
 import BankAccountsPage from './pages/BankAccounts';
 import CashInHandPage from './pages/CashInHand';
 
@@ -142,13 +134,7 @@ const App: React.FC = () => {
         'more': '/more',
         'items': '/inventory',
         'staff_control': '/staff-control',
-        'market_explorer': '/market-explorer',
-        'marketing_tools': '/marketing-tools',
-        'whatsapp_marketing': '/whatsapp-marketing',
         'tech_agent': '/tech-agent',
-        'pickup_scheduling': '/pickup-scheduling',
-        'google_profile': '/google-profile',
-        'smart_ads': '/smart-ads',
         'sale_report': '/sale-report',
         'party_statement': '/party-statement',
         'new_estimate': '/estimate/new',
@@ -228,9 +214,6 @@ const App: React.FC = () => {
               <span className="text-xs text-slate-500">({userRole})</span>
             </div>
 
-            <button onClick={() => navigate('/tech-agent')} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all">
-              <Bot className="w-5 h-5" />
-            </button>
             {canAccessRoute(userRole, 'staff_control') && (
               <button onClick={() => navigate('/staff-control')} className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors rounded-xl">
                 <Shield className="w-5 h-5" />
@@ -269,15 +252,6 @@ const App: React.FC = () => {
               if (tab === 'market_explorer') navigate(`/market-explorer${query ? `?q=${query}` : ''}`); // Simplified query handling or just pass state
               else handleNavigate(tab);
             }} />} />
-            <Route path="/horoscope" element={<BusinessHoroscope onNavigate={handleNavigate} />} />
-            <Route path="/marketing-tools" element={<MarketingTools onNavigate={handleNavigate} />} />
-            <Route path="/whatsapp-marketing" element={<WhatsAppMarketingPage onNavigate={handleNavigate} />} />
-            <Route path="/tech-agent" element={<TechAgentPage onNavigate={handleNavigate} />} />
-            <Route path="/google-profile" element={<GoogleProfilePage onNavigate={handleNavigate} />} />
-            <Route path="/ads" element={<AdsManagerPage />} />
-            <Route path="/smart-ads" element={<SmartAdsPage onNavigate={handleNavigate} />} />
-            <Route path="/market-explorer" element={<MarketExplorerPage onNavigate={handleNavigate} />} />
-
             <Route path="/sale-report" element={<ProtectedRoute feature="sale_report"><SaleReportPage onNavigate={handleNavigate} /></ProtectedRoute>} />
             <Route path="/party-statement" element={<PartyStatementPage onNavigate={handleNavigate} />} />
             <Route path="/sales" element={<SalesListPage onNavigate={handleNavigate} />} />
