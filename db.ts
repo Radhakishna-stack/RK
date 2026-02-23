@@ -495,8 +495,12 @@ export const dbService = {
     const newTxn = {
       ...data,
       id: prefix + Date.now(),
-      date: new Date().toISOString(),
-      accountId: data.accountId || 'CASH-01'
+      date: data.date || new Date().toISOString(),
+      // Only assign CASH-01 if paymentMode is Cash AND no accountId was given
+      // Credit transactions should NOT be linked to any account (they're on-book, not paid)
+      accountId: data.accountId
+        ? data.accountId
+        : (data.paymentMode === 'Cash' ? 'CASH-01' : (data.paymentMode && data.paymentMode !== 'Credit' ? data.accountId || '' : ''))
     };
     localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify([newTxn, ...current]));
     syncToCloud('addTransaction', newTxn);

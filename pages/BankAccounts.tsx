@@ -105,7 +105,10 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
       (account.accountNumber || '').includes(searchTerm)
    );
 
-   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+   // Bank balance = only non-Cash accounts (UPI, Savings, Current, Wallet)
+   const bankBalance = accounts
+      .filter(acc => acc.type !== 'Cash')
+      .reduce((sum, acc) => sum + acc.balance, 0);
 
    if (loading) {
       return (
@@ -141,7 +144,7 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
                      <Landmark className="w-5 h-5" />
                      <p className="text-sm font-medium">Bank Balance</p>
                   </div>
-                  <h2 className="text-3xl font-bold">₹{totalBalance.toLocaleString()}</h2>
+                  <h2 className="text-3xl font-bold">₹{bankBalance.toLocaleString()}</h2>
                </div>
             </Card>
 

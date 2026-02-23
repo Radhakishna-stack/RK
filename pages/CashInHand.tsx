@@ -46,9 +46,11 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
       try {
          const allTransactions = await dbService.getTransactions();
          // Filter for Cash Account transactions OR legacy manually added cash transactions
+         // Show only transactions directly linked to the Cash account (CASH-01),
+         // or manual cash-in/cash-out entries. Do NOT include purchase/expense records
+         // here — those are already captured via the cash account transaction created at billing time.
          const cashTransactions = allTransactions.filter(
-            t => t.accountId === 'CASH-01' || t.type === 'cash-in' || t.type === 'cash-out' ||
-               (t.paymentMode === 'Cash' && (t.type === 'purchase' || t.type === 'expense'))
+            t => t.accountId === 'CASH-01' || t.type === 'cash-in' || t.type === 'cash-out'
          );
          setTransactions(cashTransactions);
       } catch (err) {
