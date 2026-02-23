@@ -1,4 +1,23 @@
 
+export type PickupStatus = 'Pending' | 'Assigned' | 'In Transit' | 'Picked Up' | 'Delivered' | 'Cancelled';
+
+export interface PickupRequest {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  bikeNumber: string;
+  issueDescription: string;
+  locationLink: string;
+  location?: { lat: number; lng: number };
+  status: PickupStatus;
+  assignedEmployeeId?: string;
+  assignedEmployeeName?: string;
+  employeeLocation?: { lat: number; lng: number; updatedAt: string };
+  createdAt: string;
+  updatedAt: string;
+  notes?: string;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -57,15 +76,6 @@ export interface Complaint {
   city?: string;
 }
 
-export enum PickupStatus {
-  SCHEDULED = 'Scheduled',
-  ON_THE_WAY = 'On the Way',
-  PICKED_UP = 'Picked Up',
-  AT_CENTER = 'At Center',
-  DELIVERING = 'Delivering',
-  DELIVERED = 'Delivered',
-  CANCELLED = 'Cancelled'
-}
 
 export interface PickupSlot {
   id: string;

@@ -1,5 +1,5 @@
 
-import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole, PaymentReceipt } from './types';
+import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole, PaymentReceipt, PickupRequest, PickupStatus } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { encryptPassword } from './auth';
 
@@ -132,7 +132,8 @@ const LS_KEYS = {
   RECYCLE_BIN: 'mg_recycle_bin',
   BANK_ACCOUNTS: 'mg_bank_accounts',
   USERS: 'mg_users',
-  PAYMENT_RECEIPTS: 'mg_payment_receipts'
+  PAYMENT_RECEIPTS: 'mg_payment_receipts',
+  PICKUP_REQUESTS: 'mg_pickup_requests'
 };
 
 const DEFAULT_BANK: BankAccount = {
@@ -1846,5 +1847,46 @@ export const dbService = {
    * This is called internally by write operations when cloud is enabled.
    */
   syncToCloud,
+
+  // ============================================
+  // Pickup Requests
+  // ============================================
+  getPickupRequests: async (): Promise<PickupRequest[]> => {
+    const data = localStorage.getItem(LS_KEYS.PICKUP_REQUESTS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addPickupRequest: async (data: Omit<PickupRequest, 'id' | 'createdAt' | 'updatedAt' | 'status'>): Promise<PickupRequest> => {
+    const current = await dbService.getPickupRequests();
+    const newPickup: PickupRequest = {
+      ...data,
+      id: 'PKP-' + Date.now(),
+      status: 'Pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    localStorage.setItem(LS_KEYS.PICKUP_REQUESTS, JSON.stringify([newPickup, ...current]));
+    return newPickup;
+  },
+
+  updatePickupRequest: async (id: string, updates: Partial<PickupRequest>): Promise<void> => {
+    const current = await dbService.getPickupRequests();
+    const updated = current.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p);
+    localStorage.setItem(LS_KEYS.PICKUP_REQUESTS, JSON.stringify(updated));
+  },
+
+  updateEmployeeGpsLocation: async (pickupId: string, lat: number, lng: number): Promise<void> => {
+    const current = await dbService.getPickupRequests();
+    const updated = current.map(p => p.id === pickupId
+      ? { ...p, employeeLocation: { lat, lng, updatedAt: new Date().toISOString() }, updatedAt: new Date().toISOString() }
+      : p
+    );
+    localStorage.setItem(LS_KEYS.PICKUP_REQUESTS, JSON.stringify(updated));
+  },
+
+  deletePickupRequest: async (id: string): Promise<void> => {
+    const current = await dbService.getPickupRequests();
+    localStorage.setItem(LS_KEYS.PICKUP_REQUESTS, JSON.stringify(current.filter(p => p.id !== id)));
+  },
 
 };

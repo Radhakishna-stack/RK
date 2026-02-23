@@ -49,6 +49,8 @@ import MorePage from './pages/More';
 import LoginPage from './pages/Login';
 import PaymentVoucherPage from './pages/PaymentVoucher';
 import CloudSyncPage from './pages/CloudSync';
+import CustomerBooking from './pages/CustomerBooking';
+import PickupManagerPage from './pages/PickupManager';
 import { AuthSession, User } from './types';
 import { getSession, login, logout, validateCredentials } from './auth';
 import { canAccessRoute } from './permissions';
@@ -150,7 +152,8 @@ const App: React.FC = () => {
         'recycle_bin': '/recycle-bin',
         'field_jobs': '/field-jobs',
         'field_service_manager': '/field-service-manager',
-        'cloud_sync': '/cloud-sync'
+        'cloud_sync': '/cloud-sync',
+        'pickup_manager': '/pickup-manager'
       };
       targetPath = routeMap[path] || `/${path}`;
     }
@@ -182,10 +185,13 @@ const App: React.FC = () => {
     );
   }
 
+  // Public route: Customer Booking page (no auth required)
+  if (location.pathname === '/booking') {
+    return <CustomerBooking />;
+  }
+
   // Show login page if not authenticated
   if (!authSession) {
-    // If we are at root, show login. If deep linking, we might want to preserve path, 
-    // but for now simple login is fine.
     return <LoginPage onLogin={handleLogin} error={loginError} />;
   }
 
@@ -282,6 +288,8 @@ const App: React.FC = () => {
             <Route path="/settings/permissions" element={<SettingsPage onNavigate={handleNavigate} initialSection="permissions" />} />
             <Route path="/settings/*" element={<SettingsPage onNavigate={handleNavigate} />} />
             <Route path="/cloud-sync" element={<CloudSyncPage onNavigate={handleNavigate} />} />
+
+            <Route path="/pickup-manager" element={<PickupManagerPage onNavigate={handleNavigate} />} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" />} />

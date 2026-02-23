@@ -369,7 +369,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
                       type="text"
                       value={prefixForm[key]}
                       onChange={(e) => setPrefixForm({ ...prefixForm, [key]: e.target.value })}
-                      placeholder={key.toUpperCase().slice(0, 3) + '-'}
+                      placeholder={String(key).toUpperCase().slice(0, 3) + '-'}
                       className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
                     />
                   </div>

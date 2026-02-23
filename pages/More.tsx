@@ -76,6 +76,12 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate }) => {
                     description="Supplier orders"
                     onClick={() => onNavigate('purchase')}
                 />
+                <MenuItem
+                    icon={<Truck />}
+                    label="Pickup Manager"
+                    description="Manage vehicle pickups & track employees"
+                    onClick={() => onNavigate('pickup_manager')}
+                />
             </Section>
 
             {/* Financial Section */}
