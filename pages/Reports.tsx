@@ -1,9 +1,11 @@
 import React from 'react';
-import { BarChart3, FileText, TrendingUp, Package, Users, DollarSign, Calendar } from 'lucide-react';
+import { BarChart3, FileText, TrendingUp, Package, Users, DollarSign, Calendar, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 
 const ReportsPage: React.FC = () => {
+  const navigate = useNavigate();
   const reportCategories = [
     {
       title: 'Financial Reports',
@@ -56,6 +58,9 @@ const ReportsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors mb-4 text-sm font-medium">
+        <ArrowLeft className="w-4 h-4" /> Back
+      </button>
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Reports & Analytics</h1>

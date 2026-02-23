@@ -123,7 +123,7 @@ const JobCreationForm: React.FC<JobCreationFormProps> = ({ onClose, onJobCreated
     });
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100] animate-in">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[1000] animate-in">
             <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">

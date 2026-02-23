@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, MapPin, Phone, User, Trash2, Navigation, Target } from 'lucide-react';
+import { Plus, MapPin, Phone, User, Trash2, Navigation, Target, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { dbService } from '../db';
 import { Salesman, StaffLocation } from '../types';
 import { Card } from '../components/ui/Card';
@@ -9,6 +10,7 @@ import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 
 const SalesmanTrackingPage: React.FC = () => {
+  const navigate = useNavigate();
   const [salesmen, setSalesmen] = useState<Salesman[]>([]);
   const [locations, setLocations] = useState<StaffLocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +89,9 @@ const SalesmanTrackingPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors mb-4 text-sm font-medium">
+        <ArrowLeft className="w-4 h-4" /> Back
+      </button>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

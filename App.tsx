@@ -236,7 +236,7 @@ const App: React.FC = () => {
       )}
 
       <main className={`flex-1 overflow-y-auto relative no-scrollbar ${location.pathname.includes('billing') || location.pathname.includes('estimate/new') || location.pathname.includes('sales') || location.pathname.includes('complaints') || location.pathname.includes('field-service-manager') || location.pathname.includes('field-jobs') ? 'pb-0' : ''}`}>
-        <div className={`max-w-screen-xl mx-auto px-4 pt-4`}>
+        <div className={location.pathname === '/business' ? '' : `max-w-screen-xl mx-auto px-4 pt-4`}>
           <Routes>
             {/* Core Tabs */}
             <Route path="/" element={(userRole === 'employee' || userRole === 'mechanic') ? <Navigate to="/employee-panel" /> : <DashboardPage onNavigate={handleNavigate} />} />

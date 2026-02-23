@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Hammer, Play, CheckCircle2, Clock, RefreshCw, AlertCircle, Bike } from 'lucide-react';
+import { Hammer, Play, CheckCircle2, Clock, RefreshCw, AlertCircle, Bike, ArrowLeft } from 'lucide-react';
 import { dbService } from '../db';
 import { Complaint, ComplaintStatus } from '../types';
 import { Card } from '../components/ui/Card';
@@ -83,6 +83,11 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
   return (
     <div className="space-y-6">
       {/* Header */}
+      {onNavigate && (
+        <button onClick={() => onNavigate('more')} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors mb-4 text-sm font-medium">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+      )}
       <div>
         <h1 className="text-2xl font-bold text-slate-900">My Work</h1>
         <p className="text-sm text-slate-600 mt-1">Active service jobs assigned to you</p>

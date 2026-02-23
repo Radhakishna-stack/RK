@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Landmark, Trash2, TrendingUp, TrendingDown, Clock } from 'lucide-react';
+import { Plus, Search, Landmark, Trash2, TrendingUp, TrendingDown, Clock, ArrowLeft } from 'lucide-react';
 import { dbService } from '../db';
 import { BankAccount } from '../types';
 import { Card } from '../components/ui/Card';
@@ -124,6 +124,9 @@ const BankAccountsPage: React.FC<BankAccountsPageProps> = ({ onNavigate }) => {
    return (
       <div className="space-y-6">
          {/* Header */}
+         <button onClick={() => onNavigate('more')} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors mb-4 text-sm font-medium">
+            <ArrowLeft className="w-4 h-4" /> Back
+         </button>
          <div className="flex items-center justify-between">
             <div>
                <h1 className="text-2xl font-bold text-slate-900">Bank Accounts</h1>

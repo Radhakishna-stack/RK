@@ -184,7 +184,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     transportationDetails: false,
     additionalCharges: false,
     overdueDaysLimit: 15,
-    prefixes: { firmName: 'MOTO GEAR SRK', sale: 'INV-', estimate: 'EST-', creditNote: 'CN-', saleOrder: 'None', purchaseOrder: 'SBS-', paymentIn: 'PI-' }
+    prefixes: { firmName: 'MOTO GEAR SRK', sale: 'INV-', estimate: 'EST-', creditNote: 'CN-', saleOrder: 'None', purchaseOrder: 'SBS-', paymentIn: 'PI-', expense: 'EXP-', purchase: 'PUR-', job: 'JOB-', receipt: 'RCP-' }
   },
   print: {
     printerType: 'Regular',
@@ -238,6 +238,18 @@ const generateUniqueId = (prefix: string): string => {
   const timestamp = Date.now();
   const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
   return `${prefix}${timestamp}${random}`;
+};
+
+// Helper: read user-configured prefix from settings for a given key
+const getTxnPrefix = (key: 'sale' | 'estimate' | 'expense' | 'purchase' | 'job' | 'receipt' | 'paymentIn' | 'creditNote'): string => {
+  try {
+    const stored = localStorage.getItem(LS_KEYS.SETTINGS);
+    if (stored) {
+      const s = JSON.parse(stored);
+      return s?.transaction?.prefixes?.[key] || DEFAULT_SETTINGS.transaction.prefixes[key];
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_SETTINGS.transaction.prefixes[key];
 };
 
 // Helper function to create or update customer records
@@ -642,7 +654,7 @@ export const dbService = {
     });
 
     // Handle Invoice creation
-    const newInv = { ...data, id: 'I' + Date.now(), date: data.date || new Date().toISOString() };
+    const newInv = { ...data, id: getTxnPrefix('sale') + Date.now(), date: data.date || new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...currentInvoices]));
     syncToCloud('addInvoice', newInv);
 
@@ -985,7 +997,7 @@ export const dbService = {
 
     const newExp = {
       ...data,
-      id: 'E' + Date.now(),
+      id: getTxnPrefix('expense') + Date.now(),
       date: data.date || new Date().toISOString(),
       transactionId: newTxn.id,
       accountId: accountId

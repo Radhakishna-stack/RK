@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Download, Upload, QrCode, Barcode, FileText, Database, RefreshCw, Share2, FileSpreadsheet, AlertCircle, CheckCircle } from 'lucide-react';
+import { Download, Upload, QrCode, Barcode, FileText, Database, RefreshCw, Share2, FileSpreadsheet, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import JsBarcode from 'jsbarcode';
 import QRCodeLib from 'qrcode';
 import { dbService } from '../db';
@@ -9,6 +10,7 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 
 const UtilitiesPage: React.FC = () => {
+   const navigate = useNavigate();
    const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
    const [labelText, setLabelText] = useState('');
    const [labelType, setLabelType] = useState<'qr' | 'barcode'>('qr');
@@ -289,6 +291,9 @@ const UtilitiesPage: React.FC = () => {
 
    return (
       <div className="space-y-6">
+         <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors mb-4 text-sm font-medium">
+            <ArrowLeft className="w-4 h-4" /> Back
+         </button>
          {/* Header */}
          <div>
             <h1 className="text-2xl font-bold text-slate-900">Utilities</h1>
@@ -470,8 +475,8 @@ const UtilitiesPage: React.FC = () => {
                      <button
                         onClick={() => setImportType('customers')}
                         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${importType === 'customers'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                           ? 'bg-blue-600 text-white'
+                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                            }`}
                      >
                         Customers
@@ -479,8 +484,8 @@ const UtilitiesPage: React.FC = () => {
                      <button
                         onClick={() => setImportType('inventory')}
                         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${importType === 'inventory'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                           ? 'bg-blue-600 text-white'
+                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                            }`}
                      >
                         Inventory

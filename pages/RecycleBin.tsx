@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, RotateCcw, Users, Package, FileText, AlertCircle } from 'lucide-react';
+import { Trash2, RotateCcw, Users, Package, FileText, AlertCircle, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { dbService } from '../db';
 import { RecycleBinItem } from '../types';
 import { Card } from '../components/ui/Card';
@@ -7,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 
 const RecycleBinPage: React.FC = () => {
+  const navigate = useNavigate();
   const [items, setItems] = useState<RecycleBinItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -80,6 +82,9 @@ const RecycleBinPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors mb-4 text-sm font-medium">
+        <ArrowLeft className="w-4 h-4" /> Back
+      </button>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

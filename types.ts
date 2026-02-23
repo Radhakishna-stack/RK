@@ -431,6 +431,10 @@ export interface AppSettings {
       purchaseOrder: string;
       estimate: string;
       paymentIn: string;
+      expense: string;
+      purchase: string;
+      job: string;
+      receipt: string;
     };
   };
   print: {

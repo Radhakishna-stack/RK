@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Building, Key, Bell, Palette, Database, Globe, Users, UserPlus, Edit2, Trash2, ToggleLeft, ToggleRight, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Settings as SettingsIcon, Building, Key, Bell, Palette, Database, Globe, Users, UserPlus, Edit2, Trash2, ToggleLeft, ToggleRight, Shield, Eye, EyeOff, ArrowLeft, Tag } from 'lucide-react';
 import { dbService } from '../db';
 import { AppSettings, User, UserRole } from '../types';
 import RolePermissionsEditor from '../components/RolePermissionsEditor';
@@ -17,7 +17,7 @@ interface SettingsPageProps {
 const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business', onNavigate }) => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'business' | 'api' | 'notifications' | 'appearance' | 'users' | 'permissions'>(initialSection as any || 'business');
+  const [activeSection, setActiveSection] = useState<'business' | 'prefixes' | 'api' | 'notifications' | 'appearance' | 'users' | 'permissions'>(initialSection as any || 'business');
   const [users, setUsers] = useState<User[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -33,6 +33,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
 
   const [apiForm, setApiForm] = useState({
     geminiApiKey: ''
+  });
+
+  const [prefixForm, setPrefixForm] = useState({
+    firmName: '',
+    sale: 'INV-',
+    estimate: 'EST-',
+    expense: 'EXP-',
+    purchase: 'PUR-',
+    job: 'JOB-',
+    receipt: 'RCP-',
+    paymentIn: 'PI-',
+    creditNote: 'CN-',
   });
 
   const [userForm, setUserForm] = useState({
@@ -64,6 +76,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
           address: data.general?.businessAddress || '',
           gstNumber: ''
         });
+        if (data.transaction?.prefixes) {
+          const p = data.transaction.prefixes;
+          setPrefixForm({
+            firmName: p.firmName || '',
+            sale: p.sale || 'INV-',
+            estimate: p.estimate || 'EST-',
+            expense: p.expense || 'EXP-',
+            purchase: p.purchase || 'PUR-',
+            job: p.job || 'JOB-',
+            receipt: p.receipt || 'RCP-',
+            paymentIn: p.paymentIn || 'PI-',
+            creditNote: p.creditNote || 'CN-',
+          });
+        }
       }
 
       setApiForm({
@@ -114,6 +140,27 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
   const saveApiKey = () => {
     localStorage.setItem('gemini_api_key', apiForm.geminiApiKey);
     alert('API key saved successfully!');
+  };
+
+  const savePrefixes = async () => {
+    try {
+      if (settings) {
+        const updated = {
+          ...settings,
+          transaction: {
+            ...settings.transaction,
+            prefixes: {
+              ...settings.transaction.prefixes,
+              ...prefixForm
+            }
+          }
+        };
+        await dbService.updateSettings(updated);
+        alert('Prefixes saved! New transactions will use these prefixes.');
+      }
+    } catch (err) {
+      alert('Failed to save prefixes. Please try again.');
+    }
   };
 
   const handleSaveUser = async () => {
@@ -195,6 +242,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
 
   const sections = [
     { id: 'business' as const, icon: Building, label: 'Business Info' },
+    { id: 'prefixes' as const, icon: Tag, label: 'Prefixes' },
     { id: 'api' as const, icon: Key, label: 'API Keys' },
     ...(currentUserRole === 'admin' ? [
       { id: 'users' as const, icon: Users, label: 'Users' },
@@ -289,6 +337,49 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
 
               <Button onClick={saveBusinessDetails} className="w-full">
                 Save Business Details
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {activeSection === 'prefixes' && (
+        <div className="space-y-4">
+          <Card>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 mb-1">Transaction ID Prefixes</h3>
+                <p className="text-sm text-slate-600">Set a custom prefix for all auto-generated IDs. E.g. <span className="font-mono text-blue-600">SRK-INV-001</span></p>
+              </div>
+
+              {([
+                { key: 'sale', label: 'Invoice' },
+                { key: 'estimate', label: 'Estimate / Quote' },
+                { key: 'expense', label: 'Expense' },
+                { key: 'purchase', label: 'Purchase' },
+                { key: 'job', label: 'Service Job' },
+                { key: 'receipt', label: 'Receipt (Payment In)' },
+                { key: 'paymentIn', label: 'Payment Voucher' },
+                { key: 'creditNote', label: 'Credit Note' },
+              ] as { key: keyof typeof prefixForm; label: string }[]).map(({ key, label }) => (
+                <div key={key} className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">{label}</label>
+                    <input
+                      type="text"
+                      value={prefixForm[key]}
+                      onChange={(e) => setPrefixForm({ ...prefixForm, [key]: e.target.value })}
+                      placeholder={key.toUpperCase().slice(0, 3) + '-'}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                    />
+                  </div>
+                  <div className="text-xs text-slate-400 pt-5 shrink-0 font-mono">→ {prefixForm[key] || '???'}001</div>
+                </div>
+              ))}
+
+              <Button onClick={savePrefixes} className="w-full">
+                <Tag className="w-4 h-4 mr-2" />
+                Save Prefixes
               </Button>
             </div>
           </Card>

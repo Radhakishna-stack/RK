@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Wallet, ArrowUpCircle, ArrowDownCircle, Clock, Calendar, Download, FileText } from 'lucide-react';
+import { Plus, Minus, Wallet, ArrowUpCircle, ArrowDownCircle, Clock, Calendar, Download, FileText, ArrowLeft } from 'lucide-react';
 import { dbService } from '../db';
 import { Transaction } from '../types';
 import { Card } from '../components/ui/Card';
@@ -213,6 +213,9 @@ const CashInHandPage: React.FC<CashInHandPageProps> = ({ onNavigate }) => {
    return (
       <div className="space-y-6">
          {/* Header */}
+         <button onClick={() => onNavigate('more')} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors mb-4 text-sm font-medium">
+            <ArrowLeft className="w-4 h-4" /> Back
+         </button>
          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                <h1 className="text-2xl font-bold text-slate-900">Cash In Hand</h1>
