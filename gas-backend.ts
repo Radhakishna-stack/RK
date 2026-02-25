@@ -36,7 +36,8 @@ function initProject() {
     'Salesmen': ['ID', 'Name', 'Phone', 'Target', 'SalesCount', 'TotalSalesValue', 'JoinDate', 'Status'],
     'Users': ['ID', 'Username', 'Password', 'Role', 'Name', 'Phone', 'CreatedAt', 'IsActive'],
     'Config': ['Key', 'Value', 'UpdatedAt'],
-    'RecycleBin': ['BinID', 'OriginalID', 'Type', 'Data_JSON', 'DeletedAt']
+    'RecycleBin': ['BinID', 'OriginalID', 'Type', 'Data_JSON', 'DeletedAt'],
+    'PickupRequests': ['ID', 'CustomerName', 'CustomerPhone', 'BikeNumber', 'IssueDescription', 'LocationLink', 'Location_JSON', 'Status', 'AssignedEmployeeID', 'AssignedEmployeeName', 'EmployeeLocation_JSON', 'Notes', 'CreatedAt', 'UpdatedAt']
   };
 
   for (const name in sheets) {
@@ -413,6 +414,41 @@ function updateComplaintStatus(data: any) {
 
 function deleteComplaint(data: any) { return deleteRow('Complaints', data.id); }
 
+// --- PICKUP REQUESTS ---
+const PICKUP_FIELDS = ['id', 'customerName', 'customerPhone', 'bikeNumber', 'issueDescription', 'locationLink', 'location', 'status', 'assignedEmployeeId', 'assignedEmployeeName', 'employeeLocation', 'notes', 'createdAt', 'updatedAt'];
+
+function getPickupRequests() {
+  const raw = getSheetData('PickupRequests', PICKUP_FIELDS);
+  return raw.map((r: any) => {
+    // Parse location JSON fields stored as plain strings (not _JSON suffix)
+    if (r.location && typeof r.location === 'string') {
+      try { r.location = JSON.parse(r.location); } catch { r.location = null; }
+    }
+    if (r.employeeLocation && typeof r.employeeLocation === 'string') {
+      try { r.employeeLocation = JSON.parse(r.employeeLocation); } catch { r.employeeLocation = null; }
+    }
+    return r;
+  });
+}
+
+function addPickupRequest(data: any) {
+  const id = genId('PKP-');
+  const locationJson = data.location ? JSON.stringify(data.location) : '';
+  const empLocJson = data.employeeLocation ? JSON.stringify(data.employeeLocation) : '';
+  const row = [id, data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', data.locationLink || '', locationJson, data.status || 'Pending', data.assignedEmployeeId || '', data.assignedEmployeeName || '', empLocJson, data.notes || '', nowISO(), nowISO()];
+  getSheet('PickupRequests').appendRow(row);
+  return { ...data, id, status: 'Pending', createdAt: nowISO(), updatedAt: nowISO() };
+}
+
+function updatePickupRequest(data: any) {
+  const locationJson = data.location ? JSON.stringify(data.location) : '';
+  const empLocJson = data.employeeLocation ? JSON.stringify(data.employeeLocation) : '';
+  const row = [data.id, data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', data.locationLink || '', locationJson, data.status || 'Pending', data.assignedEmployeeId || '', data.assignedEmployeeName || '', empLocJson, data.notes || '', data.createdAt || nowISO(), nowISO()];
+  return updateRow('PickupRequests', data.id, row);
+}
+
+function deletePickupRequest(data: any) { return deleteRow('PickupRequests', data.id); }
+
 // --- STOCK WANTING ---
 const SW_FIELDS = ['id', 'partNumber', 'itemName', 'quantity', 'rate', 'createdAt'];
 
@@ -778,4 +814,10 @@ const ACTIONS: Record<string, Function> = {
 
   // Bulk Migration
   bulkImport: (d: any) => bulkImport(d),
+
+  // Pickup Requests
+  getPickupRequests: () => getPickupRequests(),
+  addPickupRequest: (d: any) => addPickupRequest(d),
+  updatePickupRequest: (d: any) => updatePickupRequest(d),
+  deletePickupRequest: (d: any) => deletePickupRequest(d),
 };

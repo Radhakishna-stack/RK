@@ -74,6 +74,7 @@ async function migrateToCloud(): Promise<string> {
     { lsKey: 'mg_reminders', sheet: 'ServiceReminders', fields: ['id', 'bikeNumber', 'customerName', 'phone', 'reminderDate', 'serviceType', 'status', 'lastNotified', 'message', 'serviceDate'] },
     { lsKey: 'mg_users', sheet: 'Users', fields: ['id', 'username', 'password', 'role', 'name', 'phone', 'createdAt', 'isActive'] },
     { lsKey: 'mg_salesmen', sheet: 'Salesmen', fields: ['id', 'name', 'phone', 'target', 'salesCount', 'totalSalesValue', 'joinDate', 'status'] },
+    { lsKey: 'mg_pickup_requests', sheet: 'PickupRequests', fields: (item: any) => [item.id, item.customerName || '', item.customerPhone || '', item.bikeNumber || '', item.issueDescription || '', item.locationLink || '', JSON.stringify(item.location || null), item.status || 'Pending', item.assignedEmployeeId || '', item.assignedEmployeeName || '', JSON.stringify(item.employeeLocation || null), item.notes || '', item.createdAt || '', item.updatedAt || ''] },
   ];
 
   const results: string[] = [];
@@ -109,6 +110,13 @@ async function migrateToCloud(): Promise<string> {
   if (settings) {
     await fetchFromCloud('setConfig', { key: 'app_settings', value: settings });
     results.push('✅ Settings migrated');
+  }
+
+  // Migrate role permissions
+  const rolePerms = localStorage.getItem('mg_role_permissions');
+  if (rolePerms) {
+    await fetchFromCloud('setConfig', { key: 'role_permissions', value: rolePerms });
+    results.push('✅ Role permissions migrated');
   }
 
   return `Migration complete! ${total} records migrated.\n\n${results.join('\n')}`;
@@ -481,10 +489,17 @@ export const dbService = {
   getCustomers: async (): Promise<Customer[]> => JSON.parse(localStorage.getItem(LS_KEYS.CUSTOMERS) || '[]'),
   addCustomer: async (data: any): Promise<Customer> => {
     const current = await dbService.getCustomers();
-    const newUser = { ...data, id: 'C' + Date.now(), loyaltyPoints: 0, createdAt: new Date().toISOString() };
+    const newUser = { ...data, id: 'C' + Date.now(), loyaltyPoints: data.loyaltyPoints || 0, createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify([...current, newUser]));
     syncToCloud('addCustomer', newUser);
     return newUser;
+  },
+  updateCustomer: async (id: string, updates: Partial<Customer>): Promise<void> => {
+    const current = await dbService.getCustomers();
+    const updated = current.map(c => c.id === id ? { ...c, ...updates } : c);
+    localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify(updated));
+    const updatedCustomer = updated.find(c => c.id === id);
+    if (updatedCustomer) syncToCloud('updateCustomer', updatedCustomer);
   },
   updateCustomerLoyalty: async (id: string, points: number): Promise<void> => {
     const current = await dbService.getCustomers();
@@ -1207,9 +1222,27 @@ export const dbService = {
     syncToCloud('deleteSalesman', { id });
   },
 
-  // Staff location tracking (stub - returns empty, no GPS tracking implemented yet)
+  // Staff location tracking
   getStaffLocations: async (): Promise<any[]> => {
     return JSON.parse(localStorage.getItem('staff_locations') || '[]');
+  },
+
+  updateStaffLocation: (staffId: string, staffName: string, lat: number, lng: number): void => {
+    const locations: any[] = JSON.parse(localStorage.getItem('staff_locations') || '[]');
+    const now = new Date().toISOString();
+    const idx = locations.findIndex((l: any) => l.staffId === staffId);
+    const entry = { staffId, staffName, lat, lng, lastUpdated: now };
+    if (idx !== -1) {
+      locations[idx] = entry;
+    } else {
+      locations.push(entry);
+    }
+    localStorage.setItem('staff_locations', JSON.stringify(locations));
+  },
+
+  clearStaffLocation: (staffId: string): void => {
+    const locations: any[] = JSON.parse(localStorage.getItem('staff_locations') || '[]');
+    localStorage.setItem('staff_locations', JSON.stringify(locations.filter((l: any) => l.staffId !== staffId)));
   },
 
 
@@ -1813,6 +1846,7 @@ export const dbService = {
       { action: 'getReminders', key: LS_KEYS.REMINDERS },
       { action: 'getUsers', key: LS_KEYS.USERS },
       { action: 'getSalesmen', key: LS_KEYS.SALESMEN },
+      { action: 'getPickupRequests', key: LS_KEYS.PICKUP_REQUESTS },
     ];
 
     const results: string[] = [];
@@ -1838,6 +1872,15 @@ export const dbService = {
         results.push('✅ Settings pulled');
       }
     } catch { results.push('⚠️ Settings: skipped'); }
+
+    // Pull role permissions
+    try {
+      const rolePerms = await fetchFromCloud('getConfig', { key: 'role_permissions' });
+      if (rolePerms) {
+        localStorage.setItem(LS_KEYS.ROLE_PERMISSIONS, JSON.stringify(rolePerms));
+        results.push('✅ Role permissions pulled');
+      }
+    } catch { results.push('⚠️ Role permissions: skipped'); }
 
     return `Cloud sync complete!\n\n${results.join('\n')}`;
   },
@@ -1866,6 +1909,7 @@ export const dbService = {
       updatedAt: new Date().toISOString()
     };
     localStorage.setItem(LS_KEYS.PICKUP_REQUESTS, JSON.stringify([newPickup, ...current]));
+    syncToCloud('addPickupRequest', newPickup);
     return newPickup;
   },
 
@@ -1873,6 +1917,8 @@ export const dbService = {
     const current = await dbService.getPickupRequests();
     const updated = current.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p);
     localStorage.setItem(LS_KEYS.PICKUP_REQUESTS, JSON.stringify(updated));
+    const updatedItem = updated.find(p => p.id === id);
+    if (updatedItem) syncToCloud('updatePickupRequest', updatedItem);
   },
 
   updateEmployeeGpsLocation: async (pickupId: string, lat: number, lng: number): Promise<void> => {
@@ -1887,6 +1933,7 @@ export const dbService = {
   deletePickupRequest: async (id: string): Promise<void> => {
     const current = await dbService.getPickupRequests();
     localStorage.setItem(LS_KEYS.PICKUP_REQUESTS, JSON.stringify(current.filter(p => p.id !== id)));
+    syncToCloud('deletePickupRequest', { id });
   },
 
 };

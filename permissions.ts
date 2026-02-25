@@ -120,20 +120,55 @@ export function canAccessRoute(role: UserRole, route: string): boolean {
     const permissions = getPermissions(role);
 
     const routePermissionMap: Record<string, keyof RolePermissions> = {
+        // Sales & Billing
         'sales': 'canViewSales',
         'billing': 'canAccessBilling',
         'sale_report': 'canViewReports',
+        'payment_receipt': 'canAccessBilling',
+        'payment_voucher': 'canAccessBilling',
+        'cash_in_hand': 'canAccessBilling',
+        'bank_accounts': 'canAccessBilling',
+        'party_statement': 'canViewReports',
+
+        // Inventory & Purchase
         'items': 'canManageInventory',
         'inventory': 'canManageInventory',
-        'customers': 'canManageCustomers',
-        'expenses': 'canManageExpenses',
-        'settings': 'canManageSettings',
-        'staff_control': 'canManageStaff',
+        'stock_wanting': 'canManageInventory',
         'purchase': 'canAccessPurchase',
+        'purchase_entry': 'canAccessPurchase',
+
+        // Customers & Visits
+        'customers': 'canManageCustomers',
+        'visitors': 'canManageCustomers',
+
+        // Job Cards & Service
+        'complaints': 'canViewComplaints',
+        'reminders': 'canViewComplaints',
+
+        // Expenses
+        'expenses': 'canManageExpenses',
+
+        // Analytics & Reports
         'dashboard': 'canAccessAnalytics',
         'business': 'canAccessAnalytics',
-        'complaints': 'canViewComplaints',
-        'payment_receipt': 'canAccessBilling',
+        'reports': 'canViewReports',
+        'sale_report_page': 'canViewReports',
+
+        // Staff & Settings
+        'settings': 'canManageSettings',
+        'staff_control': 'canManageStaff',
+        'staff_control_center': 'canManageStaff',
+        'salesmen': 'canManageStaff',
+        'salesman_tracking': 'canManageStaff',
+        'employee_panel': 'canManageStaff',
+        'pickup_manager': 'canManageStaff',
+        'field_jobs': 'canManageStaff',
+        'field_service_manager': 'canManageStaff',
+
+        // Admin-only
+        'recycle_bin': 'canManageSettings',
+        'cloud_sync': 'canManageSettings',
+        'utilities': 'canManageSettings',
     };
 
     const requiredPermission = routePermissionMap[route];

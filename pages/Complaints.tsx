@@ -122,13 +122,44 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
           photoUrls: images
         });
       } else {
-        // Create new job
+        // Auto-create or update customer when creating a new job
+        const existingCustomers = await dbService.getCustomers();
+        const existingCustomer = existingCustomers.find(
+          c => c.bikeNumber.toUpperCase() === formData.bikeNumber.toUpperCase()
+        );
+
+        if (!existingCustomer) {
+          // New customer — create them automatically
+          await dbService.addCustomer({
+            name: formData.customerName,
+            phone: formData.customerPhone,
+            bikeNumber: formData.bikeNumber.toUpperCase(),
+            city: formData.city || '',
+            loyaltyPoints: 0
+          });
+        } else if (
+          existingCustomer.name !== formData.customerName ||
+          existingCustomer.phone !== formData.customerPhone
+        ) {
+          // Customer exists but details changed — silently update
+          await dbService.updateCustomer(existingCustomer.id, {
+            name: formData.customerName,
+            phone: formData.customerPhone,
+            city: formData.city || existingCustomer.city || ''
+          });
+        }
+
+        // Create the job card
         await dbService.addComplaint({
           ...formData,
+          bikeNumber: formData.bikeNumber.toUpperCase(),
           estimatedCost: parseInt(formData.estimatedCost) || 0,
           odometerReading: parseInt(formData.odometerReading) || 0,
           photoUrls: images
         });
+
+        // Refresh customer list in state for autocomplete
+        loadCustomers();
       }
       await loadData();
       setIsModalOpen(false);

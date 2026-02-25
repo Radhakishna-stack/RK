@@ -28,7 +28,8 @@ function initProject() {
         'Salesmen': ['ID', 'Name', 'Phone', 'Target', 'SalesCount', 'TotalSalesValue', 'JoinDate', 'Status'],
         'Users': ['ID', 'Username', 'Password', 'Role', 'Name', 'Phone', 'CreatedAt', 'IsActive'],
         'Config': ['Key', 'Value', 'UpdatedAt'],
-        'RecycleBin': ['BinID', 'OriginalID', 'Type', 'Data_JSON', 'DeletedAt']
+        'RecycleBin': ['BinID', 'OriginalID', 'Type', 'Data_JSON', 'DeletedAt'],
+        'PickupRequests': ['ID', 'CustomerName', 'CustomerPhone', 'BikeNumber', 'IssueDescription', 'LocationLink', 'Location_JSON', 'Status', 'AssignedEmployeeID', 'AssignedEmployeeName', 'EmployeeLocation_JSON', 'Notes', 'CreatedAt', 'UpdatedAt']
     };
 
     for (var name in sheets) {
@@ -403,6 +404,42 @@ function updateComplaintStatus(data) {
 
 function deleteComplaint(data) { return deleteRow('Complaints', data.id); }
 
+// --- PICKUP REQUESTS ---
+var PICKUP_FIELDS = ['id', 'customerName', 'customerPhone', 'bikeNumber', 'issueDescription', 'locationLink', 'location', 'status', 'assignedEmployeeId', 'assignedEmployeeName', 'employeeLocation', 'notes', 'createdAt', 'updatedAt'];
+
+function getPickupRequests() {
+    var raw = getSheetData('PickupRequests', PICKUP_FIELDS);
+    return raw.map(function (r) {
+        // location and employeeLocation are stored as JSON strings, auto-parsed by getSheetData via _JSON suffix
+        // But field names don't end in _JSON, so parse manually
+        if (r.location && typeof r.location === 'string') {
+            try { r.location = JSON.parse(r.location); } catch (e) { r.location = null; }
+        }
+        if (r.employeeLocation && typeof r.employeeLocation === 'string') {
+            try { r.employeeLocation = JSON.parse(r.employeeLocation); } catch (e) { r.employeeLocation = null; }
+        }
+        return r;
+    });
+}
+
+function addPickupRequest(data) {
+    var id = genId('PKP-');
+    var locationJson = data.location ? JSON.stringify(data.location) : '';
+    var empLocJson = data.employeeLocation ? JSON.stringify(data.employeeLocation) : '';
+    var row = [id, data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', data.locationLink || '', locationJson, data.status || 'Pending', data.assignedEmployeeId || '', data.assignedEmployeeName || '', empLocJson, data.notes || '', nowISO(), nowISO()];
+    getSheet('PickupRequests').appendRow(row);
+    return { id: id, status: 'Pending', createdAt: nowISO(), updatedAt: nowISO() };
+}
+
+function updatePickupRequest(data) {
+    var locationJson = data.location ? JSON.stringify(data.location) : '';
+    var empLocJson = data.employeeLocation ? JSON.stringify(data.employeeLocation) : '';
+    var row = [data.id, data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', data.locationLink || '', locationJson, data.status || 'Pending', data.assignedEmployeeId || '', data.assignedEmployeeName || '', empLocJson, data.notes || '', data.createdAt || nowISO(), nowISO()];
+    return updateRow('PickupRequests', data.id, row);
+}
+
+function deletePickupRequest(data) { return deleteRow('PickupRequests', data.id); }
+
 // --- STOCK WANTING ---
 var SW_FIELDS = ['id', 'partNumber', 'itemName', 'quantity', 'rate', 'createdAt'];
 
@@ -766,5 +803,11 @@ var ACTIONS = {
     getDashboardStats: function () { return getDashboardStats(); },
 
     // Bulk Migration
-    bulkImport: function (d) { return bulkImport(d); }
+    bulkImport: function (d) { return bulkImport(d); },
+
+    // Pickup Requests
+    getPickupRequests: function () { return getPickupRequests(); },
+    addPickupRequest: function (d) { return addPickupRequest(d); },
+    updatePickupRequest: function (d) { return updatePickupRequest(d); },
+    deletePickupRequest: function (d) { return deletePickupRequest(d); }
 };
