@@ -429,7 +429,9 @@ export const dbService = {
 
   getAllRolePermissions: async (): Promise<Record<string, RolePermissions>> => {
     const local = localStorage.getItem(LS_KEYS.ROLE_PERMISSIONS);
-    return local ? JSON.parse(local) : DEFAULT_ROLE_PERMISSIONS;
+    const stored = local ? JSON.parse(local) : {};
+    // Merge system defaults with any stored overrides from cloud/localstorage
+    return { ...DEFAULT_ROLE_PERMISSIONS, ...stored };
   },
 
   updateRolePermissions: async (role: string, permissions: RolePermissions): Promise<void> => {

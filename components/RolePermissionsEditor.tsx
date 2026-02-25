@@ -126,8 +126,8 @@ const RolePermissionsEditor: React.FC = () => {
                         key={role}
                         onClick={() => setActiveRole(role)}
                         className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${activeRole === role
-                                ? 'bg-blue-600 text-white shadow-sm'
-                                : 'text-slate-600 hover:bg-slate-50'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:bg-slate-50'
                             }`}
                     >
                         {role}
@@ -144,7 +144,9 @@ const RolePermissionsEditor: React.FC = () => {
                         </div>
                         <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
                             {keys.map(key => {
-                                const isEnabled = permissions[activeRole][key];
+                                // Safeguard: use default permission if activeRole or key is missing from state
+                                const rolePerms = permissions[activeRole] || DEFAULT_ROLE_PERMISSIONS[activeRole];
+                                const isEnabled = rolePerms?.[key] ?? DEFAULT_ROLE_PERMISSIONS[activeRole][key];
                                 return (
                                     <div key={key} className="flex items-center justify-between group">
                                         <label className="text-sm font-medium text-slate-700 group-hover:text-blue-700 cursor-pointer" htmlFor={`perm-${key}`}>
