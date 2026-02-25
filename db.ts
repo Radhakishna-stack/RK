@@ -54,6 +54,31 @@ async function fetchFromCloud(action: string, data?: any): Promise<any | null> {
 }
 
 /**
+ * Cloud-aware read: fetches from Google Sheets when configured (so all users see
+ * the same data), caches the result in localStorage, and falls back to localStorage
+ * if the network call fails or GAS is not set up.
+ *
+ * This is the key function that enables multi-user sync — without it, every device
+ * reads only its own localStorage and never sees data created by other users.
+ */
+async function cloudRead(action: string, lsKey: string, fallback: any = []): Promise<any> {
+  if (isCloudEnabled()) {
+    try {
+      const cloudData = await fetchFromCloud(action);
+      if (cloudData !== null && cloudData !== undefined) {
+        // Keep local cache fresh for offline use
+        localStorage.setItem(lsKey, JSON.stringify(cloudData));
+        return cloudData;
+      }
+    } catch {
+      // Fall through to localStorage
+    }
+  }
+  const local = localStorage.getItem(lsKey);
+  return local ? JSON.parse(local) : fallback;
+}
+
+/**
  * Migrate all localStorage data to Google Sheets in one go.
  */
 async function migrateToCloud(): Promise<string> {
@@ -403,6 +428,15 @@ export const dbService = {
   },
 
   getBankAccounts: async (): Promise<BankAccount[]> => {
+    if (isCloudEnabled()) {
+      try {
+        const cloudData = await fetchFromCloud('getBankAccounts');
+        if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
+          localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify(cloudData));
+          return cloudData;
+        }
+      } catch { /* fall through */ }
+    }
     const local = localStorage.getItem(LS_KEYS.BANK_ACCOUNTS);
     if (!local) {
       const initial = [DEFAULT_BANK];
@@ -488,7 +522,7 @@ export const dbService = {
     window.open(url, '_blank');
   },
 
-  getCustomers: async (): Promise<Customer[]> => JSON.parse(localStorage.getItem(LS_KEYS.CUSTOMERS) || '[]'),
+  getCustomers: async (): Promise<Customer[]> => cloudRead('getCustomers', LS_KEYS.CUSTOMERS, []),
   addCustomer: async (data: any): Promise<Customer> => {
     const current = await dbService.getCustomers();
     const newUser = { ...data, id: 'C' + Date.now(), loyaltyPoints: data.loyaltyPoints || 0, createdAt: new Date().toISOString() };
@@ -517,7 +551,7 @@ export const dbService = {
     }
   },
 
-  getTransactions: async (): Promise<Transaction[]> => JSON.parse(localStorage.getItem(LS_KEYS.TRANSACTIONS) || '[]'),
+  getTransactions: async (): Promise<Transaction[]> => cloudRead('getTransactions', LS_KEYS.TRANSACTIONS, []),
   addTransaction: async (data: any): Promise<Transaction> => {
     const settings = await dbService.getSettings();
     const prefix = settings.transaction.prefixes.paymentIn || 'PI-';
@@ -573,7 +607,7 @@ export const dbService = {
     return totalBilled - prepaidAmount - manualPayments;
   },
 
-  getVisitors: async (): Promise<Visitor[]> => JSON.parse(localStorage.getItem(LS_KEYS.VISITORS) || '[]'),
+  getVisitors: async (): Promise<Visitor[]> => cloudRead('getVisitors', LS_KEYS.VISITORS, []),
   addVisitor: async (data: any): Promise<Visitor> => {
     const current = await dbService.getVisitors();
     const newVisitor = { ...data, id: 'V' + Date.now(), createdAt: new Date().toISOString() };
@@ -591,7 +625,7 @@ export const dbService = {
     }
   },
 
-  getStockWanting: async (): Promise<StockWantingItem[]> => JSON.parse(localStorage.getItem(LS_KEYS.STOCK_WANTING) || '[]'),
+  getStockWanting: async (): Promise<StockWantingItem[]> => cloudRead('getStockWanting', LS_KEYS.STOCK_WANTING, []),
   addStockWantingItem: async (data: Omit<StockWantingItem, 'id' | 'createdAt'>): Promise<StockWantingItem> => {
     const current = await dbService.getStockWanting();
     const newItem = { ...data, id: 'W' + Date.now(), createdAt: new Date().toISOString() };
@@ -605,7 +639,7 @@ export const dbService = {
     syncToCloud('deleteStockWanting', { id });
   },
 
-  getComplaints: async (): Promise<Complaint[]> => JSON.parse(localStorage.getItem(LS_KEYS.COMPLAINTS) || '[]'),
+  getComplaints: async (): Promise<Complaint[]> => cloudRead('getComplaints', LS_KEYS.COMPLAINTS, []),
   addComplaint: async (data: any): Promise<Complaint> => {
     const currentComplaints = await dbService.getComplaints();
     const newComplaint = {
@@ -659,7 +693,7 @@ export const dbService = {
     }
   },
 
-  getInvoices: async (): Promise<Invoice[]> => JSON.parse(localStorage.getItem(LS_KEYS.INVOICES) || '[]'),
+  getInvoices: async (): Promise<Invoice[]> => cloudRead('getInvoices', LS_KEYS.INVOICES, []),
   generateInvoice: async (data: any): Promise<Invoice> => {
     const currentInvoices = await dbService.getInvoices();
     const accounts = await dbService.getBankAccounts();
@@ -901,7 +935,7 @@ export const dbService = {
     }
   },
 
-  getInventory: async (): Promise<InventoryItem[]> => JSON.parse(localStorage.getItem(LS_KEYS.INVENTORY) || '[]'),
+  getInventory: async (): Promise<InventoryItem[]> => cloudRead('getInventory', LS_KEYS.INVENTORY, []),
   addInventoryItem: async (data: any): Promise<InventoryItem> => {
     const current = await dbService.getInventory();
     const newItem = { ...data, id: 'S' + Date.now(), lastUpdated: new Date().toISOString() };
@@ -983,7 +1017,7 @@ export const dbService = {
     return txns.filter((t: any) => t.itemId === itemId).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
   },
 
-  getExpenses: async (): Promise<Expense[]> => JSON.parse(localStorage.getItem(LS_KEYS.EXPENSES) || '[]'),
+  getExpenses: async (): Promise<Expense[]> => cloudRead('getExpenses', LS_KEYS.EXPENSES, []),
 
   addExpense: async (data: any): Promise<Expense> => {
     const current = await dbService.getExpenses();
@@ -1057,7 +1091,7 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(current.map(e => e.id === id ? { ...e, ...updates } : e)));
   },
 
-  getReminders: async (): Promise<ServiceReminder[]> => JSON.parse(localStorage.getItem(LS_KEYS.REMINDERS) || '[]'),
+  getReminders: async (): Promise<ServiceReminder[]> => cloudRead('getReminders', LS_KEYS.REMINDERS, []),
   addReminder: async (data: any): Promise<ServiceReminder> => {
     const current = await dbService.getReminders();
     const newRem = { ...data, id: 'R' + Date.now(), status: 'Pending' };
@@ -1203,7 +1237,7 @@ export const dbService = {
   setWADeviceStatus: (status: any) => localStorage.setItem(LS_KEYS.WA_STATUS, JSON.stringify(status)),
 
 
-  getSalesmen: async (): Promise<Salesman[]> => JSON.parse(localStorage.getItem(LS_KEYS.SALESMEN) || '[]'),
+  getSalesmen: async (): Promise<Salesman[]> => cloudRead('getSalesmen', LS_KEYS.SALESMEN, []),
   addSalesman: async (data: any): Promise<Salesman> => {
     const current = await dbService.getSalesmen();
     const newStaff = {
@@ -1330,10 +1364,7 @@ export const dbService = {
     }
   },
 
-  getUsers: async (): Promise<User[]> => {
-    const users = JSON.parse(localStorage.getItem(LS_KEYS.USERS) || '[]');
-    return users;
-  },
+  getUsers: async (): Promise<User[]> => cloudRead('getUsers', LS_KEYS.USERS, []),
 
   getUserByUsername: async (username: string): Promise<User | null> => {
     const users = await dbService.getUsers();
@@ -1401,10 +1432,7 @@ export const dbService = {
   },
 
   // Payment Receipts
-  getPaymentReceipts: async (): Promise<PaymentReceipt[]> => {
-    const receipts = localStorage.getItem(LS_KEYS.PAYMENT_RECEIPTS);
-    return receipts ? JSON.parse(receipts) : [];
-  },
+  getPaymentReceipts: async (): Promise<PaymentReceipt[]> => cloudRead('getPaymentReceipts', LS_KEYS.PAYMENT_RECEIPTS, []),
 
   addPaymentReceipt: async (data: Omit<PaymentReceipt, 'id' | 'receiptNumber' | 'createdAt'>): Promise<PaymentReceipt> => {
     const current = await dbService.getPaymentReceipts();
