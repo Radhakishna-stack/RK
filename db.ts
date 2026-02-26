@@ -19,17 +19,34 @@ function isCloudEnabled(): boolean {
 
 /**
  * Fire-and-forget: POST to Google Apps Script in background.
- * Does NOT block the UI. Errors are silently logged.
+ * Does NOT block the UI but DOES log success/failure for debugging.
  */
 function syncToCloud(action: string, data?: any): void {
   const url = getGasUrl();
-  if (!url) return;
+  if (!url) {
+    console.warn('[CloudSync]', action, 'skipped — no GAS URL configured');
+    return;
+  }
 
   fetch(url, {
     method: 'POST',
+    redirect: 'follow',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action, data: data || {} }),
-  }).catch(err => console.warn('[CloudSync]', action, 'failed:', err.message));
+  })
+    .then(async (res) => {
+      try {
+        const result = await res.json();
+        if (result.success) {
+          console.log('[CloudSync]', action, '✅ synced');
+        } else {
+          console.error('[CloudSync]', action, '❌ server error:', result.error || 'Unknown');
+        }
+      } catch {
+        console.error('[CloudSync]', action, '❌ invalid response, status:', res.status);
+      }
+    })
+    .catch(err => console.error('[CloudSync]', action, '❌ network error:', err.message));
 }
 
 /**

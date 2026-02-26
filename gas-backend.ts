@@ -198,10 +198,10 @@ const CUSTOMER_FIELDS = ['id', 'name', 'phone', 'bikeNumber', 'city', 'email', '
 function getCustomers() { return getSheetData('Customers', CUSTOMER_FIELDS); }
 
 function addCustomer(data: any) {
-  const id = genId('CUST-');
-  const row = [id, data.name || '', data.phone || '', data.bikeNumber || '', data.city || '', data.email || '', data.address || '', data.gstin || '', data.loyaltyPoints || 0, nowISO()];
+  const id = data.id || genId('CUST-');
+  const row = [id, data.name || '', data.phone || '', data.bikeNumber || '', data.city || '', data.email || '', data.address || '', data.gstin || '', data.loyaltyPoints || 0, data.createdAt || nowISO()];
   getSheet('Customers').appendRow(row);
-  return { ...data, id, loyaltyPoints: data.loyaltyPoints || 0, createdAt: nowISO() };
+  return { ...data, id, loyaltyPoints: data.loyaltyPoints || 0, createdAt: data.createdAt || nowISO() };
 }
 
 function updateCustomer(data: any) {
@@ -232,12 +232,12 @@ function getInvoices() {
 }
 
 function addInvoice(data: any) {
-  const id = (data.docType === 'Estimate' ? 'EST-' : 'INV-') + genId('');
+  const id = data.id || ((data.docType === 'Estimate' ? 'EST-' : 'INV-') + genId(''));
   const itemsJson = JSON.stringify(data.items || []);
   const pc = data.paymentCollections || {};
-  const row = [id, data.complaintId || '', data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', itemsJson, data.estimatedCost || 0, data.finalAmount || 0, data.taxAmount || 0, data.subTotal || 0, data.paymentStatus || 'Pending', data.accountId || '', data.paymentMode || '', nowISO(), data.odometerReading || '', data.docType || 'Sale', data.serviceReminderDate || '', pc.cash || 0, pc.upi || 0, pc.upiAccountId || ''];
+  const row = [id, data.complaintId || '', data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', itemsJson, data.estimatedCost || 0, data.finalAmount || 0, data.taxAmount || 0, data.subTotal || 0, data.paymentStatus || 'Pending', data.accountId || '', data.paymentMode || '', data.date || nowISO(), data.odometerReading || '', data.docType || 'Sale', data.serviceReminderDate || '', pc.cash || 0, pc.upi || 0, pc.upiAccountId || ''];
   getSheet('Invoices').appendRow(row);
-  return { ...data, id, date: nowISO() };
+  return { ...data, id, date: data.date || nowISO() };
 }
 
 function updateInvoice(data: any) {
@@ -255,10 +255,10 @@ const INVENTORY_FIELDS = ['id', 'name', 'category', 'stock', 'unitPrice', 'purch
 function getInventory() { return getSheetData('Inventory', INVENTORY_FIELDS); }
 
 function addInventoryItem(data: any) {
-  const id = genId('SKU-');
-  const row = [id, data.name || '', data.category || '', data.stock || 0, data.unitPrice || 0, data.purchasePrice || 0, data.itemCode || '', data.gstRate || 0, data.hsn || '', nowISO()];
+  const id = data.id || genId('SKU-');
+  const row = [id, data.name || '', data.category || '', data.stock || 0, data.unitPrice || 0, data.purchasePrice || 0, data.itemCode || '', data.gstRate || 0, data.hsn || '', data.lastUpdated || nowISO()];
   getSheet('Inventory').appendRow(row);
-  return { ...data, id, lastUpdated: nowISO() };
+  return { ...data, id, lastUpdated: data.lastUpdated || nowISO() };
 }
 
 function updateInventoryItem(data: any) {
@@ -318,7 +318,7 @@ function getTransactions() {
 }
 
 function addTransaction(data: any) {
-  const id = genId('TXN-');
+  const id = data.id || genId('TXN-');
   const itemsJson = JSON.stringify(data.items || []);
   const row = [id, data.entityId || '', data.accountId || '', data.type || '', data.amount || 0, data.paymentMode || '', data.date || nowISO(), data.description || '', data.category || '', data.status || 'completed', data.chequeNumber || '', data.partyName || '', data.bankName || '', itemsJson];
   getSheet('Transactions').appendRow(row);
@@ -339,7 +339,7 @@ const EXPENSE_FIELDS = ['id', 'description', 'amount', 'category', 'date', 'paym
 function getExpenses() { return getSheetData('Expenses', EXPENSE_FIELDS); }
 
 function addExpense(data: any) {
-  const id = genId('EXP-');
+  const id = data.id || genId('EXP-');
   const row = [id, data.description || data.title || '', data.amount || 0, data.category || '', data.date || nowISO(), data.paymentMode || '', data.transactionId || '', data.accountId || ''];
   getSheet('Expenses').appendRow(row);
   return { ...data, id, date: data.date || nowISO() };
@@ -358,10 +358,10 @@ const BANK_FIELDS = ['id', 'name', 'bankName', 'accountNumber', 'type', 'opening
 function getBankAccounts() { return getSheetData('BankAccounts', BANK_FIELDS); }
 
 function addBankAccount(data: any) {
-  const id = genId('BANK-');
-  const row = [id, data.name || '', data.bankName || '', data.accountNumber || '', data.type || 'Savings', data.openingBalance || 0, nowISO()];
+  const id = data.id || genId('BANK-');
+  const row = [id, data.name || '', data.bankName || '', data.accountNumber || '', data.type || 'Savings', data.openingBalance || 0, data.createdAt || nowISO()];
   getSheet('BankAccounts').appendRow(row);
-  return { ...data, id, createdAt: nowISO() };
+  return { ...data, id, createdAt: data.createdAt || nowISO() };
 }
 
 function deleteBankAccount(data: any) { return deleteRow('BankAccounts', data.id); }
@@ -372,14 +372,14 @@ const PR_FIELDS = ['id', 'receiptNumber', 'customerId', 'customerName', 'custome
 function getPaymentReceipts() { return getSheetData('PaymentReceipts', PR_FIELDS); }
 
 function addPaymentReceipt(data: any) {
-  const id = genId('PR-');
+  const id = data.id || genId('PR-');
   // Auto-generate receipt number
   const sheet = getSheet('PaymentReceipts');
   const count = Math.max(0, sheet.getLastRow() - 1) + 1;
-  const receiptNumber = 'PR-' + count.toString().padStart(4, '0');
-  const row = [id, receiptNumber, data.customerId || '', data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.cashAmount || 0, data.upiAmount || 0, data.totalAmount || 0, data.date || nowISO(), data.description || '', nowISO()];
+  const receiptNumber = data.receiptNumber || ('PR-' + count.toString().padStart(4, '0'));
+  const row = [id, receiptNumber, data.customerId || '', data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.cashAmount || 0, data.upiAmount || 0, data.totalAmount || 0, data.date || nowISO(), data.description || '', data.createdAt || nowISO()];
   sheet.appendRow(row);
-  return { ...data, id, receiptNumber, createdAt: nowISO() };
+  return { ...data, id, receiptNumber, createdAt: data.createdAt || nowISO() };
 }
 
 function updatePaymentReceipt(data: any) {
@@ -395,11 +395,11 @@ const COMPLAINT_FIELDS = ['id', 'bikeNumber', 'customerName', 'customerPhone', '
 function getComplaints() { return getSheetData('Complaints', COMPLAINT_FIELDS); }
 
 function addComplaint(data: any) {
-  const id = genId('CMP-');
+  const id = data.id || genId('CMP-');
   const photos = Array.isArray(data.photoUrls) ? data.photoUrls.join(',') : (data.photoUrls || '');
-  const row = [id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'Pending', nowISO(), data.dueDate || '', data.odometerReading || ''];
+  const row = [id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'Pending', data.createdAt || nowISO(), data.dueDate || '', data.odometerReading || ''];
   getSheet('Complaints').appendRow(row);
-  return { ...data, id, status: data.status || 'Pending', createdAt: nowISO() };
+  return { ...data, id, status: data.status || 'Pending', createdAt: data.createdAt || nowISO() };
 }
 
 function updateComplaint(data: any) {
@@ -432,12 +432,12 @@ function getPickupRequests() {
 }
 
 function addPickupRequest(data: any) {
-  const id = genId('PKP-');
+  const id = data.id || genId('PKP-');
   const locationJson = data.location ? JSON.stringify(data.location) : '';
   const empLocJson = data.employeeLocation ? JSON.stringify(data.employeeLocation) : '';
-  const row = [id, data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', data.locationLink || '', locationJson, data.status || 'Pending', data.assignedEmployeeId || '', data.assignedEmployeeName || '', empLocJson, data.notes || '', nowISO(), nowISO()];
+  const row = [id, data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', data.locationLink || '', locationJson, data.status || 'Pending', data.assignedEmployeeId || '', data.assignedEmployeeName || '', empLocJson, data.notes || '', data.createdAt || nowISO(), data.updatedAt || nowISO()];
   getSheet('PickupRequests').appendRow(row);
-  return { ...data, id, status: 'Pending', createdAt: nowISO(), updatedAt: nowISO() };
+  return { ...data, id, status: data.status || 'Pending', createdAt: data.createdAt || nowISO(), updatedAt: data.updatedAt || nowISO() };
 }
 
 function updatePickupRequest(data: any) {
@@ -455,10 +455,10 @@ const SW_FIELDS = ['id', 'partNumber', 'itemName', 'quantity', 'rate', 'createdA
 function getStockWanting() { return getSheetData('StockWanting', SW_FIELDS); }
 
 function addStockWanting(data: any) {
-  const id = genId('SW-');
-  const row = [id, data.partNumber || '', data.itemName || '', data.quantity || 0, data.rate || 0, nowISO()];
+  const id = data.id || genId('SW-');
+  const row = [id, data.partNumber || '', data.itemName || '', data.quantity || 0, data.rate || 0, data.createdAt || nowISO()];
   getSheet('StockWanting').appendRow(row);
-  return { ...data, id, createdAt: nowISO() };
+  return { ...data, id, createdAt: data.createdAt || nowISO() };
 }
 
 function deleteStockWanting(data: any) { return deleteRow('StockWanting', data.id); }
@@ -469,11 +469,11 @@ const VISITOR_FIELDS = ['id', 'name', 'bikeNumber', 'phone', 'remarks', 'type', 
 function getVisitors() { return getSheetData('Visitors', VISITOR_FIELDS); }
 
 function addVisitor(data: any) {
-  const id = genId('VIS-');
+  const id = data.id || genId('VIS-');
   const photos = Array.isArray(data.photoUrls) ? data.photoUrls.join(',') : (data.photoUrls || '');
-  const row = [id, data.name || '', data.bikeNumber || '', data.phone || '', data.remarks || '', data.type || 'Other', photos, nowISO()];
+  const row = [id, data.name || '', data.bikeNumber || '', data.phone || '', data.remarks || '', data.type || 'Other', photos, data.createdAt || nowISO()];
   getSheet('Visitors').appendRow(row);
-  return { ...data, id, createdAt: nowISO() };
+  return { ...data, id, createdAt: data.createdAt || nowISO() };
 }
 
 function deleteVisitor(data: any) { return deleteRow('Visitors', data.id); }
@@ -484,7 +484,7 @@ const REMINDER_FIELDS = ['id', 'bikeNumber', 'customerName', 'phone', 'reminderD
 function getReminders() { return getSheetData('ServiceReminders', REMINDER_FIELDS); }
 
 function addReminder(data: any) {
-  const id = genId('REM-');
+  const id = data.id || genId('REM-');
   const row = [id, data.bikeNumber || '', data.customerName || '', data.phone || '', data.reminderDate || '', data.serviceType || '', data.status || 'Pending', '', data.message || '', data.serviceDate || ''];
   getSheet('ServiceReminders').appendRow(row);
   return { ...data, id, status: data.status || 'Pending' };
@@ -507,7 +507,7 @@ const ST_FIELDS = ['id', 'itemId', 'type', 'quantity', 'date', 'note'];
 function getStockTransactions() { return getSheetData('StockTransactions', ST_FIELDS); }
 
 function addStockTransaction(data: any) {
-  const id = genId('ST-');
+  const id = data.id || genId('ST-');
   const row = [id, data.itemId || '', data.type || 'IN', data.quantity || 0, data.date || nowISO(), data.note || ''];
   getSheet('StockTransactions').appendRow(row);
   return { ...data, id };
@@ -519,10 +519,10 @@ const SALESMAN_FIELDS = ['id', 'name', 'phone', 'target', 'salesCount', 'totalSa
 function getSalesmen() { return getSheetData('Salesmen', SALESMAN_FIELDS); }
 
 function addSalesman(data: any) {
-  const id = genId('SM-');
-  const row = [id, data.name || '', data.phone || '', data.target || 0, 0, 0, data.joinDate || nowISO(), data.status || 'Available'];
+  const id = data.id || genId('SM-');
+  const row = [id, data.name || '', data.phone || '', data.target || 0, data.salesCount || 0, data.totalSalesValue || 0, data.joinDate || nowISO(), data.status || 'Available'];
   getSheet('Salesmen').appendRow(row);
-  return { ...data, id, salesCount: 0, totalSalesValue: 0 };
+  return { ...data, id, salesCount: data.salesCount || 0, totalSalesValue: data.totalSalesValue || 0 };
 }
 
 function deleteSalesman(data: any) { return deleteRow('Salesmen', data.id); }
@@ -533,10 +533,10 @@ const USER_FIELDS = ['id', 'username', 'password', 'role', 'name', 'phone', 'cre
 function getUsers() { return getSheetData('Users', USER_FIELDS); }
 
 function addUser(data: any) {
-  const id = genId('USR-');
-  const row = [id, data.username || '', data.password || '', data.role || 'employee', data.name || '', data.phone || '', nowISO(), true];
+  const id = data.id || genId('USR-');
+  const row = [id, data.username || '', data.password || '', data.role || 'employee', data.name || '', data.phone || '', data.createdAt || nowISO(), data.isActive !== false];
   getSheet('Users').appendRow(row);
-  return { ...data, id, createdAt: nowISO(), isActive: true };
+  return { ...data, id, createdAt: data.createdAt || nowISO(), isActive: data.isActive !== false };
 }
 
 function updateUser(data: any) {
