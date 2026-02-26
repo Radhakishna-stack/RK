@@ -677,11 +677,17 @@ export const dbService = {
   },
   updateComplaintStatus: async (id: string, status: ComplaintStatus): Promise<void> => {
     const current = await dbService.getComplaints();
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(current.map(c => c.id === id ? { ...c, status } : c)));
+    const updated = current.map(c => c.id === id ? { ...c, status } : c);
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(updated));
+    const updatedItem = updated.find(c => c.id === id);
+    if (updatedItem) syncToCloud('updateComplaint', updatedItem);
   },
   updateComplaintPhotos: async (id: string, photos: string[]): Promise<void> => {
     const current = await dbService.getComplaints();
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(current.map(c => c.id === id ? { ...c, photoUrls: photos } : c)));
+    const updated = current.map(c => c.id === id ? { ...c, photoUrls: photos } : c);
+    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(updated));
+    const updatedItem = updated.find(c => c.id === id);
+    if (updatedItem) syncToCloud('updateComplaint', updatedItem);
   },
   deleteComplaint: async (id: string): Promise<void> => {
     const current = await dbService.getComplaints();
