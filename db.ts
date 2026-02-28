@@ -17,6 +17,91 @@ function isCloudEnabled(): boolean {
   return !!getGasUrl();
 }
 
+const OFFLINE_SYNC_QUEUE_KEY = 'mg_offline_sync_queue';
+
+interface OfflineQueueItem {
+  id: string;
+  action: string;
+  data: any;
+  timestamp: number;
+}
+
+function queueOfflineSync(action: string, data?: any) {
+  try {
+    const queueJson = localStorage.getItem(OFFLINE_SYNC_QUEUE_KEY);
+    const queue: OfflineQueueItem[] = queueJson ? JSON.parse(queueJson) : [];
+
+    // Use a unique ID so we can remove it specifically upon success
+    const newItem: OfflineQueueItem = {
+      id: Math.random().toString(36).substring(2, 9),
+      action,
+      data: data || {},
+      timestamp: Date.now()
+    };
+
+    queue.push(newItem);
+    localStorage.setItem(OFFLINE_SYNC_QUEUE_KEY, JSON.stringify(queue));
+    console.log(`[OfflineSync] Queued action '${action}' for later sync. Queue size: ${queue.length}`);
+  } catch (err) {
+    console.error('[OfflineSync] Failed to queue offline action:', err);
+  }
+}
+
+export function processOfflineSyncQueue() {
+  const url = getGasUrl();
+  if (!url || !navigator.onLine) return; // Don't try if still offline or no URL
+
+  try {
+    const queueJson = localStorage.getItem(OFFLINE_SYNC_QUEUE_KEY);
+    if (!queueJson) return;
+
+    const queue: OfflineQueueItem[] = JSON.parse(queueJson);
+    if (queue.length === 0) return;
+
+    console.log(`[OfflineSync] Processing ${queue.length} queued actions...`);
+
+    // Process one by one to maintain order
+    queue.forEach(async (item) => {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          redirect: 'follow',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: item.action, data: item.data }),
+        });
+
+        const result = await res.json();
+        if (result.success) {
+          console.log(`[OfflineSync] ✅ Action '${item.action}' synced successfully from queue.`);
+          // Remove from queue
+          const currentQueueStr = localStorage.getItem(OFFLINE_SYNC_QUEUE_KEY);
+          if (currentQueueStr) {
+            const currentQueue: OfflineQueueItem[] = JSON.parse(currentQueueStr);
+            const newQueue = currentQueue.filter(q => q.id !== item.id);
+            localStorage.setItem(OFFLINE_SYNC_QUEUE_KEY, JSON.stringify(newQueue));
+          }
+        } else {
+          console.error(`[OfflineSync] ❌ Action '${item.action}' from queue failed (server error):`, result.error);
+        }
+      } catch (err: any) {
+        console.error(`[OfflineSync] ❌ Action '${item.action}' from queue failed (network error):`, err.message);
+        // Keep in queue for next time
+      }
+    });
+
+  } catch (err) {
+    console.error('[OfflineSync] Error processing queue:', err);
+  }
+}
+
+// Auto-process queue when browser comes online
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', processOfflineSyncQueue);
+  // Also try once on startup after a small delay to let the app settle
+  setTimeout(processOfflineSyncQueue, 5000);
+}
+
+
 /**
  * Fire-and-forget: POST to Google Apps Script in background.
  * Does NOT block the UI but DOES log success/failure for debugging.
@@ -25,6 +110,13 @@ function syncToCloud(action: string, data?: any): void {
   const url = getGasUrl();
   if (!url) {
     console.warn('[CloudSync]', action, 'skipped — no GAS URL configured');
+    return;
+  }
+
+  // Fast-fail if we visibly know we are offline
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    console.warn(`[CloudSync] Browser is offline. Intercepting '${action}' and queueing locally.`);
+    queueOfflineSync(action, data);
     return;
   }
 
@@ -41,12 +133,19 @@ function syncToCloud(action: string, data?: any): void {
           console.log('[CloudSync]', action, '✅ synced');
         } else {
           console.error('[CloudSync]', action, '❌ server error:', result.error || 'Unknown');
+          // If it's a server logic error, queueing it might just fail again forever. 
+          // But if it's a 500, it might be transient. For now, queueing bad JSON or 500s:
+          queueOfflineSync(action, data);
         }
       } catch {
         console.error('[CloudSync]', action, '❌ invalid response, status:', res.status);
+        queueOfflineSync(action, data);
       }
     })
-    .catch(err => console.error('[CloudSync]', action, '❌ network error:', err.message));
+    .catch(err => {
+      console.error('[CloudSync]', action, '❌ network error:', err.message);
+      queueOfflineSync(action, data);
+    });
 }
 
 /**

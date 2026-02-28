@@ -74,6 +74,20 @@ const App: React.FC = () => {
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [loginError, setLoginError] = useState('');
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Determine active tab for UI highlighting based on current path
   const getActiveTab = (path: string) => {
@@ -236,6 +250,15 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {isOffline && (
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-md" title="Data saved locally. Will sync when reconnected.">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                <span style={{ fontFamily: "'Fira Code', monospace", fontSize: '0.7rem', fontWeight: 600, color: '#B45309', textTransform: 'uppercase' }}>
+                  Offline Mode
+                </span>
+              </div>
+            )}
+
             {/* User Role Indicator */}
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 6 }}>
               <UserIcon className="w-3.5 h-3.5 text-slate-500" />
