@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "api-security-best-practices": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "6da90ec18bec0f4748862a8d1b31c6bbad62ac6514ce0624681548ec8c0ffe66"
+    },
     "web-performance-optimization": {
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",

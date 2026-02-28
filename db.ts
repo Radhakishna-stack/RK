@@ -1377,7 +1377,7 @@ export const dbService = {
       const defaultAdmin: User = {
         id: generateUniqueId('U'),
         username: 'admin',
-        password: encryptPassword('admin123'),
+        password: await encryptPassword('admin123'),
         role: 'admin',
         name: 'Administrator',
         isActive: true,
@@ -1406,7 +1406,7 @@ export const dbService = {
     const newUser: User = {
       ...data,
       id: generateUniqueId('U'),
-      password: encryptPassword(data.password),
+      password: await encryptPassword(data.password),
       createdAt: new Date().toISOString()
     };
 
@@ -1416,17 +1416,19 @@ export const dbService = {
 
   updateUser: async (id: string, updates: Partial<Omit<User, 'id' | 'createdAt'>>): Promise<void> => {
     const users = await dbService.getUsers();
-    const updatedUsers = users.map(u => {
+    const updatedUsers: User[] = [];
+    for (const u of users) {
       if (u.id === id) {
         const user = { ...u, ...updates };
-        // If password is being updated, encrypt it
+        // If password is being updated, hash it securely
         if (updates.password) {
-          user.password = encryptPassword(updates.password);
+          user.password = await encryptPassword(updates.password);
         }
-        return user;
+        updatedUsers.push(user);
+      } else {
+        updatedUsers.push(u);
       }
-      return u;
-    });
+    }
     localStorage.setItem(LS_KEYS.USERS, JSON.stringify(updatedUsers));
   },
 
