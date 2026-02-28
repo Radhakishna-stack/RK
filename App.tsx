@@ -15,7 +15,8 @@ import {
   Shield,
   Settings,
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  Wrench
 } from 'lucide-react';
 import { AuthSession, User } from './types';
 import { getSession, login, logout, validateCredentials } from './auth';
@@ -211,31 +212,44 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden text-slate-900">
       {location.pathname !== '/market-explorer' && location.pathname !== '/horoscope' && location.pathname !== '/tech-agent' && (
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-40 no-print shadow-sm">
+        <header
+          className="bg-white px-6 py-3 flex items-center justify-between sticky top-0 z-40 no-print"
+          style={{ borderBottom: '2px solid #0F172A' }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-md">
-              <BarChart3 className="w-6 h-6 text-white" />
+            <div style={{
+              width: 38, height: 38,
+              background: 'linear-gradient(135deg, #0369A1, #0EA5E9)',
+              borderRadius: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(3,105,161,0.25)',
+            }}>
+              <Wrench size={20} color="white" />
             </div>
             <div className="flex flex-col">
-              <h1 className="text-lg font-bold tracking-tight text-slate-900">Moto Gear SRK</h1>
-              <span className="text-xs text-slate-500">Service Management</span>
+              <h1 style={{ fontFamily: "'Fira Code', monospace", fontWeight: 700, fontSize: '1.1rem', color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                MOTO GEAR <span style={{ color: '#0369A1' }}>SRK</span>
+              </h1>
+              <span style={{ fontFamily: "'Fira Code', monospace", fontSize: '0.6rem', color: '#64748B', letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 2 }}>
+                // PRO TERMINAL
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
             {/* User Role Indicator */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg">
-              <UserIcon className="w-4 h-4 text-slate-600" />
-              <span className="text-xs font-semibold text-slate-700 capitalize">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 6 }}>
+              <UserIcon className="w-3.5 h-3.5 text-slate-500" />
+              <span style={{ fontFamily: "'Fira Code', monospace", fontSize: '0.7rem', fontWeight: 600, color: '#0F172A', textTransform: 'uppercase' }}>
                 {authSession.user.name}
               </span>
-              <span className="text-xs text-slate-500">({userRole})</span>
+              <span style={{ fontFamily: "'Fira Sans', sans-serif", fontSize: '0.7rem', color: '#94A3B8' }}>({userRole})</span>
             </div>
 
             {canAccessRoute(userRole, 'staff_control') && (
               <button
                 onClick={() => navigate('/staff-control')}
                 aria-label="Staff Control Center"
-                className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors rounded-xl"
+                className="p-2 text-slate-500 hover:text-[#0369A1] hover:bg-slate-100 transition-colors rounded-md"
               >
                 <Shield className="w-5 h-5" />
               </button>
@@ -243,7 +257,7 @@ const App: React.FC = () => {
             <button
               onClick={() => navigate('/settings')}
               aria-label="Settings"
-              className="p-2.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors rounded-xl"
+              className="p-2 text-slate-500 hover:text-[#0369A1] hover:bg-slate-100 transition-colors rounded-md"
             >
               <Settings className="w-5 h-5" />
             </button>
@@ -252,7 +266,7 @@ const App: React.FC = () => {
             <button
               onClick={handleLogout}
               aria-label="Logout"
-              className="p-2.5 text-red-600 hover:text-white hover:bg-red-600 transition-all rounded-xl"
+              className="p-2 text-red-500 hover:text-white hover:bg-red-600 transition-all rounded-md"
               title="Logout"
             >
               <LogOut className="w-5 h-5" />
@@ -320,7 +334,10 @@ const App: React.FC = () => {
       </main>
 
       {(!location.pathname.includes('billing') && !location.pathname.includes('estimate/new') && !location.pathname.includes('sales') && !location.pathname.includes('complaints') && !location.pathname.includes('field-service-manager') && !location.pathname.includes('field-jobs')) && (
-        <nav className="bg-white border-t border-slate-200 flex items-center justify-around py-3 px-2 z-50 no-print shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        <nav
+          className="bg-white flex items-center justify-around py-2 px-2 z-50 no-print"
+          style={{ borderTop: '2px solid #E2E8F0' }}
+        >
           <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
           <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
           <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money'} onClick={() => navigate('/money')} />
@@ -341,13 +358,30 @@ const BottomNavItem: React.FC<{
     onClick={onClick}
     aria-label={label}
     aria-current={active ? 'page' : undefined}
-    className={`flex flex-col items-center gap-1 min-w-[70px] transition-all ${active ? 'text-blue-600' : 'text-slate-400'
-      }`}
+    className="flex flex-col items-center gap-1.5 min-w-[70px] relative transition-colors"
+    style={{ padding: '0.4rem 0' }}
   >
-    <div className={`p-2.5 rounded-2xl transition-all ${active ? 'bg-blue-50' : 'bg-transparent'}`}>
-      {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
+    {/* Sharp active indicator line */}
+    {active && (
+      <div style={{ position: 'absolute', top: '-0.5rem', left: '15%', right: '15%', height: '3px', background: '#0369A1', borderRadius: '0 0 4px 4px' }} />
+    )}
+    <div style={{
+      color: active ? '#0369A1' : '#94A3B8',
+      transition: 'color 0.2s ease',
+      transform: active ? 'translateY(1px)' : 'none'
+    }}>
+      {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-[22px] h-[22px]' })}
     </div>
-    <span className="text-xs font-semibold">{label}</span>
+    <span style={{
+      fontFamily: "'Fira Code', monospace",
+      fontSize: '0.65rem',
+      fontWeight: active ? 700 : 500,
+      color: active ? '#0F172A' : '#64748B',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em'
+    }}>
+      {label}
+    </span>
   </button>
 );
 
