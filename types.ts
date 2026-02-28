@@ -550,6 +550,10 @@ export interface AppSettings {
     enabled: boolean;
     allowJournalEntries: boolean;
   };
+  whatsapp?: {
+    kapsoApiKey: string;
+    phoneNumberId: string;
+  };
 }
 
 // Authentication & Authorization Types

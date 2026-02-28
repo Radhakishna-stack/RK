@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Building, Key, Bell, Palette, Database, Globe, Users, UserPlus, Edit2, Trash2, ToggleLeft, ToggleRight, Shield, Eye, EyeOff, ArrowLeft, Tag } from 'lucide-react';
+import { Settings as SettingsIcon, Building, Key, Bell, Palette, Database, Globe, Users, UserPlus, Edit2, Trash2, ToggleLeft, ToggleRight, Shield, Eye, EyeOff, ArrowLeft, Tag, MessageSquare } from 'lucide-react';
 import { dbService } from '../db';
 import { AppSettings, User, UserRole } from '../types';
 import RolePermissionsEditor from '../components/RolePermissionsEditor';
@@ -17,7 +17,7 @@ interface SettingsPageProps {
 const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business', onNavigate }) => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'business' | 'prefixes' | 'api' | 'notifications' | 'appearance' | 'users' | 'permissions'>(initialSection as any || 'business');
+  const [activeSection, setActiveSection] = useState<'business' | 'prefixes' | 'api' | 'whatsapp' | 'notifications' | 'appearance' | 'users' | 'permissions'>(initialSection as any || 'business');
   const [users, setUsers] = useState<User[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -33,6 +33,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
 
   const [apiForm, setApiForm] = useState({
     geminiApiKey: ''
+  });
+
+  const [whatsappForm, setWhatsappForm] = useState({
+    kapsoApiKey: '',
+    phoneNumberId: ''
   });
 
   const [prefixForm, setPrefixForm] = useState({
@@ -95,6 +100,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
       setApiForm({
         geminiApiKey: localStorage.getItem('gemini_api_key') || ''
       });
+
+      if (data && data.whatsapp) {
+        setWhatsappForm({
+          kapsoApiKey: data.whatsapp.kapsoApiKey || '',
+          phoneNumberId: data.whatsapp.phoneNumberId || ''
+        });
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -140,6 +152,24 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
   const saveApiKey = () => {
     localStorage.setItem('gemini_api_key', apiForm.geminiApiKey);
     alert('API key saved successfully!');
+  };
+
+  const saveWhatsappConfig = async () => {
+    try {
+      if (settings) {
+        const updated = {
+          ...settings,
+          whatsapp: {
+            ...settings.whatsapp,
+            ...whatsappForm
+          }
+        };
+        await dbService.updateSettings(updated);
+        alert('WhatsApp Integration settings saved successfully!');
+      }
+    } catch (err) {
+      alert('Failed to save WhatsApp settings.');
+    }
   };
 
   const savePrefixes = async () => {
@@ -244,6 +274,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
     { id: 'business' as const, icon: Building, label: 'Business Info' },
     { id: 'prefixes' as const, icon: Tag, label: 'Prefixes' },
     { id: 'api' as const, icon: Key, label: 'API Keys' },
+    { id: 'whatsapp' as const, icon: MessageSquare, label: 'WhatsApp API' },
     ...(currentUserRole === 'admin' ? [
       { id: 'users' as const, icon: Users, label: 'Users' },
       { id: 'permissions' as const, icon: Shield, label: 'Permissions' }
@@ -420,6 +451,49 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ initialSection = 'business'
                   >
                     Google AI Studio
                   </a>
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {activeSection === 'whatsapp' && (
+        <div className="space-y-4">
+          <Card>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">WhatsApp Service Updates</h3>
+                <p className="text-sm text-slate-600">Automate customer notifications when service statuses change using the Kapso platform.</p>
+              </div>
+
+              <Input
+                label="Kapso API Key"
+                type="password"
+                placeholder="Enter your Kapso API Key"
+                value={whatsappForm.kapsoApiKey}
+                onChange={(e) => setWhatsappForm({ ...whatsappForm, kapsoApiKey: e.target.value })}
+                icon={<Key className="w-5 h-5" />}
+                helperText="Keep this secret. Provides access to send template messages."
+              />
+
+              <Input
+                label="WhatsApp Phone Number ID"
+                type="text"
+                placeholder="e.g. 101234567890123"
+                value={whatsappForm.phoneNumberId}
+                onChange={(e) => setWhatsappForm({ ...whatsappForm, phoneNumberId: e.target.value })}
+                icon={<MessageSquare className="w-5 h-5" />}
+                helperText="The Meta Graph ID for the sending phone number."
+              />
+
+              <Button onClick={saveWhatsappConfig} className="w-full">
+                Save WhatsApp Settings
+              </Button>
+
+              <div className="pt-4 border-t border-slate-200">
+                <p className="text-xs text-slate-600">
+                  Documentation and templates are managed via the <a href="https://console.kapso.ai/" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold hover:underline">Kapso Console</a>.
                 </p>
               </div>
             </div>

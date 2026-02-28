@@ -11,6 +11,11 @@
       "sourceType": "github",
       "computedHash": "1a0073004e949e28811a83b2d77dbabfd4cf7bccb4546d3e7c61228a21e1ba59"
     },
+    "integrate-whatsapp": {
+      "source": "gokapso/agent-skills",
+      "sourceType": "github",
+      "computedHash": "51f5f7406db562945c87aaf0892dd1d121088e0f13500ff5ecadf64ac1993f95"
+    },
     "mobile-design": {
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",

@@ -1,6 +1,6 @@
-// Field Service Manager - Job Assignment & Employee Tracking
 import { FieldServiceJob, EmployeeLocation, FieldJobStatus, EmployeeStatus, Salesman } from '../types';
 import { pwaManager } from './pwaManager';
+import { whatsappService } from './whatsappService';
 
 // In-memory storage (will be replaced with Firebase/Supabase later)
 class FieldServiceStore {
@@ -178,7 +178,6 @@ export class FieldServiceManager {
 
         const updates: Partial<FieldServiceJob> = { status, notes };
 
-        // Update timestamps based on status
         switch (status) {
             case FieldJobStatus.ACCEPTED:
                 updates.acceptedAt = new Date().toISOString();
@@ -191,6 +190,17 @@ export class FieldServiceManager {
                 break;
             case FieldJobStatus.COMPLETED:
                 updates.completedAt = new Date().toISOString();
+                // Trigger WhatsApp Notification
+                if (job.status !== FieldJobStatus.COMPLETED && job.customerPhone) {
+                    whatsappService.sendTemplateMessage({
+                        to: job.customerPhone,
+                        templateName: 'service_ready',
+                        namedParameters: {
+                            customer_name: job.customerName,
+                            bike_number: job.bikeNumber
+                        }
+                    }).catch(console.error);
+                }
                 break;
         }
 
