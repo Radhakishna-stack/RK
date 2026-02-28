@@ -159,6 +159,8 @@ export interface FieldServiceJob {
   completedAt?: string;
   estimatedCost?: number;
   notes?: string;
+  estimatedDurationMinutes?: number; // Target completion time
+  actualDurationMinutes?: number;    // Calculated actual time spent
 }
 
 // Real-time Employee Location
@@ -290,6 +292,7 @@ export interface InventoryItem {
   itemCode: string;
   gstRate?: number;
   hsn?: string;
+  lowStockThreshold?: number;
   lastUpdated: string;
 }
 
@@ -593,4 +596,15 @@ export interface RolePermissions {
   canAccessBilling: boolean;
   canAccessPurchase: boolean;
   canAccessAnalytics: boolean;
+}
+
+export interface AuditLog {
+  id: string;
+  userId: string;
+  userName: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'STATUS_CHANGE';
+  entityType: 'INVOICE' | 'JOB' | 'PAYMENT' | 'CUSTOMER' | 'SETTINGS' | 'INVENTORY';
+  entityId: string;
+  description: string;
+  timestamp: string;
 }

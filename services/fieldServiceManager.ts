@@ -1,6 +1,8 @@
 import { FieldServiceJob, EmployeeLocation, FieldJobStatus, EmployeeStatus, Salesman } from '../types';
 import { pwaManager } from './pwaManager';
 import { whatsappService } from './whatsappService';
+import { dbService } from '../db';
+import { getSession } from '../auth';
 
 // In-memory storage (will be replaced with Firebase/Supabase later)
 class FieldServiceStore {
@@ -189,7 +191,16 @@ export class FieldServiceManager {
                 updates.arrivedAt = new Date().toISOString();
                 break;
             case FieldJobStatus.COMPLETED:
-                updates.completedAt = new Date().toISOString();
+                const now = new Date();
+                updates.completedAt = now.toISOString();
+
+                // Calculate performance metric (actual duration)
+                if (job.startedAt) {
+                    const startedTime = new Date(job.startedAt).getTime();
+                    const diffMs = now.getTime() - startedTime;
+                    updates.actualDurationMinutes = Math.round(diffMs / 60000); // Convert to minutes
+                }
+
                 // Trigger WhatsApp Notification
                 if (job.status !== FieldJobStatus.COMPLETED && job.customerPhone) {
                     whatsappService.sendTemplateMessage({
@@ -205,6 +216,20 @@ export class FieldServiceManager {
         }
 
         store.updateJob(jobId, updates);
+
+        // Log Audit Trail
+        const session = getSession();
+        if (session && session.user) {
+            dbService.addAuditLog({
+                userId: session.user.id,
+                userName: session.user.name,
+                action: 'STATUS_CHANGE',
+                entityType: 'JOB',
+                entityId: jobId,
+                description: `Changed Job Card status to ${status}`
+            }).catch(console.error);
+        }
+
         console.log(`Job ${jobId} status updated to ${status}`);
 
         return true;

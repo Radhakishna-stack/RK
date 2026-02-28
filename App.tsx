@@ -57,6 +57,7 @@ const PaymentVoucherPage = React.lazy(() => import('./pages/PaymentVoucher'));
 const CloudSyncPage = React.lazy(() => import('./pages/CloudSync'));
 const CustomerBooking = React.lazy(() => import('./pages/CustomerBooking'));
 const PickupManagerPage = React.lazy(() => import('./pages/PickupManager'));
+const AuditLogsPage = React.lazy(() => import('./pages/AuditLogs'));
 
 // ── Suspense fallback spinner (skill: always show loading state) ──
 const PageLoader = () => (
@@ -179,7 +180,8 @@ const App: React.FC = () => {
         'field_jobs': '/field-jobs',
         'field_service_manager': '/field-service-manager',
         'cloud_sync': '/cloud-sync',
-        'pickup_manager': '/pickup-manager'
+        'pickup_manager': '/pickup-manager',
+        'audit_logs': '/audit-logs'
       };
       targetPath = routeMap[path] || `/${path}`;
     }
@@ -348,6 +350,7 @@ const App: React.FC = () => {
               <Route path="/cloud-sync" element={<CloudSyncPage onNavigate={handleNavigate} />} />
 
               <Route path="/pickup-manager" element={<PickupManagerPage onNavigate={handleNavigate} />} />
+              <Route path="/audit-logs" element={<ProtectedRoute feature="staff_control"><AuditLogsPage onNavigate={handleNavigate} /></ProtectedRoute>} />
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" />} />

@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import {
-  Plus, Search, Package, TrendingDown, TrendingUp, AlertCircle, Edit3, Trash2, ArrowLeft
+  Plus, Search, Package, TrendingDown, TrendingUp, AlertCircle, Edit3, Trash2, ArrowLeft, Filter
 } from 'lucide-react';
 import { dbService } from '../db';
 import { InventoryItem } from '../types';
@@ -19,6 +18,7 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -29,7 +29,8 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
     stock: '',
     unitPrice: '',
     purchasePrice: '',
-    itemCode: ''
+    itemCode: '',
+    lowStockThreshold: ''
   });
 
   useEffect(() => {
@@ -53,22 +54,35 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
     setIsSubmitting(true);
     try {
       if (editingItem) {
-        // Update existing item
-        await dbService.updateStock(editingItem.id, parseInt(formData.stock) - editingItem.stock, 'Manual Update');
+        // Update existing item attributes
+        await dbService.updateInventory(editingItem.id, {
+          name: formData.name,
+          category: formData.category,
+          itemCode: formData.itemCode,
+          unitPrice: parseFloat(formData.unitPrice) || 0,
+          purchasePrice: parseFloat(formData.purchasePrice) || 0,
+          lowStockThreshold: formData.lowStockThreshold ? parseInt(formData.lowStockThreshold) : undefined
+        });
+
+        // Ensure stock timeline gets updated correctly if stock is manually tweaked
+        if (parseInt(formData.stock) !== editingItem.stock) {
+          await dbService.updateStock(editingItem.id, parseInt(formData.stock) - editingItem.stock, 'Manual Update');
+        }
       } else {
         // Add new item
         await dbService.addInventoryItem({
           ...formData,
           stock: parseInt(formData.stock) || 0,
           unitPrice: parseFloat(formData.unitPrice) || 0,
-          purchasePrice: parseFloat(formData.purchasePrice) || 0
+          purchasePrice: parseFloat(formData.purchasePrice) || 0,
+          lowStockThreshold: formData.lowStockThreshold ? parseInt(formData.lowStockThreshold) : undefined
         });
       }
 
       await loadData();
       setIsModalOpen(false);
       setEditingItem(null);
-      setFormData({ name: '', category: '', stock: '', unitPrice: '', purchasePrice: '', itemCode: '' });
+      setFormData({ name: '', category: '', stock: '', unitPrice: '', purchasePrice: '', itemCode: '', lowStockThreshold: '' });
     } catch (err) {
       alert('Failed to save item. Please try again.');
     } finally {
@@ -91,19 +105,24 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
       stock: item.stock.toString(),
       unitPrice: item.unitPrice.toString(),
       purchasePrice: item.purchasePrice.toString(),
-      itemCode: item.itemCode
+      itemCode: item.itemCode,
+      lowStockThreshold: item.lowStockThreshold?.toString() || ''
     });
     setIsModalOpen(true);
   };
 
-  const filteredItems = items.filter(item =>
+  let filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.itemCode.toLowerCase().includes(searchTerm.toLowerCase())
+    (item.itemCode && item.itemCode.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  if (showLowStockOnly) {
+    filteredItems = filteredItems.filter(item => item.stock <= (item.lowStockThreshold || 5));
+  }
+
   // Categorize items by stock level
-  const lowStockItems = items.filter(item => item.stock < 10);
+  const lowStockItems = items.filter(item => item.stock <= (item.lowStockThreshold || 5));
 
   if (loading) {
     return (
@@ -131,7 +150,7 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
         </div>
         <Button onClick={() => {
           setEditingItem(null);
-          setFormData({ name: '', category: '', stock: '', unitPrice: '', purchasePrice: '', itemCode: '' });
+          setFormData({ name: '', category: '', stock: '', unitPrice: '', purchasePrice: '', itemCode: '', lowStockThreshold: '' });
           setIsModalOpen(true);
         }}>
           <Plus className="w-5 h-5 mr-2" />
@@ -154,14 +173,26 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
         </Card>
       )}
 
-      {/* Search */}
-      <Input
-        type="text"
-        placeholder="Search by name, category, or item code..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        icon={<Search className="w-5 h-5" />}
-      />
+      {/* Filters */}
+      <div className="flex gap-3">
+        <div className="flex-1">
+          <Input
+            type="text"
+            placeholder="Search by name, category, or item code..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            icon={<Search className="w-5 h-5" />}
+          />
+        </div>
+        <Button
+          variant={showLowStockOnly ? 'primary' : 'outline'}
+          onClick={() => setShowLowStockOnly(!showLowStockOnly)}
+          className={showLowStockOnly ? 'bg-amber-600 hover:bg-amber-700 text-white border-transparent shadow' : ''}
+        >
+          <Filter className="w-4 h-4 mr-2" />
+          Low Stock
+        </Button>
+      </div>
 
       {/* Items Grid */}
       <div className="space-y-3">
@@ -170,14 +201,14 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
             <div className="text-center py-12">
               <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                {searchTerm ? 'No matching items' : 'No inventory items'}
+                {searchTerm || showLowStockOnly ? 'No matching items' : 'No inventory items'}
               </h3>
               <p className="text-slate-600 mb-4">
-                {searchTerm
-                  ? 'Try a different search term'
+                {searchTerm || showLowStockOnly
+                  ? 'Try a different search term or clear the filter'
                   : 'Add your first inventory item to get started'}
               </p>
-              {!searchTerm && (
+              {!searchTerm && !showLowStockOnly && (
                 <Button onClick={() => setIsModalOpen(true)}>
                   <Plus className="w-5 h-5 mr-2" />
                   Add First Item
@@ -201,12 +232,12 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
                     <div className="flex items-center gap-2">
                       <Package className="w-4 h-4 text-slate-500" />
                       <span className="text-sm">
-                        Stock: <span className={`font-semibold ${item.stock < 10 ? 'text-amber-600' : 'text-slate-900'}`}>
+                        Stock: <span className={`font-semibold ${item.stock <= (item.lowStockThreshold || 5) ? 'text-amber-600' : 'text-slate-900'}`}>
                           {item.stock}
                         </span>
                       </span>
                     </div>
-                    {item.stock < 10 && (
+                    {item.stock <= (item.lowStockThreshold || 5) && (
                       <Badge variant="warning" size="sm">Low Stock</Badge>
                     )}
                   </div>
@@ -223,10 +254,15 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
                     </div>
                   </div>
 
-                  {/* Item Code */}
-                  {item.itemCode && (
-                    <p className="text-xs text-slate-500 font-mono">Code: {item.itemCode}</p>
-                  )}
+                  {/* Item Code & Threshold */}
+                  <div className="flex gap-4">
+                    {item.itemCode && (
+                      <p className="text-xs text-slate-500 font-mono">Code: {item.itemCode}</p>
+                    )}
+                    {(item.lowStockThreshold) && (
+                      <p className="text-xs text-slate-500 font-mono">Alert @ {item.lowStockThreshold}</p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Actions */}
@@ -290,14 +326,24 @@ const InventoryPage: React.FC<InventoryPageProps> = ({ onNavigate }) => {
             />
           </div>
 
-          <Input
-            label="Stock Quantity"
-            type="number"
-            required
-            placeholder="0"
-            value={formData.stock}
-            onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Stock Quantity"
+              type="number"
+              required
+              placeholder="0"
+              value={formData.stock}
+              onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+            />
+
+            <Input
+              label="Low Stock Alert Threshold"
+              type="number"
+              placeholder="Default: 5"
+              value={formData.lowStockThreshold}
+              onChange={(e) => setFormData({ ...formData, lowStockThreshold: e.target.value })}
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Input

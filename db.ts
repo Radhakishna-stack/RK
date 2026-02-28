@@ -1,7 +1,6 @@
-
-import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole, PaymentReceipt, PickupRequest, PickupStatus } from './types';
+import { Customer, Visitor, Complaint, Invoice, InvoiceItem, InventoryItem, Expense, ComplaintStatus, DashboardStats, ServiceReminder, AdSuggestion, AppSettings, StockTransaction, Salesman, StockWantingItem, RecycleBinItem, RecycleBinCategory, Transaction, BankAccount, User, UserRole, PaymentReceipt, PickupRequest, PickupStatus, AuditLog } from './types';
 import { GoogleGenAI, Type } from "@google/genai";
-import { encryptPassword } from './auth';
+import { encryptPassword, getSession } from './auth';
 
 // ============================================
 // Google Sheets Sync Layer
@@ -282,7 +281,8 @@ const LS_KEYS = {
   BANK_ACCOUNTS: 'mg_bank_accounts',
   USERS: 'mg_users',
   PAYMENT_RECEIPTS: 'mg_payment_receipts',
-  PICKUP_REQUESTS: 'mg_pickup_requests'
+  PICKUP_REQUESTS: 'mg_pickup_requests',
+  AUDIT_LOGS: 'mg_audit_logs'
 };
 
 const DEFAULT_BANK: BankAccount = {
@@ -378,7 +378,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   reminders: { enabled: true, autoSchedule: true, manualDateSelection: true, defaultInterval: '3 Months', reminderTemplate: 'Hello {{CustomerName}}, your bike {{BikeNumber}} is due for service.', reminderDaysBefore: 3, remindersPerDay: 1 },
   accounting: { enabled: false, allowJournalEntries: false }
 };
-
+// In-memory cache
+const cache: Partial<Record<keyof typeof LS_KEYS, any>> = {};
 // Import default permissions to use as fallback
 import { ROLE_PERMISSIONS as DEFAULT_ROLE_PERMISSIONS } from './permissions';
 import { RolePermissions } from './types';
@@ -1058,6 +1059,12 @@ export const dbService = {
   },
 
   getInventory: async (): Promise<InventoryItem[]> => cloudRead('getInventory', LS_KEYS.INVENTORY, []),
+
+  getLowStockItems: async (): Promise<InventoryItem[]> => {
+    const inventory = await dbService.getInventory();
+    return inventory.filter(item => item.stock <= (item.lowStockThreshold || 5));
+  },
+
   addInventoryItem: async (data: any): Promise<InventoryItem> => {
     const current = await dbService.getInventory();
     const newItem = { ...data, id: 'S' + Date.now(), lastUpdated: new Date().toISOString() };
@@ -1141,7 +1148,7 @@ export const dbService = {
 
   getExpenses: async (): Promise<Expense[]> => cloudRead('getExpenses', LS_KEYS.EXPENSES, []),
 
-  addExpense: async (data: any): Promise<Expense> => {
+  addExpense: async (data: any, skipTransaction: boolean = false): Promise<Expense> => {
     const current = await dbService.getExpenses();
     const accounts = await dbService.getBankAccounts();
 
@@ -1158,22 +1165,28 @@ export const dbService = {
       // But typically there's a Bank account.
     }
 
-    // Create Transaction first
-    const newTxn = await dbService.addTransaction({
-      entityId: 'EXPENSE',
-      accountId: accountId,
-      type: 'OUT',
-      amount: data.amount,
-      paymentMode: data.paymentMode,
-      description: `Expense: ${data.description} (${data.category})`,
-      date: data.date || new Date().toISOString()
-    });
+    let transactionId = data.transactionId;
+
+    // Create Transaction first ONLY if we aren't explicitly skipping it 
+    // (e.g., when syncing directly from a Purchase Entry that already logged its own transaction)
+    if (!skipTransaction) {
+      const newTxn = await dbService.addTransaction({
+        entityId: 'EXPENSE',
+        accountId: accountId,
+        type: 'OUT',
+        amount: data.amount,
+        paymentMode: data.paymentMode,
+        description: `Expense: ${data.description} (${data.category})`,
+        date: data.date || new Date().toISOString()
+      });
+      transactionId = newTxn.id;
+    }
 
     const newExp = {
       ...data,
       id: getTxnPrefix('expense') + Date.now(),
       date: data.date || new Date().toISOString(),
-      transactionId: newTxn.id,
+      transactionId: transactionId || '',
       accountId: accountId
     };
 
@@ -1211,6 +1224,7 @@ export const dbService = {
     }
 
     localStorage.setItem(LS_KEYS.EXPENSES, JSON.stringify(current.map(e => e.id === id ? { ...e, ...updates } : e)));
+    syncToCloud('updateExpense', { ...updates, id });
   },
 
   getReminders: async (): Promise<ServiceReminder[]> => cloudRead('getReminders', LS_KEYS.REMINDERS, []),
@@ -2067,12 +2081,57 @@ export const dbService = {
     return newPickup;
   },
 
-  updatePickupRequest: async (id: string, updates: Partial<PickupRequest>): Promise<void> => {
-    const current = await dbService.getPickupRequests();
-    const updated = current.map(p => p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p);
-    localStorage.setItem(LS_KEYS.PICKUP_REQUESTS, JSON.stringify(updated));
-    const updatedItem = updated.find(p => p.id === id);
-    if (updatedItem) syncToCloud('updatePickupRequest', updatedItem);
+  updatePickupRequest: async (request: PickupRequest): Promise<boolean> => {
+    const requests = await dbService.getPickupRequests();
+    const index = requests.findIndex(r => r.id === request.id);
+    if (index !== -1) {
+      requests[index] = request;
+      localStorage.setItem(LS_KEYS.PICKUP_REQUESTS, JSON.stringify(requests));
+      // Optionally queue offline sync: queueOfflineSync('update_pickup_request', request);
+      return true;
+    }
+    return false;
+  },
+
+  // ============================================
+  // Audit Logs
+  // ============================================
+
+  getAuditLogs: async (): Promise<AuditLog[]> => {
+    try {
+      const data = localStorage.getItem(LS_KEYS.AUDIT_LOGS);
+      if (data) {
+        return JSON.parse(data);
+      }
+      return [];
+    } catch (err) {
+      console.error('Failed to get audit logs:', err);
+      return [];
+    }
+  },
+
+  addAuditLog: async (log: Omit<AuditLog, 'id' | 'timestamp'>): Promise<AuditLog> => {
+    try {
+      const logs = await dbService.getAuditLogs();
+      const newLog: AuditLog = {
+        ...log,
+        id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString()
+      };
+
+      logs.unshift(newLog); // Add to beginning (newest first)
+
+      // Keep only the last 1000 logs to prevent localStorage bloat
+      if (logs.length > 1000) {
+        logs.pop();
+      }
+
+      localStorage.setItem(LS_KEYS.AUDIT_LOGS, JSON.stringify(logs));
+      return newLog;
+    } catch (err) {
+      console.error('Failed to add audit log:', err);
+      throw err;
+    }
   },
 
   updateEmployeeGpsLocation: async (pickupId: string, lat: number, lng: number): Promise<void> => {

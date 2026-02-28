@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import {
   Plus, Search, Settings, ChevronRight, Loader2, ArrowUpRight,
   ArrowDownRight, Landmark, Wallet, Box, TrendingUp, IndianRupee,
-  Bell, User, CreditCard, ChevronDown
+  Bell, User, CreditCard, ChevronDown, AlertCircle
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import { dbService } from '../db';
-import { DashboardStats, InventoryItem, Invoice } from '../types';
+import { fieldServiceManager } from '../services/fieldServiceManager';
+import { DashboardStats, InventoryItem, Invoice, Salesman, FieldServiceJob } from '../types';
+import MechanicPerformanceDashboard from '../components/MechanicPerformanceDashboard';
 
 interface DashboardV2Props {
   onNavigate: (tab: string) => void;
@@ -17,6 +19,9 @@ interface DashboardV2Props {
 const DashboardV2: React.FC<DashboardV2Props> = ({ onNavigate }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [lowStockItems, setLowStockItems] = useState<InventoryItem[]>([]);
+  const [mechanics, setMechanics] = useState<Salesman[]>([]);
+  const [jobs, setJobs] = useState<FieldServiceJob[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,12 +31,18 @@ const DashboardV2: React.FC<DashboardV2Props> = ({ onNavigate }) => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [sData, iData] = await Promise.all([
+      const [sData, iData, lowStockData, salesmenData] = await Promise.all([
         dbService.getDashboardStats(),
-        dbService.getInventory()
+        dbService.getInventory(),
+        dbService.getLowStockItems(),
+        dbService.getSalesmen()
       ]);
       setStats(sData);
       setInventory(iData);
+      setLowStockItems(lowStockData);
+      setMechanics(salesmenData);
+      // Field jobs are stored in the memory manager currently
+      setJobs(fieldServiceManager.getAllJobs());
     } catch (err) {
       console.error("Dashboard V2 load failed:", err);
     } finally {
@@ -59,6 +70,25 @@ const DashboardV2: React.FC<DashboardV2Props> = ({ onNavigate }) => {
 
       {/* ── Dashboard Content ── */}
       <div className="space-y-4">
+
+        {/* Global Alerts */}
+        {lowStockItems.length > 0 && (
+          <div
+            onClick={() => onNavigate('inventory')}
+            className="cursor-pointer mb-2"
+            style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderLeft: '3px solid #F59E0B', borderRadius: '6px', padding: '1rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}
+          >
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 style={{ fontFamily: "'Fira Code', monospace", fontSize: '0.8rem', fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+                Inventory Alert
+              </h4>
+              <p style={{ fontFamily: "'Fira Sans', sans-serif", fontSize: '0.85rem', color: '#B45309' }}>
+                You have {lowStockItems.length} item{lowStockItems.length > 1 ? 's' : ''} running dangerously low on stock. Tap to reorder.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Receivables/Payables Cards (Structural Minimalist) */}
         <div className="grid grid-cols-2 gap-4">
@@ -201,6 +231,11 @@ const DashboardV2: React.FC<DashboardV2Props> = ({ onNavigate }) => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Mechanic Performance Dashboard / Leaderboard */}
+        <div style={{ marginBottom: '2rem' }}>
+          <MechanicPerformanceDashboard mechanics={mechanics} jobs={jobs} />
         </div>
       </div>
 

@@ -295,9 +295,30 @@ const PurchaseEntryPage: React.FC<PurchaseEntryPageProps> = ({ onNavigate }) => 
 
             if (editingTransactionId) {
                 await dbService.updateTransaction(editingTransactionId, txnData);
+                // Automated Expense Sync (Edit)
+                const expenses = await dbService.getExpenses();
+                const relatedExpense = expenses.find(e => e.transactionId === editingTransactionId);
+                if (relatedExpense) {
+                    await dbService.updateExpense(relatedExpense.id, {
+                        amount: totalAmount,
+                        description: `Purchase from ${supplierName} ${invoiceNumber ? `(Ref: ${invoiceNumber})` : ''}`,
+                        date: date,
+                        paymentMode: paymentStatus === 'Credit' ? 'Credit' : paymentMode,
+                    });
+                }
             } else {
                 const newTxn = await dbService.addTransaction(txnData);
                 savedTxnId = newTxn.id;
+
+                // Automated Expense Sync (New)
+                await dbService.addExpense({
+                    description: `Purchase from ${supplierName} ${invoiceNumber ? `(Ref: ${invoiceNumber})` : ''}`,
+                    amount: totalAmount,
+                    category: 'Inventory Purchase',
+                    date: date,
+                    paymentMode: paymentStatus === 'Credit' ? 'Credit' : paymentMode,
+                    transactionId: savedTxnId,
+                }, true); // skipTransaction = true
             }
 
             // 3. Handle Payment (Outgoing)

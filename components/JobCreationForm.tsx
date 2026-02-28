@@ -21,6 +21,7 @@ const JobCreationForm: React.FC<JobCreationFormProps> = ({ onClose, onJobCreated
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [bikeNumber, setBikeNumber] = useState('');
     const [issueDescription, setIssueDescription] = useState('');
+    const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState<number | ''>('');
     const [priority, setPriority] = useState<'Low' | 'Medium' | 'High' | 'Urgent'>('Medium');
     const [location, setLocation] = useState({ lat: 0, lng: 0, address: '' });
     const [selectedEmployee, setSelectedEmployee] = useState<string>('');
@@ -96,7 +97,8 @@ const JobCreationForm: React.FC<JobCreationFormProps> = ({ onClose, onJobCreated
             bikeNumber: bikeNumber || selectedCustomer.bikeNumber,
             issueDescription,
             priority,
-            location
+            location,
+            estimatedDurationMinutes: typeof estimatedDurationMinutes === 'number' ? estimatedDurationMinutes : undefined
         });
 
         // Assign to employee if selected
@@ -240,6 +242,21 @@ const JobCreationForm: React.FC<JobCreationFormProps> = ({ onClose, onJobCreated
                                 placeholder="Describe the vehicle issue..."
                                 rows={4}
                                 className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+                            />
+                        </div>
+
+                        {/* Estimated Duration */}
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                Estimated Duration (Minutes)
+                            </label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={estimatedDurationMinutes}
+                                onChange={(e) => setEstimatedDurationMinutes(e.target.value === '' ? '' : parseInt(e.target.value))}
+                                placeholder="e.g. 60"
+                                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                             />
                         </div>
 
