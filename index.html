@@ -1,6 +1,6 @@
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -10,50 +10,256 @@
     <link rel="manifest" href="/manifest.json">
     <title>Moto Gear SRK | Pro Terminal</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Google Fonts: Inter (Minimal Swiss — recommended for dashboards by ui-ux-pro-max skill) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
     <style>
-        body { 
-            font-family: 'Inter', sans-serif; 
-            overscroll-behavior-y: contain;
-            background-color: #F8FAFC;
-        }
-        @media print {
-            .no-print { display: none !important; }
-            .print-only { display: block !important; }
-            body { background: white !important; }
-            @page { margin: 0; }
-        }
-        .print-only { display: none; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        .animate-in {
-            animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        @keyframes slide-up {
-            from { transform: translateY(10px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+        /* ================================================
+           DESIGN TOKENS — ui-ux-pro-max skill
+           Product: Service Management Dashboard (B2B Service)
+           Style: Flat Design + Vibrant (SaaS/Dashboard)
+           Typography: Minimal Swiss — Inter
+           Palette: Trust Blue + Slate + Orange Accent
+           ================================================ */
+        :root {
+            /* Primary colors */
+            --color-primary: #2563EB;
+            --color-primary-light: #3B82F6;
+            --color-primary-dark: #1D4ED8;
+
+            /* Accent */
+            --color-accent: #F97316;
+            --color-accent-light: #FB923C;
+
+            /* Success / Warning / Error */
+            --color-success: #22C55E;
+            --color-warning: #F59E0B;
+            --color-error: #EF4444;
+
+            /* Backgrounds & surfaces */
+            --color-bg: #F8FAFC;
+            --color-surface: #FFFFFF;
+            --color-surface-2: #F1F5F9;
+
+            /* Text — skill: use #0F172A for max contrast, #475569 for muted (min) */
+            --color-text: #0F172A;
+            --color-text-muted: #475569;
+            --color-text-light: #94A3B8;
+
+            /* Borders — skill: use border-gray-200 in light mode */
+            --color-border: #E2E8F0;
+            --color-border-strong: #CBD5E1;
+
+            /* Spacing scale */
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+            --radius-2xl: 1.5rem;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.05);
+
+            /* Transitions — skill: 150-300ms for micro-interactions */
+            --transition-fast: 150ms ease;
+            --transition-base: 200ms ease;
+            --transition-slow: 300ms cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* Leaflet pulse animation */
+        /* Base */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 16px;
+            /* skill: min 16px body on mobile */
+            line-height: 1.6;
+            /* skill: 1.5–1.75 for body text */
+            color: var(--color-text);
+            background-color: var(--color-bg);
+            overscroll-behavior-y: contain;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* skill: cursor-pointer on ALL clickable/interactive elements */
+        button,
+        [role="button"],
+        a,
+        label[for],
+        select,
+        [tabindex]:not([tabindex="-1"]) {
+            cursor: pointer;
+        }
+
+        /* skill: visible focus rings for keyboard navigation (CRITICAL accessibility) */
+        :focus-visible {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+            border-radius: var(--radius-sm);
+        }
+
+        :focus:not(:focus-visible) {
+            outline: none;
+        }
+
+        /* skill: smooth transitions on interactive elements (150-300ms) */
+        button,
+        a,
+        input,
+        select,
+        textarea,
+        [role="button"] {
+            transition: color var(--transition-base),
+                background-color var(--transition-base),
+                border-color var(--transition-base),
+                box-shadow var(--transition-base),
+                opacity var(--transition-base);
+        }
+
+        /* skill: touch targets minimum 44×44px (CRITICAL) */
+        button,
+        [role="button"],
+        a {
+            min-height: 44px;
+            min-width: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* skill: prefers-reduced-motion — disable animations for sensitive users */
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Entrance animation — use transform/opacity (skill: perf-safe) */
+        .animate-in {
+            animation: slide-up 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slide-up {
+            from {
+                transform: translateY(8px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* skill: skeleton loader for async content (prevents layout shift) */
+        .skeleton {
+            background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+            border-radius: var(--radius-md);
+        }
+
+        @keyframes skeleton-shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* Slim scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-border-strong);
+            border-radius: 10px;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Leaflet pulse marker */
         .leaflet-marker-pulse {
             border-radius: 50%;
-            background: #3b82f6;
+            background: var(--color-primary-light);
             cursor: pointer;
-            box-shadow: 0 0 0 rgba(59, 130, 246, 0.4);
             animation: pulse 2s infinite;
         }
+
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+            0% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 15px rgba(59, 130, 246, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            }
+        }
+
+        /* Print */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            .print-only {
+                display: block !important;
+            }
+
+            body {
+                background: white !important;
+            }
+
+            @page {
+                margin: 0;
+            }
+        }
+
+        .print-only {
+            display: none;
         }
     </style>
-<script type="importmap">
+
+    <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@19.0.0",
@@ -71,8 +277,10 @@
 }
 </script>
 </head>
+
 <body class="selection:bg-blue-100 selection:text-blue-900">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
 </body>
+
 </html>
