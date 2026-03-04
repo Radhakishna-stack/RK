@@ -29,7 +29,14 @@ function initProject() {
         'Users': ['ID', 'Username', 'Password', 'Role', 'Name', 'Phone', 'CreatedAt', 'IsActive'],
         'Config': ['Key', 'Value', 'UpdatedAt'],
         'RecycleBin': ['BinID', 'OriginalID', 'Type', 'Data_JSON', 'DeletedAt'],
-        'PickupRequests': ['ID', 'CustomerName', 'CustomerPhone', 'BikeNumber', 'IssueDescription', 'LocationLink', 'Location_JSON', 'Status', 'AssignedEmployeeID', 'AssignedEmployeeName', 'EmployeeLocation_JSON', 'Notes', 'CreatedAt', 'UpdatedAt']
+        'PickupRequests': ['ID', 'CustomerName', 'CustomerPhone', 'BikeNumber', 'IssueDescription', 'LocationLink', 'Location_JSON', 'Status', 'AssignedEmployeeID', 'AssignedEmployeeName', 'EmployeeLocation_JSON', 'Notes', 'CreatedAt', 'UpdatedAt'],
+        'PickupSlots': ['ID', 'Date', 'TimeRange', 'Capacity', 'BookedCount'],
+        'PickupBookings': ['ID', 'CustomerID', 'CustomerName', 'CustomerPhone', 'BikeNumber', 'SlotID', 'Date', 'TimeRange', 'Status', 'StaffID', 'StaffName', 'Location_JSON', 'MapsLink', 'CreatedAt'],
+        'FieldServiceJobs': ['ID', 'CustomerID', 'CustomerName', 'CustomerPhone', 'BikeNumber', 'IssueDescription', 'PhotoUrls', 'Location_JSON', 'Status', 'AssignedMechanicID', 'AssignedMechanicName', 'CreatedAt', 'AcceptedAt', 'StartedAt', 'ArrivedAt', 'CompletedAt', 'EstimatedCost', 'Notes', 'EstimatedDurationMinutes', 'ActualDurationMinutes'],
+        'EmployeeLocations': ['EmployeeID', 'EmployeeName', 'Status', 'CurrentJobID', 'Location_JSON', 'LastUpdated', 'Battery'],
+        'LocationUpdates': ['EmployeeID', 'JobID', 'Location_JSON', 'Timestamp', 'Speed', 'Heading'],
+        'JobTimelineEvents': ['ID', 'JobID', 'Status', 'Timestamp', 'Location_JSON', 'Note'],
+        'AuditLogs': ['ID', 'UserID', 'UserName', 'Action', 'EntityType', 'EntityID', 'Description', 'Timestamp']
     };
 
     for (var name in sheets) {
@@ -700,6 +707,169 @@ function bulkImport(data) {
     return { imported: rows.length };
 }
 
+// --- PICKUP SLOTS ---
+var PICKUP_SLOT_FIELDS = ['id', 'date', 'timeRange', 'capacity', 'bookedCount'];
+
+function getPickupSlots() { return getSheetData('PickupSlots', PICKUP_SLOT_FIELDS); }
+
+function addPickupSlot(data) {
+    var id = genId('PSL-');
+    var row = [id, data.date || '', data.timeRange || '', data.capacity || 0, data.bookedCount || 0];
+    getSheet('PickupSlots').appendRow(row);
+    return { id: id };
+}
+
+function updatePickupSlot(data) {
+    var row = [data.id, data.date || '', data.timeRange || '', data.capacity || 0, data.bookedCount || 0];
+    return updateRow('PickupSlots', data.id, row);
+}
+
+function deletePickupSlot(data) { return deleteRow('PickupSlots', data.id); }
+
+// --- PICKUP BOOKINGS ---
+var PICKUP_BOOKING_FIELDS = ['id', 'customerId', 'customerName', 'customerPhone', 'bikeNumber', 'slotId', 'date', 'timeRange', 'status', 'staffId', 'staffName', 'location', 'mapsLink', 'createdAt'];
+
+function getPickupBookings() {
+    var raw = getSheetData('PickupBookings', PICKUP_BOOKING_FIELDS);
+    return raw.map(function (r) {
+        if (r.location && typeof r.location === 'string') {
+            try { r.location = JSON.parse(r.location); } catch (e) { r.location = null; }
+        }
+        return r;
+    });
+}
+
+function addPickupBooking(data) {
+    var id = genId('PBK-');
+    var locJson = data.location ? JSON.stringify(data.location) : '';
+    var row = [id, data.customerId || '', data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.slotId || '', data.date || '', data.timeRange || '', data.status || 'Pending', data.staffId || '', data.staffName || '', locJson, data.mapsLink || '', nowISO()];
+    getSheet('PickupBookings').appendRow(row);
+    return { id: id, status: 'Pending', createdAt: nowISO() };
+}
+
+function updatePickupBooking(data) {
+    var locJson = data.location ? JSON.stringify(data.location) : '';
+    var row = [data.id, data.customerId || '', data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.slotId || '', data.date || '', data.timeRange || '', data.status || 'Pending', data.staffId || '', data.staffName || '', locJson, data.mapsLink || '', data.createdAt || nowISO()];
+    return updateRow('PickupBookings', data.id, row);
+}
+
+function deletePickupBooking(data) { return deleteRow('PickupBookings', data.id); }
+
+// --- FIELD SERVICE JOBS ---
+var FS_JOB_FIELDS = ['id', 'customerId', 'customerName', 'customerPhone', 'bikeNumber', 'issueDescription', 'photoUrls', 'location', 'status', 'assignedMechanicId', 'assignedMechanicName', 'createdAt', 'acceptedAt', 'startedAt', 'arrivedAt', 'completedAt', 'estimatedCost', 'notes', 'estimatedDurationMinutes', 'actualDurationMinutes'];
+
+function getFieldServiceJobs() {
+    var raw = getSheetData('FieldServiceJobs', FS_JOB_FIELDS);
+    return raw.map(function (r) {
+        if (r.location && typeof r.location === 'string') {
+            try { r.location = JSON.parse(r.location); } catch (e) { r.location = null; }
+        }
+        if (typeof r.photoUrls === 'string') {
+            r.photoUrls = r.photoUrls ? r.photoUrls.split(',') : [];
+        }
+        return r;
+    });
+}
+
+function addFieldServiceJob(data) {
+    var id = genId('FSJ-');
+    var locJson = data.location ? JSON.stringify(data.location) : '';
+    var photos = Array.isArray(data.photoUrls) ? data.photoUrls.join(',') : (data.photoUrls || '');
+    var row = [id, data.customerId || '', data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', photos, locJson, data.status || 'Assigned', data.assignedMechanicId || '', data.assignedMechanicName || '', nowISO(), data.acceptedAt || '', data.startedAt || '', data.arrivedAt || '', data.completedAt || '', data.estimatedCost || 0, data.notes || '', data.estimatedDurationMinutes || 0, data.actualDurationMinutes || 0];
+    getSheet('FieldServiceJobs').appendRow(row);
+    return { id: id, status: data.status || 'Assigned', createdAt: nowISO() };
+}
+
+function updateFieldServiceJob(data) {
+    var locJson = data.location ? JSON.stringify(data.location) : '';
+    var photos = Array.isArray(data.photoUrls) ? data.photoUrls.join(',') : (data.photoUrls || '');
+    var row = [data.id, data.customerId || '', data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', photos, locJson, data.status || 'Assigned', data.assignedMechanicId || '', data.assignedMechanicName || '', data.createdAt || nowISO(), data.acceptedAt || '', data.startedAt || '', data.arrivedAt || '', data.completedAt || '', data.estimatedCost || 0, data.notes || '', data.estimatedDurationMinutes || 0, data.actualDurationMinutes || 0];
+    return updateRow('FieldServiceJobs', data.id, row);
+}
+
+function deleteFieldServiceJob(data) { return deleteRow('FieldServiceJobs', data.id); }
+
+// --- EMPLOYEE LOCATIONS ---
+var EMP_LOC_FIELDS = ['employeeId', 'employeeName', 'status', 'currentJobId', 'location', 'lastUpdated', 'battery'];
+
+function getEmployeeLocations() {
+    var raw = getSheetData('EmployeeLocations', EMP_LOC_FIELDS);
+    return raw.map(function (r) {
+        if (r.location && typeof r.location === 'string') {
+            try { r.location = JSON.parse(r.location); } catch (e) { r.location = null; }
+        }
+        return r;
+    });
+}
+
+function updateEmployeeLocation(data) {
+    var locJson = data.location ? JSON.stringify(data.location) : '';
+    // Use employeeId as the unique ID constraint for findRowIndex
+    var rowNum = findRowIndex('EmployeeLocations', data.employeeId, 0);
+    var row = [data.employeeId, data.employeeName || '', data.status || 'Offline', data.currentJobId || '', locJson, data.lastUpdated || nowISO(), data.battery || 0];
+
+    if (rowNum) {
+        getSheet('EmployeeLocations').getRange(rowNum, 1, 1, row.length).setValues([row]);
+        return { updated: true };
+    } else {
+        getSheet('EmployeeLocations').appendRow(row);
+        return { created: true };
+    }
+}
+
+// --- LOCATION UPDATES (HISTORY) ---
+var LOC_UPD_FIELDS = ['employeeId', 'jobId', 'location', 'timestamp', 'speed', 'heading'];
+
+function getLocationUpdates() {
+    var raw = getSheetData('LocationUpdates', LOC_UPD_FIELDS);
+    return raw.map(function (r) {
+        if (r.location && typeof r.location === 'string') {
+            try { r.location = JSON.parse(r.location); } catch (e) { r.location = null; }
+        }
+        return r;
+    });
+}
+
+function addLocationUpdate(data) {
+    var locJson = data.location ? JSON.stringify(data.location) : '';
+    var row = [data.employeeId || '', data.jobId || '', locJson, data.timestamp || nowISO(), data.speed || 0, data.heading || 0];
+    getSheet('LocationUpdates').appendRow(row);
+    return { success: true };
+}
+
+// --- JOB TIMELINE EVENTS ---
+var TIMELINE_FIELDS = ['id', 'jobId', 'status', 'timestamp', 'location', 'note'];
+
+function getJobTimelineEvents() {
+    var raw = getSheetData('JobTimelineEvents', TIMELINE_FIELDS);
+    return raw.map(function (r) {
+        if (r.location && typeof r.location === 'string') {
+            try { r.location = JSON.parse(r.location); } catch (e) { r.location = null; }
+        }
+        return r;
+    });
+}
+
+function addJobTimelineEvent(data) {
+    var id = genId('JTE-');
+    var locJson = data.location ? JSON.stringify(data.location) : '';
+    var row = [id, data.jobId || '', data.status || '', data.timestamp || nowISO(), locJson, data.note || ''];
+    getSheet('JobTimelineEvents').appendRow(row);
+    return { id: id };
+}
+
+// --- AUDIT LOGS ---
+var AUDIT_LOG_FIELDS = ['id', 'userId', 'userName', 'action', 'entityType', 'entityId', 'description', 'timestamp'];
+
+function getAuditLogs() { return getSheetData('AuditLogs', AUDIT_LOG_FIELDS); }
+
+function addAuditLog(data) {
+    var id = genId('AUD-');
+    var row = [id, data.userId || '', data.userName || '', data.action || '', data.entityType || '', data.entityId || '', data.description || '', data.timestamp || nowISO()];
+    getSheet('AuditLogs').appendRow(row);
+    return { id: id };
+}
+
 // ============================================
 // 5. ACTION ROUTER MAP
 // ============================================
@@ -809,5 +979,39 @@ var ACTIONS = {
     getPickupRequests: function () { return getPickupRequests(); },
     addPickupRequest: function (d) { return addPickupRequest(d); },
     updatePickupRequest: function (d) { return updatePickupRequest(d); },
-    deletePickupRequest: function (d) { return deletePickupRequest(d); }
+    deletePickupRequest: function (d) { return deletePickupRequest(d); },
+
+    // Pickup Slots
+    getPickupSlots: function () { return getPickupSlots(); },
+    addPickupSlot: function (d) { return addPickupSlot(d); },
+    updatePickupSlot: function (d) { return updatePickupSlot(d); },
+    deletePickupSlot: function (d) { return deletePickupSlot(d); },
+
+    // Pickup Bookings
+    getPickupBookings: function () { return getPickupBookings(); },
+    addPickupBooking: function (d) { return addPickupBooking(d); },
+    updatePickupBooking: function (d) { return updatePickupBooking(d); },
+    deletePickupBooking: function (d) { return deletePickupBooking(d); },
+
+    // Field Service Jobs
+    getFieldServiceJobs: function () { return getFieldServiceJobs(); },
+    addFieldServiceJob: function (d) { return addFieldServiceJob(d); },
+    updateFieldServiceJob: function (d) { return updateFieldServiceJob(d); },
+    deleteFieldServiceJob: function (d) { return deleteFieldServiceJob(d); },
+
+    // Employee Locations
+    getEmployeeLocations: function () { return getEmployeeLocations(); },
+    updateEmployeeLocation: function (d) { return updateEmployeeLocation(d); },
+
+    // Location Updates
+    getLocationUpdates: function () { return getLocationUpdates(); },
+    addLocationUpdate: function (d) { return addLocationUpdate(d); },
+
+    // Job Timeline Events
+    getJobTimelineEvents: function () { return getJobTimelineEvents(); },
+    addJobTimelineEvent: function (d) { return addJobTimelineEvent(d); },
+
+    // Audit Logs
+    getAuditLogs: function () { return getAuditLogs(); },
+    addAuditLog: function (d) { return addAuditLog(d); }
 };
