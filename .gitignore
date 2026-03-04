@@ -40,3 +40,5 @@ coverage/
 # System files
 Thumbs.db
 desktop.ini
+
+/generated/prisma

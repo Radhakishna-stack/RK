@@ -103,15 +103,15 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
 
   const handlePickupAction = async (pickup: PickupRequest, action: PickupStatus) => {
     if (action === 'In Transit') {
-      await dbService.updatePickupRequest(pickup.id, { status: 'In Transit' });
+      await dbService.updatePickupRequest({ ...pickup, status: 'In Transit' });
       startGpsTracking(pickup.id);
     } else if (action === 'Picked Up') {
       stopGpsTracking();
-      await dbService.updatePickupRequest(pickup.id, { status: 'Picked Up' });
+      await dbService.updatePickupRequest({ ...pickup, status: 'Picked Up' });
     } else if (action === 'Delivered') {
-      await dbService.updatePickupRequest(pickup.id, { status: 'Delivered' });
+      await dbService.updatePickupRequest({ ...pickup, status: 'Delivered' });
     } else {
-      await dbService.updatePickupRequest(pickup.id, { status: action });
+      await dbService.updatePickupRequest({ ...pickup, status: action });
     }
     await loadData();
   };

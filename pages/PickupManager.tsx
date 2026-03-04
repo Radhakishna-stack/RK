@@ -79,8 +79,10 @@ const PickupManager: React.FC<PickupManagerProps> = ({ onNavigate }) => {
 
     const handleAssign = async (pickupId: string, empId: string) => {
         const emp = employees.find(e => e.id === empId);
-        if (!emp) return;
-        await dbService.updatePickupRequest(pickupId, {
+        const pickup = pickups.find(p => p.id === pickupId);
+        if (!emp || !pickup) return;
+        await dbService.updatePickupRequest({
+            ...pickup,
             status: 'Assigned',
             assignedEmployeeId: empId,
             assignedEmployeeName: emp.name
@@ -91,7 +93,10 @@ const PickupManager: React.FC<PickupManagerProps> = ({ onNavigate }) => {
 
     const handleCancel = async (id: string) => {
         if (!confirm('Cancel this pickup request?')) return;
-        await dbService.updatePickupRequest(id, { status: 'Cancelled' });
+        const pickup = pickups.find(p => p.id === id);
+        if (pickup) {
+            await dbService.updatePickupRequest({ ...pickup, status: 'Cancelled' });
+        }
         await loadData();
     };
 

@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  password  String
+  role      String   // admin | manager | driver | mechanic
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  assignedRequests ServiceRequest[] @relation("AssignedDriver")
+  mechanicRequests ServiceRequest[] @relation("AssignedMechanic")
+}
+
+model ServiceRequest {
+  id               String   @id @default(cuid())
+  customerName     String
+  customerPhone    String
+  customerCity     String
+  locationLink     String?  // Google Maps link
+  bikeDetails      String?  // Model, Number plate
+  notes            String?
+
+  status           String   @default("Assigned")
+  // Assigned | Start Trip | Picked Up | Delivered to Store
+  // Mechanic Assigned | Under Repair | Repair Complete
+  // Out for Delivery | Delivered
+
+  assignedDriverId   String?
+  assignedDriver     User?    @relation("AssignedDriver", fields: [assignedDriverId], references: [id])
+
+  assignedMechanicId String?
+  assignedMechanic   User?    @relation("AssignedMechanic", fields: [assignedMechanicId], references: [id])
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  statusLogs StatusLog[]
+}
+
+model StatusLog {
+  id         String         @id @default(cuid())
+  requestId  String
+  request    ServiceRequest @relation(fields: [requestId], references: [id])
+  status     String
+  changedBy  String         // User name who changed status
+  timestamp  DateTime       @default(now())
+}
