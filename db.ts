@@ -1484,8 +1484,12 @@ export const dbService = {
 
   // User Management Functions
   initializeDefaultUsers: async (): Promise<void> => {
-    const users = await dbService.getUsers();
-    if (users.length === 0) {
+    // Check localStorage directly — cloudRead would return cloud users, masking
+    // whether we've ever initialized locally. We only want to seed once.
+    const localRaw = localStorage.getItem(LS_KEYS.USERS);
+    const localUsers: User[] = localRaw ? JSON.parse(localRaw) : [];
+
+    if (localUsers.length === 0) {
       // Create default admin user
       const defaultAdmin: User = {
         id: generateUniqueId('U'),
@@ -1497,6 +1501,11 @@ export const dbService = {
         createdAt: new Date().toISOString()
       };
       localStorage.setItem(LS_KEYS.USERS, JSON.stringify([defaultAdmin]));
+
+      // Also push to cloud so all devices see the seeded user
+      if (isCloudEnabled()) {
+        syncToCloud('addUser', defaultAdmin);
+      }
     }
   },
 
@@ -1524,6 +1533,7 @@ export const dbService = {
     };
 
     localStorage.setItem(LS_KEYS.USERS, JSON.stringify([...users, newUser]));
+    syncToCloud('addUser', newUser);
     return newUser;
   },
 
@@ -1543,6 +1553,8 @@ export const dbService = {
       }
     }
     localStorage.setItem(LS_KEYS.USERS, JSON.stringify(updatedUsers));
+    const updatedUser = updatedUsers.find(u => u.id === id);
+    if (updatedUser) syncToCloud('updateUser', updatedUser);
   },
 
   deleteUser: async (id: string): Promise<void> => {
@@ -1556,6 +1568,7 @@ export const dbService = {
     }
 
     localStorage.setItem(LS_KEYS.USERS, JSON.stringify(users.filter(u => u.id !== id)));
+    syncToCloud('deleteUser', { id });
   },
 
   toggleUserStatus: async (id: string): Promise<void> => {
@@ -1567,6 +1580,8 @@ export const dbService = {
       return u;
     });
     localStorage.setItem(LS_KEYS.USERS, JSON.stringify(updatedUsers));
+    const toggled = updatedUsers.find(u => u.id === id);
+    if (toggled) syncToCloud('updateUser', toggled);
   },
 
   // Payment Receipts
