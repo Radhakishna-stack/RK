@@ -1484,13 +1484,12 @@ export const dbService = {
 
   // User Management Functions
   initializeDefaultUsers: async (): Promise<void> => {
-    // Check localStorage directly — cloudRead would return cloud users, masking
-    // whether we've ever initialized locally. We only want to seed once.
     const localRaw = localStorage.getItem(LS_KEYS.USERS);
-    const localUsers: User[] = localRaw ? JSON.parse(localRaw) : [];
+    let localUsers: User[] = localRaw ? JSON.parse(localRaw) : [];
+    let changed = false;
 
-    if (localUsers.length === 0) {
-      // Create default admin user
+    // Check for admin
+    if (!localUsers.some(u => u.username.toLowerCase() === 'admin')) {
       const defaultAdmin: User = {
         id: generateUniqueId('U'),
         username: 'admin',
@@ -1500,23 +1499,44 @@ export const dbService = {
         isActive: true,
         createdAt: new Date().toISOString()
       };
-      localStorage.setItem(LS_KEYS.USERS, JSON.stringify([defaultAdmin]));
+      localUsers.push(defaultAdmin);
+      changed = true;
+      if (isCloudEnabled()) syncToCloud('addUser', defaultAdmin);
+    }
 
-      // Also push to cloud so all devices see the seeded user
-      if (isCloudEnabled()) {
-        syncToCloud('addUser', defaultAdmin);
-      }
+    // Check for vishnu
+    if (!localUsers.some(u => u.username.toLowerCase() === 'vishnu')) {
+      const defaultVishnu: User = {
+        id: generateUniqueId('U'),
+        username: 'vishnu',
+        password: await encryptPassword('vishnu1'),
+        role: 'manager',
+        name: 'Vishnu',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+      localUsers.push(defaultVishnu);
+      changed = true;
+      if (isCloudEnabled()) syncToCloud('addUser', defaultVishnu);
+    }
+
+    if (changed) {
+      localStorage.setItem(LS_KEYS.USERS, JSON.stringify(localUsers));
     }
   },
 
   getUsers: async (): Promise<User[]> => {
     let users = await cloudRead('getUsers', LS_KEYS.USERS, []);
-    // Cloud sync might return an empty array if the sheet hasn't been seeded yet,
-    // which overwrites the local default admin. Re-inject defaults if empty.
-    if (!users || users.length === 0) {
+
+    // Check if both default users exist in the results
+    const hasAdmin = users.some(u => u.username.toLowerCase() === 'admin');
+    const hasVishnu = users.some(u => u.username.toLowerCase() === 'vishnu');
+
+    if (!hasAdmin || !hasVishnu) {
+      console.log('Default users missing from cloud, re-initializing local defaults...');
       await dbService.initializeDefaultUsers();
       const local = localStorage.getItem(LS_KEYS.USERS);
-      users = local ? JSON.parse(local) : [];
+      users = local ? JSON.parse(local) : users;
     }
     return users;
   },
