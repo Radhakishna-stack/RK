@@ -1509,7 +1509,17 @@ export const dbService = {
     }
   },
 
-  getUsers: async (): Promise<User[]> => cloudRead('getUsers', LS_KEYS.USERS, []),
+  getUsers: async (): Promise<User[]> => {
+    let users = await cloudRead('getUsers', LS_KEYS.USERS, []);
+    // Cloud sync might return an empty array if the sheet hasn't been seeded yet,
+    // which overwrites the local default admin. Re-inject defaults if empty.
+    if (!users || users.length === 0) {
+      await dbService.initializeDefaultUsers();
+      const local = localStorage.getItem(LS_KEYS.USERS);
+      users = local ? JSON.parse(local) : [];
+    }
+    return users;
+  },
 
   getUserByUsername: async (username: string): Promise<User | null> => {
     const users = await dbService.getUsers();
