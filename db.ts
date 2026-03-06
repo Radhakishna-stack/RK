@@ -9,7 +9,21 @@ import { encryptPassword, getSession } from './auth';
 const GAS_URL_KEY = 'gas_url';
 
 function getGasUrl(): string {
-  return localStorage.getItem(GAS_URL_KEY) || '';
+  // 1. Check localStorage (admin may have saved it via Cloud Sync page)
+  const fromStorage = localStorage.getItem(GAS_URL_KEY);
+  if (fromStorage) return fromStorage;
+
+  // 2. Fall back to compile-time env variable (VITE_GAS_URL in .env.local)
+  //    This ensures every device—including fresh browsers without any localStorage—
+  //    can automatically reach the Google Sheets backend.
+  const fromEnv = (import.meta as any).env?.VITE_GAS_URL as string | undefined;
+  if (fromEnv) {
+    // Persist to localStorage so future calls are fast
+    localStorage.setItem(GAS_URL_KEY, fromEnv);
+    return fromEnv;
+  }
+
+  return '';
 }
 
 function isCloudEnabled(): boolean {
