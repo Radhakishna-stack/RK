@@ -309,7 +309,7 @@ const App: React.FC = () => {
               <Route path="/dashboard" element={<Navigate to="/" />} />
               <Route path="/business" element={<DashboardV2 onNavigate={handleNavigate} />} />
               <Route path="/money" element={<BankAccountsPage onNavigate={handleNavigate} />} />
-              <Route path="/more" element={<MorePage onNavigate={handleNavigate} />} />
+              <Route path="/more" element={<MorePage onNavigate={handleNavigate} userRole={userRole} />} />
 
               {/* Features */}
               <Route path="/employee-panel" element={<EmployeePanel onNavigate={handleNavigate} userRole={userRole} />} />
