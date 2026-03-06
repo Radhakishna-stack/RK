@@ -74,6 +74,8 @@ export interface Complaint {
   dueDate?: string;
   odometerReading?: number;
   city?: string;
+  assignedMechanicId?: string;
+  assignedMechanicName?: string;
 }
 
 

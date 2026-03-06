@@ -404,21 +404,21 @@ function updatePaymentReceipt(data: any) {
 function deletePaymentReceipt(data: any) { return deleteRow('PaymentReceipts', data.id); }
 
 // --- COMPLAINTS (JOB CARDS) ---
-const COMPLAINT_FIELDS = ['id', 'bikeNumber', 'customerName', 'customerPhone', 'details', 'photoUrls', 'estimatedCost', 'status', 'createdAt', 'dueDate', 'odometerReading'];
+const COMPLAINT_FIELDS = ['id', 'bikeNumber', 'customerName', 'customerPhone', 'details', 'photoUrls', 'estimatedCost', 'status', 'createdAt', 'dueDate', 'odometerReading', 'assignedMechanicId', 'assignedMechanicName'];
 
 function getComplaints() { return getSheetData('Complaints', COMPLAINT_FIELDS); }
 
 function addComplaint(data: any) {
   const id = data.id || genId('CMP-');
   const photos = Array.isArray(data.photoUrls) ? data.photoUrls.join(',') : (data.photoUrls || '');
-  const row = [id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'Pending', data.createdAt || nowISO(), data.dueDate || '', data.odometerReading || ''];
+  const row = [id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'Pending', data.createdAt || nowISO(), data.dueDate || '', data.odometerReading || '', data.assignedMechanicId || '', data.assignedMechanicName || ''];
   getSheet('Complaints').appendRow(row);
   return { ...data, id, status: data.status || 'Pending', createdAt: data.createdAt || nowISO() };
 }
 
 function updateComplaint(data: any) {
   const photos = Array.isArray(data.photoUrls) ? data.photoUrls.join(',') : (data.photoUrls || '');
-  const row = [data.id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'Pending', data.createdAt || '', data.dueDate || '', data.odometerReading || ''];
+  const row = [data.id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'Pending', data.createdAt || '', data.dueDate || '', data.odometerReading || '', data.assignedMechanicId || '', data.assignedMechanicName || ''];
   return updateRow('Complaints', data.id, row);
 }
 
