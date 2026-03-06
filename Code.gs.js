@@ -120,11 +120,19 @@ function getSheetData(sheetName, fieldMap) {
 
     var rows = values.slice(1);
 
-    return rows.map(function (row) {
+    return rows.map(function (row, rowIndex) {
         var obj = {};
+        var hasData = false;
+
         fieldMap.forEach(function (key, i) {
             if (i < row.length) {
                 var val = row[i];
+
+                // Check if value is not empty
+                if (val !== null && val !== undefined && val !== '') {
+                    hasData = true;
+                }
+
                 // Auto-convert JSON fields
                 if (key.endsWith('_JSON') || key === 'items') {
                     try { val = JSON.parse(val || '[]'); } catch (e) { val = key === 'items' ? [] : val; }
@@ -140,6 +148,12 @@ function getSheetData(sheetName, fieldMap) {
                 obj[key] = val;
             }
         });
+
+        // Auto-assign an ID if it's missing but row has data
+        if (!obj.id && hasData) {
+            obj.id = 'AUTO-' + (rowIndex + 2); // Row 1 is header, so data starts at row 2
+        }
+
         return obj;
     }).filter(function (item) { return item && item.id; });
 }

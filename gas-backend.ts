@@ -124,11 +124,19 @@ function getSheetData(sheetName: string, fieldMap: string[]): any[] {
   const headers = values[0];
   const rows = values.slice(1);
 
-  return rows.map((row: any[]) => {
+  return rows.map((row: any[], rowIndex: number) => {
     const obj: any = {};
+    let hasData = false;
+
     fieldMap.forEach((key, i) => {
       if (i < row.length) {
         let val = row[i];
+
+        // Check if value is not empty
+        if (val !== null && val !== undefined && val !== '') {
+          hasData = true;
+        }
+
         // Auto-convert JSON fields
         if (key.endsWith('_JSON') || key === 'items') {
           try { val = JSON.parse(val || '[]'); } catch { val = key === 'items' ? [] : val; }
@@ -144,6 +152,12 @@ function getSheetData(sheetName: string, fieldMap: string[]): any[] {
         obj[key] = val;
       }
     });
+
+    // Auto-assign an ID if it's missing but row has data
+    if (!obj.id && hasData) {
+      obj.id = 'AUTO-' + (rowIndex + 2); // Row 1 is header, so data starts at row 2
+    }
+
     return obj;
   }).filter((item: any) => item && item.id); // Skip empty rows
 }
