@@ -1,5 +1,5 @@
 
-export type PickupStatus = 'Pending' | 'Assigned' | 'In Transit' | 'Picked Up' | 'Delivered' | 'Cancelled';
+export type PickupStatus = 'Pending' | 'Assigned' | 'Accepted' | 'In Transit' | 'Picked Up' | 'Delivered' | 'Cancelled';
 
 export interface PickupRequest {
   id: string;

@@ -18,6 +18,7 @@ interface EmployeePanelProps {
 const PICKUP_STATUS_COLORS: Record<PickupStatus, string> = {
   'Pending': 'bg-yellow-100 text-yellow-800',
   'Assigned': 'bg-blue-100 text-blue-800',
+  'Accepted': 'bg-indigo-100 text-indigo-800',
   'In Transit': 'bg-purple-100 text-purple-800',
   'Picked Up': 'bg-green-100 text-green-800',
   'Delivered': 'bg-emerald-100 text-emerald-800',
@@ -306,9 +307,15 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
                     {/* Action Buttons */}
                     <div className="flex gap-2 pt-1">
                       {pickup.status === 'Assigned' && (
+                        <Button size="sm" className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                          onClick={() => handlePickupAction(pickup, 'Accepted')}>
+                          <CheckCircle2 className="w-4 h-4 mr-1.5" /> Accept Pickup
+                        </Button>
+                      )}
+                      {pickup.status === 'Accepted' && (
                         <Button size="sm" className="flex-1 bg-purple-600 hover:bg-purple-700"
                           onClick={() => handlePickupAction(pickup, 'In Transit')}>
-                          <Navigation className="w-4 h-4 mr-1.5" /> Start Pickup
+                          <Navigation className="w-4 h-4 mr-1.5" /> Start Journey
                         </Button>
                       )}
                       {pickup.status === 'In Transit' && (

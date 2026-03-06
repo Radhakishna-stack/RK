@@ -22,6 +22,7 @@ import { AuthSession, User } from './types';
 import { getSession, login, logout, validateCredentials } from './auth';
 import { canAccessRoute } from './permissions';
 import { dbService } from './db';
+import { NotificationSystem } from './components/NotificationSystem';
 
 // ── Lazy-load all page components (web-perf + mobile-design skill) ──
 // Each page loads only when navigated to, dramatically reducing initial bundle.
@@ -370,6 +371,9 @@ const App: React.FC = () => {
           <BottomNavItem icon={<LayoutGrid />} label="More" active={activeTab === 'more'} onClick={() => navigate('/more')} />
         </nav>
       )}
+
+      {/* Global Notifications Overlay */}
+      <NotificationSystem />
     </div>
   );
 };
