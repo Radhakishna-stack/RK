@@ -1484,12 +1484,23 @@ export const dbService = {
 
   // User Management Functions
   initializeDefaultUsers: async (): Promise<void> => {
-    const localRaw = localStorage.getItem(LS_KEYS.USERS);
-    let localUsers: User[] = localRaw ? JSON.parse(localRaw) : [];
-    let changed = false;
+    // Load both cloud users (if available) and local users, merge them
+    let existingUsers: User[] = [];
+    if (isCloudEnabled()) {
+      try {
+        const cloudUsers = await fetchFromCloud('getUsers');
+        if (Array.isArray(cloudUsers)) existingUsers = cloudUsers;
+      } catch { /* fall through to local */ }
+    }
+    if (existingUsers.length === 0) {
+      const localRaw = localStorage.getItem(LS_KEYS.USERS);
+      existingUsers = localRaw ? JSON.parse(localRaw) : [];
+    }
 
-    // Check for admin
-    if (!localUsers.some(u => u.username.toLowerCase() === 'admin')) {
+    const usersToAdd: User[] = [];
+
+    // Only add admin default if not already in any source
+    if (!existingUsers.some(u => u.username.toLowerCase() === 'admin')) {
       const defaultAdmin: User = {
         id: generateUniqueId('U'),
         username: 'admin',
@@ -1499,13 +1510,12 @@ export const dbService = {
         isActive: true,
         createdAt: new Date().toISOString()
       };
-      localUsers.push(defaultAdmin);
-      changed = true;
+      usersToAdd.push(defaultAdmin);
       if (isCloudEnabled()) syncToCloud('addUser', defaultAdmin);
     }
 
-    // Check for vishnu
-    if (!localUsers.some(u => u.username.toLowerCase() === 'vishnu')) {
+    // Only add vishnu default if not already in any source
+    if (!existingUsers.some(u => u.username.toLowerCase() === 'vishnu')) {
       const defaultVishnu: User = {
         id: generateUniqueId('U'),
         username: 'vishnu',
@@ -1515,28 +1525,62 @@ export const dbService = {
         isActive: true,
         createdAt: new Date().toISOString()
       };
-      localUsers.push(defaultVishnu);
-      changed = true;
+      usersToAdd.push(defaultVishnu);
       if (isCloudEnabled()) syncToCloud('addUser', defaultVishnu);
     }
 
-    if (changed) {
-      localStorage.setItem(LS_KEYS.USERS, JSON.stringify(localUsers));
+    if (usersToAdd.length > 0) {
+      // Merge defaults in; preserve all existing users
+      const merged = [...existingUsers, ...usersToAdd];
+      localStorage.setItem(LS_KEYS.USERS, JSON.stringify(merged));
+    } else {
+      // Ensure local cache is up to date with the cloud list
+      localStorage.setItem(LS_KEYS.USERS, JSON.stringify(existingUsers));
     }
   },
 
   getUsers: async (): Promise<User[]> => {
-    let users = await cloudRead('getUsers', LS_KEYS.USERS, []);
+    // Fetch from cloud (or fall back to localStorage cache)
+    let users: User[] = await cloudRead('getUsers', LS_KEYS.USERS, []);
 
-    // Check if both default users exist in the results
+    // Only re-initialize missing defaults if cloud is NOT enabled
+    // (when cloud IS enabled, the source of truth is the cloud, so we
+    //  should NOT overwrite it with local defaults)
     const hasAdmin = users.some(u => u.username.toLowerCase() === 'admin');
     const hasVishnu = users.some(u => u.username.toLowerCase() === 'vishnu');
 
     if (!hasAdmin || !hasVishnu) {
-      console.log('Default users missing from cloud, re-initializing local defaults...');
-      await dbService.initializeDefaultUsers();
-      const local = localStorage.getItem(LS_KEYS.USERS);
-      users = local ? JSON.parse(local) : users;
+      // Add only missing defaults, merged into the existing user list
+      const usersToAdd: User[] = [];
+      if (!hasAdmin) {
+        usersToAdd.push({
+          id: generateUniqueId('U'),
+          username: 'admin',
+          password: await encryptPassword('admin123'),
+          role: 'admin',
+          name: 'Administrator',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        });
+      }
+      if (!hasVishnu) {
+        usersToAdd.push({
+          id: generateUniqueId('U'),
+          username: 'vishnu',
+          password: await encryptPassword('vishnu1'),
+          role: 'manager',
+          name: 'Vishnu',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        });
+      }
+      // Merge: keep all cloud users, just append the missing defaults
+      users = [...users, ...usersToAdd];
+      localStorage.setItem(LS_KEYS.USERS, JSON.stringify(users));
+      // Sync missing defaults to cloud
+      for (const u of usersToAdd) {
+        if (isCloudEnabled()) syncToCloud('addUser', u);
+      }
     }
     return users;
   },
