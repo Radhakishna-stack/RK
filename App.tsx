@@ -16,7 +16,8 @@ import {
   Settings,
   LogOut,
   User as UserIcon,
-  Wrench
+  Wrench,
+  Plus
 } from 'lucide-react';
 import { AuthSession, User } from './types';
 import { getSession, login, logout, validateCredentials } from './auth';
@@ -365,18 +366,40 @@ const App: React.FC = () => {
       </main>
 
       {(!location.pathname.includes('billing') && !location.pathname.includes('estimate/new') && !location.pathname.includes('sales') && !location.pathname.includes('complaints') && !location.pathname.includes('field-service-manager') && !location.pathname.includes('field-jobs')) && (
-        <nav
-          className="bg-white flex items-center justify-around py-2 px-2 z-50 no-print safe-area-bottom"
-          style={{ 
-            borderTop: '1px solid #E2E8F0',
-            boxShadow: '0 -4px 20px rgba(0,0,0,0.03)'
-          }}
-        >
-          <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
-          <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
-          <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money'} onClick={() => navigate('/money')} />
-          <BottomNavItem icon={<LayoutGrid />} label="More" active={activeTab === 'more'} onClick={() => navigate('/more')} />
-        </nav>
+        <div className="relative">
+          {/* Central FAB */}
+          <div className="absolute left-1/2 -top-6 -translate-x-1/2 z-[60] no-print">
+            <button
+              onClick={() => navigate('/complaints')}
+              className="flex items-center justify-center w-14 h-14 rounded-full text-white shadow-[0_8px_30px_rgba(3,105,161,0.4)] hover:-translate-y-1 transition-all active:scale-95 btn-shimmer"
+              style={{ background: 'var(--gradient-cta)', border: '4px solid white' }}
+              aria-label="New Job"
+            >
+              <Plus className="w-8 h-8" strokeWidth={2.5} />
+            </button>
+          </div>
+          
+          <nav
+            className="bg-white flex items-center justify-between py-2 px-2 z-50 no-print safe-area-bottom relative"
+            style={{ 
+              borderTop: '1px solid #E2E8F0',
+              boxShadow: '0 -4px 20px rgba(0,0,0,0.03)'
+            }}
+          >
+            <div className="flex justify-around w-full max-w-[45%]">
+              <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
+              <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
+            </div>
+            
+            {/* Empty space for the FAB */}
+            <div className="w-[10%] min-w-[60px]" aria-hidden="true" />
+            
+            <div className="flex justify-around w-full max-w-[45%]">
+              <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money'} onClick={() => navigate('/money')} />
+              <BottomNavItem icon={<LayoutGrid />} label="More" active={activeTab === 'more'} onClick={() => navigate('/more')} />
+            </div>
+          </nav>
+        </div>
       )}
 
       {/* Global Notifications Overlay */}
