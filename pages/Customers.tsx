@@ -18,17 +18,20 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     loadData();
+    const handleSync = () => loadData(true);
+    window.addEventListener('mg_data_updated', handleSync);
+    return () => window.removeEventListener('mg_data_updated', handleSync);
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await dbService.getCustomers();
       setCustomers(data);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 

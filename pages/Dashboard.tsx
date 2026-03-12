@@ -22,10 +22,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     loadData();
+    const handleSync = () => loadData(true);
+    window.addEventListener('mg_data_updated', handleSync);
+    return () => window.removeEventListener('mg_data_updated', handleSync);
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [statData, compData, invData] = await Promise.all([
         dbService.getDashboardStats(),
@@ -38,7 +41,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 

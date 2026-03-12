@@ -191,20 +191,29 @@ async function fetchFromCloud(action: string, data?: any): Promise<any | null> {
  * reads only its own localStorage and never sees data created by other users.
  */
 async function cloudRead(action: string, lsKey: string, fallback: any = []): Promise<any> {
+  const localStr = localStorage.getItem(lsKey);
+  const localData = localStr ? JSON.parse(localStr) : fallback;
+
   if (isCloudEnabled()) {
-    try {
-      const cloudData = await fetchFromCloud(action);
+    // Fire off background fetch immediately
+    fetchFromCloud(action).then(cloudData => {
       if (cloudData !== null && cloudData !== undefined) {
-        // Keep local cache fresh for offline use
-        localStorage.setItem(lsKey, JSON.stringify(cloudData));
-        return cloudData;
+        const cloudStr = JSON.stringify(cloudData);
+        // Only trigger an update if the data actually changed
+        if (localStr !== cloudStr) {
+          localStorage.setItem(lsKey, cloudStr);
+          // Dispatch a custom event so the UI can silently update
+          // using a specific event name format for the affected key
+          window.dispatchEvent(new CustomEvent('mg_data_updated', { detail: { action, lsKey } }));
+        }
       }
-    } catch {
-      // Fall through to localStorage
-    }
+    }).catch(err => {
+      console.error(`[BackgroundSync] Failed to fetch ${action}:`, err);
+    });
   }
-  const local = localStorage.getItem(lsKey);
-  return local ? JSON.parse(local) : fallback;
+
+  // Return local data instantly for zero loading time
+  return localData;
 }
 
 /**
@@ -559,22 +568,27 @@ export const dbService = {
   },
 
   getBankAccounts: async (): Promise<BankAccount[]> => {
-    if (isCloudEnabled()) {
-      try {
-        const cloudData = await fetchFromCloud('getBankAccounts');
-        if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
-          localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify(cloudData));
-          return cloudData;
-        }
-      } catch { /* fall through */ }
-    }
     const local = localStorage.getItem(LS_KEYS.BANK_ACCOUNTS);
+    const initial = local ? JSON.parse(local) : [DEFAULT_BANK];
+    
+    // Save defaults if it doesn't exist
     if (!local) {
-      const initial = [DEFAULT_BANK];
       localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify(initial));
-      return initial;
     }
-    return JSON.parse(local);
+
+    if (isCloudEnabled()) {
+      fetchFromCloud('getBankAccounts').then(cloudData => {
+        if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
+          const cloudStr = JSON.stringify(cloudData);
+          if (local !== cloudStr) {
+            localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, cloudStr);
+            window.dispatchEvent(new CustomEvent('mg_data_updated', { detail: { action: 'getBankAccounts', lsKey: LS_KEYS.BANK_ACCOUNTS } }));
+          }
+        }
+      }).catch(err => console.error('[BackgroundSync] Bank accounts:', err));
+    }
+    
+    return initial;
   },
 
   addBankAccount: async (data: Omit<BankAccount, 'id' | 'createdAt'>): Promise<BankAccount> => {

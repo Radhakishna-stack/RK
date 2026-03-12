@@ -23,9 +23,13 @@ const SaleReportPage: React.FC<SaleReportPageProps> = ({ onNavigate }) => {
 
    useEffect(() => {
       loadData();
+      const handleSync = () => loadData(true);
+      window.addEventListener('mg_data_updated', handleSync);
+      return () => window.removeEventListener('mg_data_updated', handleSync);
    }, []);
 
-   const loadData = async () => {
+   const loadData = async (silent = false) => {
+      if (!silent) setLoading(true);
       try {
          const data = await dbService.getInvoices();
          setInvoices(data);
@@ -38,7 +42,7 @@ const SaleReportPage: React.FC<SaleReportPageProps> = ({ onNavigate }) => {
       } catch (error) {
          console.error('Error loading invoices:', error);
       } finally {
-         setLoading(false);
+         if (!silent) setLoading(false);
       }
    };
 

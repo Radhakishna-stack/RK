@@ -1,4 +1,4 @@
-﻿
+
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
@@ -67,10 +67,13 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
 
   useEffect(() => {
     loadData();
+    const handleSync = () => loadData(true);
+    window.addEventListener('mg_data_updated', handleSync);
+    return () => window.removeEventListener('mg_data_updated', handleSync);
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [invData, accData, custData, settings] = await Promise.all([
         dbService.getInventory(),
@@ -144,7 +147,7 @@ const BillingPage: React.FC<BillingPageProps> = ({ onNavigate, defaultDocType = 
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
