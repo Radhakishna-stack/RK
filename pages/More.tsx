@@ -21,45 +21,49 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate, userRole = 'employee' a
     const can = (route: string) => canAccessRoute(userRole, route);
 
     return (
-        <div className="pb-32 px-4 pt-6 space-y-6">
+        <div className="pb-32 px-4 pt-6 space-y-8 fade-up">
             {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900 mb-2">All Features</h1>
-                <p className="text-slate-600">Organize your business operations</p>
+            <div className="mb-4">
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">System Terminal</h1>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest font-mono">Control Center // v2.0</p>
             </div>
 
             {/* Customers Section — show if any sub-item is allowed */}
             {(can('customers') || can('visitors') || can('reminders') || can('party_statement')) && (
-                <Section title="Customers" icon={<Users className="w-5 h-5" />}>
+                <Section title="Directory" icon={<Users className="w-5 h-5" />}>
                     {can('customers') && (
                         <MenuItem
                             icon={<Users />}
                             label="Customers"
-                            description="Manage customer database"
+                            description="Core database"
+                            color="#10B981"
                             onClick={() => onNavigate('customers')}
                         />
                     )}
                     {can('visitors') && (
                         <MenuItem
                             icon={<UserCheck />}
-                            label="Walk-in Visitors"
-                            description="Track daily visitors"
+                            label="Visitors"
+                            description="Daily arrivals"
+                            color="#10B981"
                             onClick={() => onNavigate('visitors')}
                         />
                     )}
                     {can('reminders') && (
                         <MenuItem
                             icon={<Calendar />}
-                            label="Service Reminders"
-                            description="Schedule follow-ups"
+                            label="Reminders"
+                            description="Service queue"
+                            color="#10B981"
                             onClick={() => onNavigate('reminders')}
                         />
                     )}
                     {can('party_statement') && (
                         <MenuItem
                             icon={<FileText />}
-                            label="Customer Ledger"
-                            description="View statements"
+                            label="Ledger"
+                            description="Account history"
+                            color="#10B981"
                             onClick={() => onNavigate('party_statement')}
                         />
                     )}
@@ -68,12 +72,13 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate, userRole = 'employee' a
 
             {/* Workshop Section */}
             {(can('complaints') || can('inventory') || can('stock_wanting') || can('purchase') || can('pickup_manager')) && (
-                <Section title="Workshop" icon={<Wrench className="w-5 h-5" />}>
+                <Section title="Operations" icon={<Wrench className="w-5 h-5" />}>
                     {can('complaints') && (
                         <MenuItem
                             icon={<ClipboardCheck />}
-                            label="Service Jobs"
-                            description="Manage work orders"
+                            label="Work Orders"
+                            description="Service jobs"
+                            color="#F59E0B"
                             onClick={() => onNavigate('complaints')}
                         />
                     )}
@@ -81,23 +86,26 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate, userRole = 'employee' a
                         <MenuItem
                             icon={<Package />}
                             label="Inventory"
-                            description="Stock management"
+                            description="Part management"
+                            color="#F59E0B"
                             onClick={() => onNavigate('items')}
                         />
                     )}
                     {can('stock_wanting') && (
                         <MenuItem
                             icon={<ClipboardList />}
-                            label="Stock Request"
-                            description="Order needed parts"
+                            label="Stock Wanting"
+                            description="Order parts"
+                            color="#F59E0B"
                             onClick={() => onNavigate('stock_wanting')}
                         />
                     )}
                     {can('purchase') && (
                         <MenuItem
                             icon={<ShoppingCart />}
-                            label="Purchase Orders"
-                            description="Supplier orders"
+                            label="Purchases"
+                            description="Supplier terminal"
+                            color="#F59E0B"
                             onClick={() => onNavigate('purchase')}
                         />
                     )}
@@ -105,7 +113,8 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate, userRole = 'employee' a
                         <MenuItem
                             icon={<Truck />}
                             label="Pickup Manager"
-                            description="Manage vehicle pickups & track employees"
+                            description="Logistics & tracking"
+                            color="#F59E0B"
                             onClick={() => onNavigate('pickup_manager')}
                         />
                     )}
@@ -119,7 +128,8 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate, userRole = 'employee' a
                         <MenuItem
                             icon={<Receipt />}
                             label="Billing"
-                            description="Create invoices"
+                            description="POS Terminal"
+                            color="#0369A1"
                             onClick={() => onNavigate('billing')}
                         />
                     )}
@@ -127,15 +137,17 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate, userRole = 'employee' a
                         <MenuItem
                             icon={<FileText />}
                             label="Estimates"
-                            description="Quote customers"
+                            description="Quotation desk"
+                            color="#0369A1"
                             onClick={() => onNavigate('estimate')}
                         />
                     )}
                     {can('payment_voucher') && (
                         <MenuItem
                             icon={<ArrowDownCircle />}
-                            label="Payment Receipt"
-                            description="Receive payments"
+                            label="Payments"
+                            description="In / Out flow"
+                            color="#0369A1"
                             onClick={() => onNavigate('payment_receipt')}
                         />
                     )}
@@ -143,25 +155,27 @@ const MorePage: React.FC<MorePageProps> = ({ onNavigate, userRole = 'employee' a
                         <MenuItem
                             icon={<Wallet />}
                             label="Expenses"
-                            description="Track spending"
+                            description="Outflow logs"
+                            color="#0369A1"
                             onClick={() => onNavigate('expenses')}
                         />
                     )}
                     {can('bank_accounts') && (
                         <MenuItem
                             icon={<CreditCard />}
-                            label="Bank Accounts"
-                            description="Account management"
+                            label="Accounts"
+                            description="Bank balances"
+                            color="#0369A1"
                             onClick={() => onNavigate('bank_accounts')}
                         />
                     )}
                     {can('cash_in_hand') && (
                         <MenuItem
                             icon={<Banknote />}
-                            label="Cash in Hand"
-                            description="Cash flow tracking"
+                            label="Cash Logs"
+                            description="Physical cash"
+                            color="#0369A1"
                             onClick={() => onNavigate('cash_in_hand')}
-                            noBorder
                         />
                     )}
                 </Section>
@@ -277,12 +291,22 @@ const Section: React.FC<{ title: string; icon: React.ReactNode; children: React.
     if (validChildren.length === 0) return null;
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-4">
             <div className="flex items-center gap-2 px-1">
-                <div className="text-blue-600">{icon}</div>
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">{title}</h2>
+                <div style={{
+                    background: '#F1F5F9',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    border: '1px solid #E2E8F0'
+                }}>
+                    <span className="text-blue-600">{icon}</span>
+                    <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{title}</h2>
+                </div>
             </div>
-            <Card padding="none" className="overflow-hidden">
+            <Card padding="none" className="overflow-hidden card-glow">
                 <div className="divide-y divide-slate-100">
                     {children}
                 </div>
@@ -298,27 +322,31 @@ const MenuItem: React.FC<{
     description: string;
     onClick: () => void;
     highlight?: boolean;
-    noBorder?: boolean;
-}> = ({ icon, label, description, onClick, highlight }) => (
+    color?: string;
+}> = ({ icon, label, description, onClick, highlight, color = '#64748B' }) => (
     <button
         onClick={onClick}
         className={`
-      w-full flex items-center gap-4 p-4 text-left transition-colors
-      hover:bg-slate-50 active:bg-slate-100
-      ${highlight ? 'bg-blue-50 hover:bg-blue-100' : ''}
+      w-full flex items-center gap-4 p-4 text-left transition-all
+      hover:bg-slate-50 active:bg-slate-100 group
+      ${highlight ? 'bg-blue-50/50 border-l-[3px] border-l-[#0369A1]' : ''}
     `}
     >
-        <div className={`
-      flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center
-      ${highlight ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}
-    `}>
-            {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
+        <div 
+            className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all group-hover:scale-105"
+            style={{ 
+                backgroundColor: highlight ? '#0369A1' : `${color}10`, 
+                color: highlight ? 'white' : color,
+                border: highlight ? 'none' : `1px solid ${color}20`
+            }}
+        >
+            {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-5 h-5' })}
         </div>
         <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-slate-900">{label}</h3>
-            <p className="text-sm text-slate-500 truncate">{description}</p>
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight">{label}</h3>
+            <p className="text-[11px] font-medium text-slate-500 truncate uppercase mt-0.5 tracking-wide">{description}</p>
         </div>
-        <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0" />
+        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all" />
     </button>
 );
 

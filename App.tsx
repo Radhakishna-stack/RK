@@ -231,16 +231,20 @@ const App: React.FC = () => {
       {location.pathname !== '/market-explorer' && location.pathname !== '/horoscope' && location.pathname !== '/tech-agent' && (
         <header
           className="bg-white px-6 py-3 flex items-center justify-between sticky top-0 z-40 no-print"
-          style={{ borderBottom: '2px solid #0F172A' }}
+          style={{ 
+            borderBottom: '1px solid #E2E8F0',
+            boxShadow: '0 1px 0 rgba(0,0,0,0.05), 0 4px 20px rgba(3,105,161,0.04)'
+          }}
         >
           <div className="flex items-center gap-3">
             <div style={{
               width: 38, height: 38,
-              background: 'linear-gradient(135deg, #0369A1, #0EA5E9)',
-              borderRadius: 8,
+              background: 'var(--gradient-cta)',
+              borderRadius: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(3,105,161,0.25)',
-            }}>
+              boxShadow: '0 4px 12px rgba(3,105,161,0.3)',
+              position: 'relative',
+            }} className="animate-pulse-slow">
               <Wrench size={20} color="white" />
             </div>
             <div className="flex flex-col">
@@ -362,8 +366,11 @@ const App: React.FC = () => {
 
       {(!location.pathname.includes('billing') && !location.pathname.includes('estimate/new') && !location.pathname.includes('sales') && !location.pathname.includes('complaints') && !location.pathname.includes('field-service-manager') && !location.pathname.includes('field-jobs')) && (
         <nav
-          className="bg-white flex items-center justify-around py-2 px-2 z-50 no-print"
-          style={{ borderTop: '2px solid #E2E8F0' }}
+          className="bg-white flex items-center justify-around py-2 px-2 z-50 no-print safe-area-bottom"
+          style={{ 
+            borderTop: '1px solid #E2E8F0',
+            boxShadow: '0 -4px 20px rgba(0,0,0,0.03)'
+          }}
         >
           <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
           <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
@@ -388,27 +395,31 @@ const BottomNavItem: React.FC<{
     onClick={onClick}
     aria-label={label}
     aria-current={active ? 'page' : undefined}
-    className="flex flex-col items-center gap-1.5 min-w-[70px] relative transition-colors"
-    style={{ padding: '0.4rem 0' }}
+    className="flex flex-col items-center gap-1 min-w-[70px] relative transition-all duration-200"
+    style={{ padding: '0.5rem 0' }}
   >
-    {/* Sharp active indicator line */}
-    {active && (
-      <div style={{ position: 'absolute', top: '-0.5rem', left: '15%', right: '15%', height: '3px', background: '#0369A1', borderRadius: '0 0 4px 4px' }} />
-    )}
     <div style={{
       color: active ? '#0369A1' : '#94A3B8',
-      transition: 'color 0.2s ease',
-      transform: active ? 'translateY(1px)' : 'none'
+      background: active ? 'rgba(3, 105, 161, 0.08)' : 'transparent',
+      padding: '6px 16px',
+      borderRadius: '12px',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     }}>
-      {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-[22px] h-[22px]' })}
+      {React.cloneElement(icon as React.ReactElement<any>, { 
+        className: `w-[22px] h-[22px] transition-transform duration-200 ${active ? 'scale-110' : ''}` 
+      })}
     </div>
     <span style={{
       fontFamily: "'Fira Code', monospace",
-      fontSize: '0.65rem',
+      fontSize: '0.6rem',
       fontWeight: active ? 700 : 500,
       color: active ? '#0F172A' : '#64748B',
       textTransform: 'uppercase',
-      letterSpacing: '0.05em'
+      letterSpacing: '0.05em',
+      marginTop: '2px'
     }}>
       {label}
     </span>

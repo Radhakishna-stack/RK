@@ -90,13 +90,13 @@ const DashboardV2: React.FC<DashboardV2Props> = ({ onNavigate }) => {
           </div>
         )}
 
-        {/* Receivables/Payables Cards (Structural Minimalist) */}
+        {/* Receivables/Payables Cards (Industrial Minimalist) */}
         <div className="grid grid-cols-2 gap-4">
-          <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderLeft: '3px solid #0369A1', borderRadius: '6px', padding: '1rem' }}>
+          <div className="card-glow" style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderLeft: '4px solid #0369A1', borderRadius: '12px', padding: '1.25rem' }}>
             <div className="flex items-center gap-2 mb-2">
               <ArrowDownRight className="w-3.5 h-3.5" style={{ color: '#0369A1' }} />
-              <span style={{ fontFamily: "'Fira Code', monospace", fontSize: '0.65rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                You'll Get
+              <span style={{ fontFamily: "'Fira Code', monospace", fontSize: '0.65rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                Receivable
               </span>
             </div>
             <p style={{ fontFamily: "'Fira Code', monospace", fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.02em' }}>
@@ -104,11 +104,11 @@ const DashboardV2: React.FC<DashboardV2Props> = ({ onNavigate }) => {
             </p>
           </div>
 
-          <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderLeft: '3px solid #F59E0B', borderRadius: '6px', padding: '1rem' }}>
+          <div className="card-glow" style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderLeft: '4px solid #F59E0B', borderRadius: '12px', padding: '1.25rem' }}>
             <div className="flex items-center gap-2 mb-2">
               <ArrowUpRight className="w-3.5 h-3.5" style={{ color: '#F59E0B' }} />
-              <span style={{ fontFamily: "'Fira Code', monospace", fontSize: '0.65rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                You'll Give
+              <span style={{ fontFamily: "'Fira Code', monospace", fontSize: '0.65rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                Payable
               </span>
             </div>
             <p style={{ fontFamily: "'Fira Code', monospace", fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.02em' }}>
@@ -168,8 +168,8 @@ const DashboardV2: React.FC<DashboardV2Props> = ({ onNavigate }) => {
         </div>
 
         {/* Purchase Card */}
-        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '6px', padding: '1rem' }}>
-          <p style={{ fontFamily: "'Fira Code', monospace", fontSize: '0.65rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '1.25rem' }} className="card-glow">
+          <p style={{ fontFamily: "'Fira Code', monospace", fontSize: '0.65rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.4rem' }}>
             Purchases (Jan)
           </p>
           <h4 style={{ fontFamily: "'Fira Code', monospace", fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.02em' }}>
@@ -243,28 +243,28 @@ const DashboardV2: React.FC<DashboardV2Props> = ({ onNavigate }) => {
       <div className="fixed bottom-28 left-0 right-0 flex justify-center pointer-events-none z-[60]">
         <button
           onClick={() => onNavigate('billing')}
-          className="pointer-events-auto transform active:scale-95 transition-all"
+          className="pointer-events-auto transform active:scale-95 transition-all btn-shimmer"
           style={{
-            background: '#0F172A', // Deep Navy base
+            background: 'var(--color-primary)', // Deep Navy base
             color: '#FFFFFF',
             padding: '1rem 2rem',
-            border: '2px solid #F59E0B', // Amber structural border
-            borderRadius: '4px',
+            border: '1.5px solid #F59E0B', // Amber structural border
+            borderRadius: '8px',
             fontFamily: "'Fira Code', monospace",
             fontWeight: 700,
             fontSize: '0.75rem',
             textTransform: 'uppercase',
-            letterSpacing: '0.1em',
+            letterSpacing: '0.12em',
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem',
-            boxShadow: '0 8px 24px rgba(15, 23, 42, 0.25)'
+            boxShadow: '0 8px 32px rgba(15, 23, 42, 0.4), 0 0 15px rgba(3, 105, 161, 0.3)'
           }}
         >
-          <div style={{ background: '#0369A1', padding: '0.35rem', borderRadius: '2px' }}>
+          <div style={{ background: '#0369A1', padding: '0.35rem', borderRadius: '4px' }}>
             <IndianRupee className="w-4 h-4 text-white" />
           </div>
-          ADD SALE NOW
+          TERMINAL: ADD SALE
         </button>
       </div>
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Plus, Clock, TrendingUp, Receipt, ArrowDownCircle, AlertCircle,
-  ClipboardCheck, Users, Package, Bike, Phone, Wallet
+  ClipboardCheck, Users, Package, Bike, Phone, Wallet, Wrench
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Invoice, Customer, DashboardStats, Complaint, ComplaintStatus } from '../types';
@@ -62,43 +62,47 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 fade-up">
       {/* Welcome Header */}
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold text-slate-900">Welcome Back!</h1>
-        <p className="text-sm text-slate-600">{today}</p>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Welcome Back!</h1>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest font-mono">{today}</p>
       </div>
 
-      {/* Today's Revenue - Most Important Metric */}
-      <Card className="bg-gradient-to-br from-blue-600 to-blue-700 border-0 text-white">
-        <div className="flex items-center justify-between">
+      {/* Today's Revenue - Brand Hero Card */}
+      <div className="relative overflow-hidden rounded-2xl p-6 text-white shadow-[0_8px_32px_rgba(3,105,161,0.35)]" style={{ background: 'var(--gradient-cta)' }}>
+        {/* Background Texture Element */}
+        <Wrench className="absolute -right-6 -bottom-6 w-32 h-32 text-white opacity-10 rotate-[15deg] pointer-events-none" />
+        
+        <div className="relative z-10 flex items-center justify-between">
           <div>
-            <p className="text-sm text-blue-100 mb-1">Today's Revenue</p>
-            <h2 className="text-4xl font-bold">₹{(stats?.totalReceived || 0).toLocaleString()}</h2>
+            <p className="text-xs font-bold text-white/70 uppercase tracking-widest font-mono mb-1">Today's Revenue</p>
+            <h2 className="text-4xl font-bold tracking-tighter">₹{(stats?.totalReceived || 0).toLocaleString()}</h2>
           </div>
-          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
-            <Wallet className="w-8 h-8" />
+          <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20">
+            <Wallet className="w-7 h-7" />
           </div>
         </div>
-      </Card>
+      </div>
 
-      {/* Quick Actions - 6 Most Common */}
+      {/* Quick Actions - Industrial Grid */}
       <div>
-        <h2 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h2>
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Quick Terminal</h2>
         <div className="grid grid-cols-3 gap-3">
-          <QuickAction icon={<ClipboardCheck />} label="New Job" onClick={() => onNavigate('complaints')} />
-          <QuickAction icon={<Receipt />} label="New Sale" onClick={() => onNavigate('sales')} />
-          <QuickAction icon={<Package />} label="Stock" onClick={() => onNavigate('items')} />
-          <QuickAction icon={<TrendingUp />} label="Reports" onClick={() => onNavigate('sale_report')} />
-          <QuickAction icon={<ArrowDownCircle />} label="Payment In" onClick={() => onNavigate('payment_receipt')} />
+          <QuickAction icon={<ClipboardCheck />} label="New Job" accentColor="#F59E0B" onClick={() => onNavigate('complaints')} />
+          <QuickAction icon={<Receipt />} label="New Sale" accentColor="#0369A1" onClick={() => onNavigate('sales')} />
+          <QuickAction icon={<Package />} label="Stock" accentColor="#10B981" onClick={() => onNavigate('items')} />
+          <QuickAction icon={<TrendingUp />} label="Reports" accentColor="#6366F1" onClick={() => onNavigate('sale_report')} />
+          <QuickAction icon={<ArrowDownCircle />} label="Payment In" accentColor="#0EA5E9" onClick={() => onNavigate('payment_receipt')} />
+          <QuickAction icon={<Phone />} label="Contacts" accentColor="#EC4899" onClick={() => onNavigate('customers')} />
         </div>
       </div>
 
       {/* Workshop Status */}
       <div>
-        <h2 className="text-lg font-bold text-slate-900 mb-4">Workshop Status</h2>
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Workshop Status</h2>
         <div onClick={() => onNavigate('complaints')}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+          <Card className="hover:shadow-md transition-all cursor-pointer overflow-hidden border-t-2 border-t-[#0369A1]">
             <div className="grid grid-cols-3 gap-4">
               <StatusCard
                 label="Pending"
@@ -119,9 +123,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 icon={<ClipboardCheck className="w-5 h-5" />}
               />
             </div>
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <Button variant="ghost" className="w-full justify-center">
-                View All Jobs →
+            <div className="mt-4 pt-4 border-t border-slate-100 bg-slate-50/50">
+              <Button variant="ghost" className="w-full justify-center text-xs font-bold uppercase tracking-widest">
+                Access Workshop Terminal →
               </Button>
             </div>
           </Card>
@@ -131,12 +135,12 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       {/* Recent Activity */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-slate-900">Recent Invoices</h2>
+          <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Recent Activity</h2>
           <button
             onClick={() => onNavigate('sale_report')}
-            className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+            className="text-xs font-bold text-blue-600 hover:underline uppercase tracking-widest"
           >
-            View All →
+            Terminal Logs →
           </button>
         </div>
         <Card padding="none">
@@ -177,17 +181,17 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
       {/* Financial Summary */}
       <div>
-        <h2 className="text-lg font-bold text-slate-900 mb-4">Financial Summary</h2>
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Financial Core</h2>
         <div className="grid grid-cols-2 gap-3">
-          <Card padding="sm" onClick={() => onNavigate('expenses')}>
+          <Card padding="sm" onClick={() => onNavigate('expenses')} className="border-l-4 border-l-red-500">
             <div className="text-center">
-              <p className="text-xs text-slate-600 mb-1">Total Expenses</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Expenses</p>
               <p className="text-xl font-bold text-red-600">₹{(stats?.totalExpenses || 0).toLocaleString()}</p>
             </div>
           </Card>
-          <Card padding="sm" onClick={() => onNavigate('dashboard')}>
+          <Card padding="sm" onClick={() => onNavigate('dashboard')} className="border-l-4 border-l-green-500">
             <div className="text-center">
-              <p className="text-xs text-slate-600 mb-1">Net Profit</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Net Profit</p>
               <p className="text-xl font-bold text-green-600">₹{(stats?.netProfit || 0).toLocaleString()}</p>
             </div>
           </Card>
@@ -238,15 +242,16 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 };
 
 // Quick Action Component
-const QuickAction: React.FC<{ icon: React.ReactNode; label: string; onClick: () => void }> = ({ icon, label, onClick }) => (
+const QuickAction: React.FC<{ icon: React.ReactNode; label: string; accentColor: string; onClick: () => void }> = ({ icon, label, accentColor, onClick }) => (
   <button
     onClick={onClick}
-    className="flex flex-col items-center gap-2 p-4 bg-white border-2 border-slate-200 rounded-2xl hover:border-blue-600 hover:bg-blue-50 transition-all active:scale-95"
+    className="flex flex-col items-center gap-2 p-3 bg-white border border-slate-200 rounded-xl hover:shadow-lg transition-all active:scale-95 group"
+    style={{ borderLeft: `3px solid ${accentColor}` }}
   >
-    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
-      {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
+    <div className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors" style={{ backgroundColor: `${accentColor}10`, color: accentColor }}>
+      {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-5 h-5 transition-transform group-hover:scale-110' })}
     </div>
-    <span className="text-xs font-semibold text-slate-700 text-center leading-tight">{label}</span>
+    <span className="text-[10px] font-bold text-slate-700 text-center leading-tight uppercase tracking-tight">{label}</span>
   </button>
 );
 

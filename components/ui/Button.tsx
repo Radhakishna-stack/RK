@@ -5,6 +5,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
     size?: 'sm' | 'md' | 'lg';
     isLoading?: boolean;
+    shimmer?: boolean;
     children: React.ReactNode;
 }
 
@@ -12,18 +13,19 @@ export const Button: React.FC<ButtonProps> = ({
     variant = 'primary',
     size = 'md',
     isLoading = false,
+    shimmer = false,
     children,
     className = '',
     disabled,
     ...props
 }) => {
-    const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-2xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed';
+    const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed';
 
     const variants = {
-        primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm',
-        secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200',
+        primary: `bg-[#0369A1] text-white hover:bg-[#0284C7] shadow-[0_4px_14px_rgba(3,105,161,0.3)] hover:shadow-[0_6px_20px_rgba(3,105,161,0.4)] ${shimmer ? 'btn-shimmer' : ''}`,
+        secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200 border border-slate-200',
         danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm',
-        ghost: 'bg-transparent text-slate-700 hover:bg-slate-100'
+        ghost: 'bg-transparent text-slate-700 hover:bg-slate-100 border border-transparent hover:border-slate-200'
     };
 
     const sizes = {
@@ -38,8 +40,11 @@ export const Button: React.FC<ButtonProps> = ({
             disabled={disabled || isLoading}
             {...props}
         >
-            {isLoading && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
-            {children}
+            {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+                children
+            )}
         </button>
     );
 };
