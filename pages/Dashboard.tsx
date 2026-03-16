@@ -45,10 +45,17 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     }
   };
 
-  // Calculate job counts
-  const pendingJobs = complaints.filter(c => c.status === ComplaintStatus.PENDING).length;
-  const activeJobs = complaints.filter(c => c.status === ComplaintStatus.IN_PROGRESS).length;
-  const completedJobs = complaints.filter(c => c.status === ComplaintStatus.COMPLETED).length;
+  // Pipeline stage counts for dashboard
+  const needsActionJobs = complaints.filter(c =>
+    c.status === ComplaintStatus.NEW ||
+    c.status === ComplaintStatus.PENDING ||
+    c.status === ComplaintStatus.ASSIGNED
+  ).length;
+  const workingJobs = complaints.filter(c =>
+    c.status === ComplaintStatus.ACCEPTED ||
+    c.status === ComplaintStatus.IN_PROGRESS
+  ).length;
+  const readyJobs = complaints.filter(c => c.status === ComplaintStatus.READY).length;
 
   // Get today's date
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -108,20 +115,20 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           <Card className="hover:shadow-md transition-all cursor-pointer overflow-hidden border-t-2 border-t-[#0369A1]">
             <div className="grid grid-cols-3 gap-4">
               <StatusCard
-                label="Pending"
-                value={pendingJobs}
+                label="Needs Action"
+                value={needsActionJobs}
                 variant="warning"
                 icon={<Clock className="w-5 h-5" />}
               />
               <StatusCard
-                label="Active"
-                value={activeJobs}
+                label="Working"
+                value={workingJobs}
                 variant="info"
                 icon={<ClipboardCheck className="w-5 h-5" />}
               />
               <StatusCard
-                label="Ready"
-                value={completedJobs}
+                label="Ready/QC"
+                value={readyJobs}
                 variant="success"
                 icon={<ClipboardCheck className="w-5 h-5" />}
               />

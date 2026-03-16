@@ -195,8 +195,10 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
           bikeNumber: formData.bikeNumber.toUpperCase(),
           estimatedCost: parseInt(formData.estimatedCost) || 0,
           odometerReading: parseInt(formData.odometerReading) || 0,
-          photoUrls: images
-        });
+          photoUrls: images,
+          // If mechanic already selected, jump straight to ASSIGNED stage
+          status: formData.assignedMechanicId ? ComplaintStatus.ASSIGNED : ComplaintStatus.NEW
+        } as any);
         loadCustomers();
       }
       await loadData();
@@ -251,11 +253,19 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
 
   const handleQuickAssign = async (job: Complaint, mechanicId: string) => {
     const mechanic = mechanics.find(m => m.id === mechanicId);
+    const isAssigning = Boolean(mechanicId);
+    // Auto-advance status: assigning → ASSIGNED, unassigning → NEW
+    const newStatus = isAssigning
+      ? (job.status === ComplaintStatus.NEW || job.status === ComplaintStatus.PENDING
+          ? ComplaintStatus.ASSIGNED
+          : job.status)  // keep current stage if already further along
+      : ComplaintStatus.NEW;
     await dbService.updateComplaint(job.id, {
       ...job,
       photoUrls: job.photoUrls || [],
       assignedMechanicId: mechanic?.id || '',
-      assignedMechanicName: mechanic?.name || ''
+      assignedMechanicName: mechanic?.name || '',
+      status: newStatus
     });
     await loadData();
   };
