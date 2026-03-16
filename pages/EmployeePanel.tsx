@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Hammer, Play, CheckCircle2, Clock, RefreshCw, AlertCircle, Bike,
-  ArrowLeft, Truck, Navigation, UserCheck, MapPin, Phone, User, X, Package
+  Hammer, Play, CheckCircle2, Clock, AlertCircle, Bike,
+  ArrowLeft, Truck, Navigation, UserCheck, MapPin, Phone,
+  Package, RefreshCw, ChevronRight, Wrench, Star
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Complaint, ComplaintStatus, PickupRequest, PickupStatus } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
 import { getCurrentUser } from '../auth';
 
 interface EmployeePanelProps {
@@ -15,15 +15,41 @@ interface EmployeePanelProps {
   onNavigate?: (path: string) => void;
 }
 
-const PICKUP_STATUS_COLORS: Record<PickupStatus, string> = {
-  'Pending': 'bg-yellow-100 text-yellow-800',
-  'Assigned': 'bg-blue-100 text-blue-800',
-  'Accepted': 'bg-indigo-100 text-indigo-800',
-  'In Transit': 'bg-purple-100 text-purple-800',
-  'Picked Up': 'bg-green-100 text-green-800',
-  'Delivered': 'bg-emerald-100 text-emerald-800',
-  'Cancelled': 'bg-red-100 text-red-800',
+// ─── Stage pill for job cards ─────────────────────────────────────────────────
+
+const STAGE_CONFIG: Record<string, { label: string; bg: string; text: string; }> = {
+  [ComplaintStatus.NEW]:        { label: '🆕 New',          bg: 'bg-slate-100',   text: 'text-slate-700' },
+  [ComplaintStatus.PENDING]:    { label: '🆕 New',          bg: 'bg-slate-100',   text: 'text-slate-700' },
+  [ComplaintStatus.ASSIGNED]:   { label: '🔧 Assigned',    bg: 'bg-blue-100',    text: 'text-blue-700' },
+  [ComplaintStatus.ACCEPTED]:   { label: '✅ Accepted',    bg: 'bg-indigo-100',  text: 'text-indigo-700' },
+  [ComplaintStatus.IN_PROGRESS]:{ label: '⚙️ Working',     bg: 'bg-amber-100',   text: 'text-amber-700' },
+  [ComplaintStatus.READY]:      { label: '🔍 Ready for QC', bg: 'bg-green-100',  text: 'text-green-700' },
+  [ComplaintStatus.DELIVERED]:  { label: '🏁 Delivered',   bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  [ComplaintStatus.COMPLETED]:  { label: '🏁 Delivered',   bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  [ComplaintStatus.CANCELLED]:  { label: '✕ Cancelled',    bg: 'bg-red-100',     text: 'text-red-600' },
 };
+
+function elapsedLabel(isoDate: string): string {
+  const minutes = Math.floor((Date.now() - new Date(isoDate).getTime()) / 60000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+// ─── Pickup status colors ─────────────────────────────────────────────────────
+
+const PICKUP_STATUS_COLORS: Record<PickupStatus, string> = {
+  'Pending':    'bg-yellow-100 text-yellow-800',
+  'Assigned':   'bg-blue-100 text-blue-800',
+  'Accepted':   'bg-indigo-100 text-indigo-800',
+  'In Transit': 'bg-purple-100 text-purple-800',
+  'Picked Up':  'bg-green-100 text-green-800',
+  'Delivered':  'bg-emerald-100 text-emerald-800',
+  'Cancelled':  'bg-red-100 text-red-800',
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) => {
   const [activeTab, setActiveTab] = useState<'jobs' | 'pickups'>('jobs');
@@ -31,61 +57,63 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
   const [pickups, setPickups] = useState<PickupRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [gpsError, setGpsError] = useState('');
-
-  // GPS tracking state for active pickup
   const [trackingPickupId, setTrackingPickupId] = useState<string | null>(null);
   const gpsWatchRef = useRef<number | null>(null);
   const gpsPollRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentUser = getCurrentUser();
 
-  const loadData = useCallback(async () => {
+  // ── Data Loading ──────────────────────────────────────────────────────────
+
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [jobsData, pickupsData] = await Promise.all([
         dbService.getComplaints(),
         dbService.getPickupRequests()
       ]);
 
-      setJobs(jobsData.filter(j =>
-        j.status === ComplaintStatus.PENDING || j.status === ComplaintStatus.IN_PROGRESS
-      ));
+      // Only show THIS mechanic's jobs (excluding closed stages)
+      const myJobs = jobsData.filter(j =>
+        j.assignedMechanicId === currentUser?.id &&
+        j.status !== ComplaintStatus.DELIVERED &&
+        j.status !== ComplaintStatus.COMPLETED &&
+        j.status !== ComplaintStatus.CANCELLED
+      );
+      setJobs(myJobs);
 
-      // Show pickups assigned to this employee
+      // Pickups assigned to this employee
       const myPickups = pickupsData.filter(p =>
-        p.assignedEmployeeId === currentUser?.id || !p.assignedEmployeeId && p.status === 'Pending'
-      ).filter(p => p.status !== 'Cancelled' && p.status !== 'Delivered');
-
+        (p.assignedEmployeeId === currentUser?.id || (!p.assignedEmployeeId && p.status === 'Pending')) &&
+        p.status !== 'Cancelled' && p.status !== 'Delivered'
+      );
       setPickups(myPickups);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [currentUser?.id]);
 
   useEffect(() => {
     loadData();
+    const handleSync = () => loadData(true);
+    window.addEventListener('mg_data_updated', handleSync);
+    return () => window.removeEventListener('mg_data_updated', handleSync);
   }, [loadData]);
 
-  // Start GPS tracking for a pickup (watchPosition + save every 10s)
-  const startGpsTracking = (pickupId: string) => {
-    if (!navigator.geolocation) {
-      setGpsError('GPS not supported on this device');
-      return;
-    }
-    setTrackingPickupId(pickupId);
+  // ── GPS Tracking ──────────────────────────────────────────────────────────
 
-    const savePosition = (pos: GeolocationPosition) => {
+  const startGpsTracking = (pickupId: string) => {
+    if (!navigator.geolocation) { setGpsError('GPS not supported on this device'); return; }
+    setTrackingPickupId(pickupId);
+    const savePos = (pos: GeolocationPosition) => {
       const { latitude, longitude } = pos.coords;
       dbService.updateEmployeeGpsLocation(pickupId, latitude, longitude);
     };
-
-    // Immediate + continuous watch
-    gpsWatchRef.current = navigator.geolocation.watchPosition(savePosition, () => { }, { enableHighAccuracy: true });
-
-    // Also save on interval to guarantee 10s cadence
+    gpsWatchRef.current = navigator.geolocation.watchPosition(savePos, () => {}, { enableHighAccuracy: true });
     gpsPollRef.current = setInterval(() => {
-      navigator.geolocation.getCurrentPosition(savePosition, () => { }, { enableHighAccuracy: true });
+      navigator.geolocation.getCurrentPosition(savePos, () => {}, { enableHighAccuracy: true });
     }, 10000);
   };
 
@@ -97,10 +125,14 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
 
   useEffect(() => () => { stopGpsTracking(); }, []);
 
+  // ── Job Actions ───────────────────────────────────────────────────────────
+
   const updateJobStatus = async (id: string, status: ComplaintStatus) => {
     await dbService.updateComplaintStatus(id, status);
     loadData();
   };
+
+  // ── Pickup Actions ────────────────────────────────────────────────────────
 
   const handlePickupAction = async (pickup: PickupRequest, action: PickupStatus) => {
     if (action === 'In Transit') {
@@ -109,48 +141,56 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
     } else if (action === 'Picked Up') {
       stopGpsTracking();
       await dbService.updatePickupRequest({ ...pickup, status: 'Picked Up' });
-    } else if (action === 'Delivered') {
-      await dbService.updatePickupRequest({ ...pickup, status: 'Delivered' });
     } else {
       await dbService.updatePickupRequest({ ...pickup, status: action });
     }
     await loadData();
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-600">Loading work...</p>
+          <Wrench className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <p className="text-slate-600 font-medium">Loading your jobs…</p>
         </div>
       </div>
     );
   }
 
+  const activeJobs    = jobs.filter(j => j.status === ComplaintStatus.IN_PROGRESS);
+  const pendingJobs   = jobs.filter(j => j.status === ComplaintStatus.ASSIGNED || j.status === ComplaintStatus.NEW || j.status === ComplaintStatus.PENDING);
+  const acceptedJobs  = jobs.filter(j => j.status === ComplaintStatus.ACCEPTED);
+  const readyJobs     = jobs.filter(j => j.status === ComplaintStatus.READY);
+
   return (
-    <div className="space-y-4 pb-24">
-      {/* Header */}
+    <div className="space-y-4 pb-28">
+
+      {/* Back nav */}
       {onNavigate && (
-        <button onClick={() => onNavigate('more')} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors mb-4 text-sm font-medium">
+        <button onClick={() => onNavigate('more')}
+          className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors text-sm font-medium">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
       )}
 
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900">My Work</h1>
-        <p className="text-sm text-slate-600 mt-1">Your assigned jobs and pickups</p>
-
+        <p className="text-sm text-slate-500 mt-0.5">
+          {currentUser?.name && <span className="text-blue-600 font-semibold">{currentUser.name} · </span>}
+          {jobs.length} active job{jobs.length !== 1 ? 's' : ''}
+        </p>
         {gpsError && (
           <div className="mt-2 flex items-center gap-2 text-xs text-red-600 bg-red-50 p-2 rounded-lg">
-            <AlertCircle className="w-4 h-4" />
-            {gpsError}
+            <AlertCircle className="w-4 h-4" />{gpsError}
           </div>
         )}
-
         {trackingPickupId && (
           <div className="mt-2 flex items-center gap-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 p-2.5 rounded-xl">
-            <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+            <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
             <span className="font-semibold">Live GPS tracking active</span>
             <span className="text-purple-500">— Manager can see your location</span>
           </div>
@@ -160,104 +200,147 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
       {/* Tabs */}
       <div className="flex gap-2">
         <button onClick={() => setActiveTab('jobs')}
-          className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'jobs' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
-          <span className="flex items-center justify-center gap-1.5">
-            <Hammer className="w-4 h-4" /> Service Jobs
-            {jobs.length > 0 && <span className={`px-1.5 py-0.5 rounded-full text-xs font-black ${activeTab === 'jobs' ? 'bg-white/30' : 'bg-blue-100 text-blue-700'}`}>{jobs.length}</span>}
-          </span>
+          className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === 'jobs' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-700'}`}>
+          <Hammer className="w-4 h-4" /> Service Jobs
+          {jobs.length > 0 && <span className={`px-1.5 py-0.5 rounded-full text-xs font-black ${activeTab === 'jobs' ? 'bg-white/30' : 'bg-blue-100 text-blue-700'}`}>{jobs.length}</span>}
         </button>
         <button onClick={() => setActiveTab('pickups')}
-          className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'pickups' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
-          <span className="flex items-center justify-center gap-1.5">
-            <Truck className="w-4 h-4" /> Pickups
-            {pickups.length > 0 && <span className={`px-1.5 py-0.5 rounded-full text-xs font-black ${activeTab === 'pickups' ? 'bg-white/30' : 'bg-purple-100 text-purple-700'}`}>{pickups.length}</span>}
-          </span>
+          className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === 'pickups' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 text-slate-700'}`}>
+          <Truck className="w-4 h-4" /> Pickups
+          {pickups.length > 0 && <span className={`px-1.5 py-0.5 rounded-full text-xs font-black ${activeTab === 'pickups' ? 'bg-white/30' : 'bg-purple-100 text-purple-700'}`}>{pickups.length}</span>}
         </button>
       </div>
 
-      {/* ─── SERVICE JOBS TAB ─── */}
+      {/* ─── SERVICE JOBS TAB ─────────────────────────────────────────────── */}
       {activeTab === 'jobs' && (
         <div className="space-y-3">
-          {/* Summary Card */}
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 border-0 text-white">
-            <div>
-              <p className="text-sm text-blue-100 mb-1">Active Service Jobs</p>
-              <h2 className="text-4xl font-bold">{jobs.length}</h2>
-            </div>
-          </Card>
+          {/* Summary strip */}
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: 'To Accept', count: pendingJobs.length, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+              { label: 'Accepted', count: acceptedJobs.length, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+              { label: 'Working', count: activeJobs.length, color: 'bg-amber-50 text-amber-700 border-amber-200' },
+              { label: 'Ready', count: readyJobs.length, color: 'bg-green-50 text-green-700 border-green-200' },
+            ].map(s => (
+              <div key={s.label} className={`border rounded-xl p-2 text-center ${s.color}`}>
+                <p className="text-lg font-black">{s.count}</p>
+                <p className="text-[10px] font-semibold leading-tight">{s.label}</p>
+              </div>
+            ))}
+          </div>
 
-          {/* Field Jobs Quick Access */}
+          {/* Field jobs shortcut */}
           {onNavigate && (
             <Card className="bg-gradient-to-br from-purple-500 to-purple-600 border-0 text-white cursor-pointer hover:shadow-xl transition-all"
               onClick={() => onNavigate('field_jobs')}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-purple-100 mb-1">Field Service</p>
-                  <h3 className="text-xl font-bold">My GPS Jobs</h3>
-                  <p className="text-sm text-purple-100 mt-1">View jobs with live navigation</p>
+                  <p className="text-sm text-purple-100">Field Service</p>
+                  <h3 className="text-lg font-bold">GPS Jobs</h3>
+                  <p className="text-xs text-purple-200 mt-0.5">Live navigation to customer</p>
                 </div>
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <Bike className="w-7 h-7" />
+                <div className="flex items-center gap-2">
+                  <Bike className="w-7 h-7 opacity-80" />
+                  <ChevronRight className="w-5 h-5 opacity-60" />
                 </div>
               </div>
             </Card>
           )}
 
+          {/* Job list */}
           {jobs.length === 0 ? (
             <Card>
               <div className="text-center py-12">
-                <Hammer className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">No active jobs</h3>
-                <p className="text-slate-600">You're all caught up! New jobs will appear here.</p>
+                <Star className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-slate-700 mb-1">All caught up!</h3>
+                <p className="text-slate-500 text-sm">No active jobs assigned to you right now.</p>
               </div>
             </Card>
           ) : (
-            jobs.map((job) => (
-              <Card key={job.id} padding="md">
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-lg font-bold text-slate-900">{job.bikeNumber}</h3>
-                        <Badge
-                          variant={job.status === ComplaintStatus.PENDING ? 'warning' : job.status === ComplaintStatus.IN_PROGRESS ? 'info' : 'success'}
-                          size="sm"
-                        >
-                          {job.status === ComplaintStatus.PENDING && <Clock className="w-3 h-3 mr-1" />}
-                          {job.status === ComplaintStatus.IN_PROGRESS && <RefreshCw className="w-3 h-3 mr-1" />}
-                          {job.status === ComplaintStatus.COMPLETED && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                          {job.status || 'Pending'}
-                        </Badge>
-                      </div>
-                      <div className="space-y-1 text-sm text-slate-600">
-                        <div className="flex items-center gap-2">
-                          <Bike className="w-4 h-4" />
-                          <span>{job.customerName}</span>
+            jobs.map((job) => {
+              const stage = STAGE_CONFIG[job.status] ?? STAGE_CONFIG[ComplaintStatus.NEW];
+              return (
+                <Card key={job.id} padding="md">
+                  <div className="space-y-3">
+                    {/* Job header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <Bike className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                          <h3 className="text-base font-bold text-slate-900">{job.bikeNumber}</h3>
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${stage.bg} ${stage.text}`}>
+                            {stage.label}
+                          </span>
                         </div>
-                        <p className="text-slate-700 mt-2">{job.details}</p>
+                        <p className="text-sm font-semibold text-slate-700">{job.customerName}</p>
+                        {job.customerPhone && (
+                          <a href={`tel:${job.customerPhone}`} className="text-xs text-blue-600 flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3" /> {job.customerPhone}
+                          </a>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        {job.estimatedCost > 0 && (
+                          <>
+                            <p className="text-[10px] text-slate-400">Est. Cost</p>
+                            <p className="text-base font-bold text-slate-900">₹{job.estimatedCost.toLocaleString()}</p>
+                          </>
+                        )}
                       </div>
                     </div>
+
+                    {/* Issue details */}
+                    <p className="text-sm text-slate-600 bg-slate-50 rounded-xl px-3 py-2 line-clamp-2">{job.details}</p>
+
+                    {/* Meta */}
+                    <div className="flex items-center gap-3 text-xs text-slate-400">
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{elapsedLabel(job.createdAt)}</span>
+                      {job.dueDate && (
+                        <span className={`flex items-center gap-1 ${new Date(job.dueDate) < new Date() ? 'text-red-500 font-semibold' : ''}`}>
+                          ⏰ {new Date(job.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* ── THE KEY MECHANIC CTA ── */}
+                    <div className="pt-2 border-t border-slate-100">
+                      {job.status === ComplaintStatus.ASSIGNED && (
+                        <Button
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-3 rounded-xl shadow-md shadow-blue-200"
+                          onClick={() => updateJobStatus(job.id, ComplaintStatus.ACCEPTED)}>
+                          <UserCheck className="w-5 h-5 mr-2" /> Accept This Job
+                        </Button>
+                      )}
+                      {job.status === ComplaintStatus.ACCEPTED && (
+                        <Button
+                          className="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold py-3 rounded-xl shadow-md shadow-amber-200"
+                          onClick={() => updateJobStatus(job.id, ComplaintStatus.IN_PROGRESS)}>
+                          <Play className="w-5 h-5 mr-2" /> Start Work
+                        </Button>
+                      )}
+                      {job.status === ComplaintStatus.IN_PROGRESS && (
+                        <Button
+                          className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-3 rounded-xl shadow-md shadow-green-200"
+                          onClick={() => updateJobStatus(job.id, ComplaintStatus.READY)}>
+                          <CheckCircle2 className="w-5 h-5 mr-2" /> Mark Ready for Delivery
+                        </Button>
+                      )}
+                      {(job.status === ComplaintStatus.NEW || job.status === ComplaintStatus.PENDING) && (
+                        <p className="text-center text-xs text-slate-400 py-1">⏳ Awaiting admin to assign you to this job</p>
+                      )}
+                      {job.status === ComplaintStatus.READY && (
+                        <p className="text-center text-xs text-green-600 font-semibold py-1">✅ Waiting for manager QC check</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2 pt-2 border-t border-slate-200">
-                    {job.status === ComplaintStatus.PENDING && (
-                      <Button size="sm" onClick={() => updateJobStatus(job.id, ComplaintStatus.IN_PROGRESS)} className="flex-1">
-                        <Play className="w-4 h-4 mr-1" /> Start Work
-                      </Button>
-                    )}
-                    {job.status === ComplaintStatus.IN_PROGRESS && (
-                      <Button size="sm" onClick={() => updateJobStatus(job.id, ComplaintStatus.COMPLETED)} className="flex-1">
-                        <CheckCircle2 className="w-4 h-4 mr-1" /> Mark Ready
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            ))
+                </Card>
+              );
+            })
           )}
         </div>
       )}
 
-      {/* ─── PICKUPS TAB ─── */}
+      {/* ─── PICKUPS TAB ──────────────────────────────────────────────────── */}
       {activeTab === 'pickups' && (
         <div className="space-y-3">
           {pickups.length === 0 ? (
@@ -265,7 +348,7 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
               <div className="text-center py-12">
                 <Truck className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-slate-900 mb-2">No pickups assigned</h3>
-                <p className="text-slate-600">Your manager will assign a pickup request to you.</p>
+                <p className="text-slate-500 text-sm">Your manager will assign a pickup to you.</p>
               </div>
             </Card>
           ) : (
@@ -283,28 +366,23 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
                           <span className="font-mono text-xs font-bold text-slate-700">{pickup.bikeNumber}</span>
                         </div>
                       </div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${PICKUP_STATUS_COLORS[pickup.status]}`}>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${PICKUP_STATUS_COLORS[pickup.status]}`}>
                         {pickup.status}
                       </span>
                     </div>
-
-                    <p className="text-sm text-slate-700 bg-slate-50 rounded-xl p-2.5">{pickup.issueDescription}</p>
-
+                    <p className="text-sm text-slate-700 bg-slate-50 rounded-xl px-3 py-2">{pickup.issueDescription}</p>
                     {pickup.locationLink && (
                       <a href={pickup.locationLink} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-2 text-sm text-blue-600 font-semibold hover:underline">
                         <MapPin className="w-4 h-4" /> Open Customer Location
                       </a>
                     )}
-
                     {isMyTracking && (
                       <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-xl px-3 py-2.5 font-semibold">
-                        <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+                        <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
                         GPS tracking active — manager can see your location
                       </div>
                     )}
-
-                    {/* Action Buttons */}
                     <div className="flex gap-2 pt-1">
                       {pickup.status === 'Assigned' && (
                         <Button size="sm" className="flex-1 bg-indigo-600 hover:bg-indigo-700"

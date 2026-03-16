@@ -276,12 +276,20 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
   });
 
   const statusCounts = {
-    pending: complaints.filter(c => c.status === ComplaintStatus.PENDING).length,
+    new: complaints.filter(c => c.status === ComplaintStatus.NEW || c.status === ComplaintStatus.PENDING).length,
+    assigned: complaints.filter(c => c.status === ComplaintStatus.ASSIGNED).length,
+    accepted: complaints.filter(c => c.status === ComplaintStatus.ACCEPTED).length,
     inProgress: complaints.filter(c => c.status === ComplaintStatus.IN_PROGRESS).length,
-    completed: complaints.filter(c => c.status === ComplaintStatus.COMPLETED).length
+    ready: complaints.filter(c => c.status === ComplaintStatus.READY).length,
+    delivered: complaints.filter(c => c.status === ComplaintStatus.DELIVERED || c.status === ComplaintStatus.COMPLETED).length,
   };
 
-  const unassignedCount = complaints.filter(c => !c.assignedMechanicId && c.status !== ComplaintStatus.COMPLETED && c.status !== ComplaintStatus.CANCELLED).length;
+  const unassignedCount = complaints.filter(c =>
+    !c.assignedMechanicId &&
+    c.status !== ComplaintStatus.DELIVERED &&
+    c.status !== ComplaintStatus.COMPLETED &&
+    c.status !== ComplaintStatus.CANCELLED
+  ).length;
 
   if (loading) {
     return (
@@ -318,12 +326,15 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
         </Button>
       </div>
 
-      {/* Status Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <StatusTab label="All" count={complaints.length} active={filterStatus === 'ALL'} onClick={() => setFilterStatus('ALL')} />
-        <StatusTab label="Pending" count={statusCounts.pending} active={filterStatus === ComplaintStatus.PENDING} onClick={() => setFilterStatus(ComplaintStatus.PENDING)} variant="warning" />
-        <StatusTab label="In Progress" count={statusCounts.inProgress} active={filterStatus === ComplaintStatus.IN_PROGRESS} onClick={() => setFilterStatus(ComplaintStatus.IN_PROGRESS)} variant="info" />
-        <StatusTab label="Completed" count={statusCounts.completed} active={filterStatus === ComplaintStatus.COMPLETED} onClick={() => setFilterStatus(ComplaintStatus.COMPLETED)} variant="success" />
+      {/* 6-Stage Pipeline Strip */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        <PipelineTab label="All" count={complaints.length} active={filterStatus === 'ALL'} onClick={() => setFilterStatus('ALL')} color="slate" />
+        <PipelineTab label="🆕 New" count={statusCounts.new} active={filterStatus === ComplaintStatus.NEW} onClick={() => setFilterStatus(ComplaintStatus.NEW)} color="slate" />
+        <PipelineTab label="🔧 Assigned" count={statusCounts.assigned} active={filterStatus === ComplaintStatus.ASSIGNED} onClick={() => setFilterStatus(ComplaintStatus.ASSIGNED)} color="blue" />
+        <PipelineTab label="✅ Accepted" count={statusCounts.accepted} active={filterStatus === ComplaintStatus.ACCEPTED} onClick={() => setFilterStatus(ComplaintStatus.ACCEPTED)} color="indigo" />
+        <PipelineTab label="⚙️ Working" count={statusCounts.inProgress} active={filterStatus === ComplaintStatus.IN_PROGRESS} onClick={() => setFilterStatus(ComplaintStatus.IN_PROGRESS)} color="amber" />
+        <PipelineTab label="🔍 Ready" count={statusCounts.ready} active={filterStatus === ComplaintStatus.READY} onClick={() => setFilterStatus(ComplaintStatus.READY)} color="green" />
+        <PipelineTab label="🏁 Done" count={statusCounts.delivered} active={filterStatus === ComplaintStatus.DELIVERED} onClick={() => setFilterStatus(ComplaintStatus.DELIVERED)} color="emerald" />
       </div>
 
       {/* Search + Mechanic Filter Row */}
@@ -684,14 +695,29 @@ const JobCard: React.FC<{
 
   const getStatusBadge = (status: ComplaintStatus) => {
     switch (status) {
-      case ComplaintStatus.PENDING: return <Badge variant="warning" size="sm">Pending</Badge>;
-      case ComplaintStatus.IN_PROGRESS: return <Badge variant="info" size="sm">In Progress</Badge>;
-      case ComplaintStatus.COMPLETED: return <Badge variant="success" size="sm">Completed</Badge>;
-      case ComplaintStatus.CANCELLED: return <Badge variant="danger" size="sm">Cancelled</Badge>;
+      case ComplaintStatus.NEW:
+      case ComplaintStatus.PENDING:
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">🆕 New</span>;
+      case ComplaintStatus.ASSIGNED:
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700 border border-blue-200">🔧 Assigned</span>;
+      case ComplaintStatus.ACCEPTED:
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">✅ Accepted</span>;
+      case ComplaintStatus.IN_PROGRESS:
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200">⚙️ Working</span>;
+      case ComplaintStatus.READY:
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-700 border border-green-200">🔍 Ready for QC</span>;
+      case ComplaintStatus.DELIVERED:
+      case ComplaintStatus.COMPLETED:
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">🏁 Delivered</span>;
+      case ComplaintStatus.CANCELLED:
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-600 border border-red-200">✗ Cancelled</span>;
+      default:
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500">{status}</span>;
     }
   };
 
-  const isOverdue = job.dueDate && new Date(job.dueDate) < new Date() && job.status !== ComplaintStatus.COMPLETED && job.status !== ComplaintStatus.CANCELLED;
+  const isActive = ![ComplaintStatus.DELIVERED, ComplaintStatus.COMPLETED, ComplaintStatus.CANCELLED].includes(job.status);
+  const isOverdue = job.dueDate && new Date(job.dueDate) < new Date() && isActive;
 
   return (
     <Card>
@@ -796,22 +822,39 @@ const JobCard: React.FC<{
           )}
         </div>
 
-        {/* Actions */}
-        <div className="pt-2 border-t border-slate-100 flex gap-2">
-          {job.status !== ComplaintStatus.COMPLETED && job.status !== ComplaintStatus.CANCELLED && (
-            <>
-              {job.status === ComplaintStatus.PENDING && (
-                <Button size="sm" variant="secondary" onClick={() => onStatusChange(job.id, ComplaintStatus.IN_PROGRESS)} className="flex-1">
-                  Start Work
-                </Button>
-              )}
-              {job.status === ComplaintStatus.IN_PROGRESS && (
-                <Button size="sm" onClick={() => onStatusChange(job.id, ComplaintStatus.COMPLETED)} className="flex-1">
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  Mark Complete
-                </Button>
-              )}
-            </>
+        {/* Pipeline Actions - role-based CTAs */}
+        <div className="pt-2 border-t border-slate-100 flex gap-2 flex-wrap">
+          {/* Admin: assign mechanic prompt for NEW jobs */}
+          {(job.status === ComplaintStatus.NEW || job.status === ComplaintStatus.PENDING) && !job.assignedMechanicId && (
+            <span className="flex-1 text-xs text-amber-600 font-semibold flex items-center gap-1">
+              <UserCheck className="w-3.5 h-3.5" /> Awaiting mechanic assignment
+            </span>
+          )}
+          {/* Admin: after assigning, waiting for mechanic to accept */}
+          {job.status === ComplaintStatus.ASSIGNED && (
+            <span className="flex-1 text-xs text-blue-600 font-semibold flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" /> Waiting for mechanic to accept…
+            </span>
+          )}
+          {/* Admin: QC Pass button when mechanic marks ready */}
+          {job.status === ComplaintStatus.READY && (
+            <Button size="sm" onClick={() => onStatusChange(job.id, ComplaintStatus.DELIVERED)}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white">
+              <CheckCircle className="w-4 h-4 mr-1" /> Pass QC → Deliver
+            </Button>
+          )}
+          {/* Done state */}
+          {(job.status === ComplaintStatus.DELIVERED || job.status === ComplaintStatus.COMPLETED) && (
+            <span className="flex-1 text-xs text-emerald-600 font-semibold flex items-center gap-1">
+              🏁 Job closed
+            </span>
+          )}
+          {/* Cancel option for active jobs */}
+          {isActive && (
+            <Button size="sm" variant="ghost" onClick={() => onStatusChange(job.id, ComplaintStatus.CANCELLED)}
+              className="text-red-500 hover:bg-red-50 px-2">
+              ✕
+            </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => onEdit(job)}>Edit</Button>
           <Button size="sm" variant="ghost" onClick={() => onDelete(job.id)} className="text-red-600 hover:bg-red-50">
@@ -823,25 +866,30 @@ const JobCard: React.FC<{
   );
 };
 
-// ─── Status Tab ────────────────────────────────────────────────────────────────
+// ─── Pipeline Stage Tab ────────────────────────────────────────────────────────
 
-const StatusTab: React.FC<{
-  label: string; count: number; active: boolean; onClick: () => void; variant?: 'warning' | 'info' | 'success';
-}> = ({ label, count, active, onClick, variant }) => {
-  const colors = {
-    warning: active ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100',
-    info: active ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100',
-    success: active ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'
-  };
-  const defaultColor = active ? 'bg-slate-900 text-white' : 'bg-white text-slate-700 hover:bg-slate-50';
-  const colorClass = variant ? colors[variant] : defaultColor;
+const PIPELINE_COLORS: Record<string, { active: string; idle: string }> = {
+  slate:   { active: 'bg-slate-800 text-white',   idle: 'bg-slate-100 text-slate-700 hover:bg-slate-200' },
+  blue:    { active: 'bg-blue-600 text-white',    idle: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+  indigo:  { active: 'bg-indigo-600 text-white',  idle: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100' },
+  amber:   { active: 'bg-amber-500 text-white',   idle: 'bg-amber-50 text-amber-700 hover:bg-amber-100' },
+  green:   { active: 'bg-green-600 text-white',   idle: 'bg-green-50 text-green-700 hover:bg-green-100' },
+  emerald: { active: 'bg-emerald-600 text-white', idle: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
+};
 
+const PipelineTab: React.FC<{
+  label: string; count: number; active: boolean; onClick: () => void; color: string;
+}> = ({ label, count, active, onClick, color }) => {
+  const palette = PIPELINE_COLORS[color] ?? PIPELINE_COLORS.slate;
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-colors ${colorClass} ${active ? 'shadow-sm' : 'border border-slate-200'}`}
+      className={`px-3 py-1.5 rounded-xl font-semibold text-xs whitespace-nowrap transition-all flex items-center gap-1.5 ${active ? palette.active + ' shadow-md' : palette.idle + ' border border-slate-200'}`}
     >
-      {label} ({count})
+      {label}
+      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${active ? 'bg-white/25' : 'bg-current/10'}`}>
+        {count}
+      </span>
     </button>
   );
 };

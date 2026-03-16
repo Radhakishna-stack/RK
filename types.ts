@@ -55,9 +55,17 @@ export interface StockWantingItem {
 }
 
 export enum ComplaintStatus {
-  PENDING = 'Pending',
+  // Legacy aliases kept for backward-compat (old data maps to new stages)
+  PENDING = 'Pending',       // maps → NEW (unassigned) or ASSIGNED
+  COMPLETED = 'Completed',   // maps → DELIVERED
+
+  // New 6-stage pipeline
+  NEW = 'New',
+  ASSIGNED = 'Assigned',
+  ACCEPTED = 'Accepted',
   IN_PROGRESS = 'In Progress',
-  COMPLETED = 'Completed',
+  READY = 'Ready',
+  DELIVERED = 'Delivered',
   CANCELLED = 'Cancelled'
 }
 
@@ -76,6 +84,11 @@ export interface Complaint {
   city?: string;
   assignedMechanicId?: string;
   assignedMechanicName?: string;
+  // Stage timestamps for audit trail
+  acceptedAt?: string;
+  startedAt?: string;
+  readyAt?: string;
+  deliveredAt?: string;
 }
 
 

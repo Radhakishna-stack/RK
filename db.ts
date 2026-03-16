@@ -790,7 +790,7 @@ export const dbService = {
     const newComplaint = {
       ...data,
       id: 'B' + Date.now(),
-      status: ComplaintStatus.PENDING,
+      status: ComplaintStatus.NEW,
       createdAt: new Date().toISOString()
     };
 
@@ -822,10 +822,18 @@ export const dbService = {
   },
   updateComplaintStatus: async (id: string, status: ComplaintStatus): Promise<void> => {
     const current = await dbService.getComplaints();
-    const updated = current.map(c => c.id === id ? { ...c, status } : c);
-    localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(updated));
-    const updatedItem = updated.find(c => c.id === id);
-    if (updatedItem) syncToCloud('updateComplaint', updatedItem);
+    const index = current.findIndex(c => c.id === id);
+    if (index !== -1) {
+      const now = new Date().toISOString();
+      const timestamps: Partial<Complaint> = {}; // Use Partial<Complaint> for type safety
+      if (status === ComplaintStatus.ACCEPTED) timestamps.acceptedAt = now;
+      if (status === ComplaintStatus.IN_PROGRESS) timestamps.startedAt = now;
+      if (status === ComplaintStatus.READY) timestamps.readyAt = now;
+      if (status === ComplaintStatus.DELIVERED) timestamps.deliveredAt = now;
+      current[index] = { ...current[index], status, ...timestamps };
+      localStorage.setItem(LS_KEYS.COMPLAINTS, JSON.stringify(current));
+      syncToCloud('updateComplaint', current[index]); // Sync the full updated item
+    }
   },
   updateComplaintPhotos: async (id: string, photos: string[]): Promise<void> => {
     const current = await dbService.getComplaints();
