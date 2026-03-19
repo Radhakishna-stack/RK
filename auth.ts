@@ -94,7 +94,12 @@ export function validateCredentials(
 
     const user = users.find(u => u.username.toLowerCase() === sanitizedUsername);
     if (!user) return null;
-    if (!user.isActive) throw new Error('User account is disabled');
+
+    // Be lenient with Google Sheets data: assume active unless explicitly set to false or 'FALSE'
+    const isExplicitlyDisabled = user.isActive === false || String(user.isActive).toUpperCase() === 'FALSE';
+    if (isExplicitlyDisabled) {
+        throw new Error('User account is disabled');
+    }
 
     return verifyPassword(password, user.password) ? user : null;
 }
