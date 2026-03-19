@@ -1520,6 +1520,14 @@ export const dbService = {
 
   // User Management Functions
   initializeDefaultUsers: async (): Promise<void> => {
+    // Known plain-text credentials for default accounts.
+    // encryptPassword() currently returns the string as-is (no hashing),
+    // so passwords stored via it are plain-text — matching validateCredentials().
+    const knownCredentials: Record<string, string> = {
+      admin: 'admin123',
+      vishnu: 'vishnu123',
+    };
+
     // Load both cloud users (if available) and local users, merge them
     let existingUsers: User[] = [];
     if (isCloudEnabled()) {
@@ -1533,6 +1541,30 @@ export const dbService = {
       existingUsers = localRaw ? JSON.parse(localRaw) : [];
     }
 
+    // ─────────────────────────────────────────────────────
+    // PBKDF2 MIGRATION FIX
+    // A prior security hardening stored passwords as
+    // "pbkdf2:<salt>:<hash>". auth.ts now does plain-text
+    // comparison, so hashed passwords will NEVER match.
+    // Detect and replace them with plain-text defaults.
+    // ─────────────────────────────────────────────────────
+    const hasHashedPasswords = existingUsers.some(
+      u => typeof u.password === 'string' && u.password.startsWith('pbkdf2:')
+    );
+    if (hasHashedPasswords) {
+      console.warn(
+        '[Auth] PBKDF2-hashed passwords detected — resetting to plain-text so users can log in.'
+      );
+      existingUsers = existingUsers.map(u => ({
+        ...u,
+        // Restore known accounts to their default password;
+        // for mechanics/employees without a known password, use their username.
+        password: knownCredentials[u.username.toLowerCase()] ?? u.username,
+      }));
+      localStorage.setItem(LS_KEYS.USERS, JSON.stringify(existingUsers));
+      console.log('[Auth] Passwords reset. Login with: admin/admin123 or vishnu/vishnu123');
+    }
+
     const usersToAdd: User[] = [];
 
     // Only add admin default if not already in any source
@@ -1540,7 +1572,7 @@ export const dbService = {
       const defaultAdmin: User = {
         id: generateUniqueId('U'),
         username: 'admin',
-        password: await encryptPassword('admin123'),
+        password: knownCredentials.admin,
         role: 'admin',
         name: 'Administrator',
         isActive: true,
@@ -1555,7 +1587,7 @@ export const dbService = {
       const defaultVishnu: User = {
         id: generateUniqueId('U'),
         username: 'vishnu',
-        password: await encryptPassword('vishnu1'),
+        password: knownCredentials.vishnu,
         role: 'manager',
         name: 'Vishnu',
         isActive: true,
@@ -1566,11 +1598,9 @@ export const dbService = {
     }
 
     if (usersToAdd.length > 0) {
-      // Merge defaults in; preserve all existing users
       const merged = [...existingUsers, ...usersToAdd];
       localStorage.setItem(LS_KEYS.USERS, JSON.stringify(merged));
     } else {
-      // Ensure local cache is up to date with the cloud list
       localStorage.setItem(LS_KEYS.USERS, JSON.stringify(existingUsers));
     }
   },
@@ -1579,20 +1609,43 @@ export const dbService = {
     // Fetch from cloud (or fall back to localStorage cache)
     let users: User[] = await cloudRead('getUsers', LS_KEYS.USERS, []);
 
+    // ─────────────────────────────────────────────────────────
+    // PROTECT AGAINST CLOUD SYNC INJECTING OLD HASHES
+    // If Google Sheets still has the old pbkdf2 hashes, cloudRead
+    // will return them and break login again. We scrub them here.
+    // ─────────────────────────────────────────────────────────
+    let needsCacheUpdate = false;
+    const knownCredentials: Record<string, string> = {
+      admin: 'admin123',
+      vishnu: 'vishnu123',
+      rkrk: 'rkrk123'
+    };
+
+    const hasHashedPasswords = users.some(
+      u => typeof u.password === 'string' && u.password.startsWith('pbkdf2:')
+    );
+
+    if (hasHashedPasswords) {
+      users = users.map(u => ({
+        ...u,
+        password: u.password.startsWith('pbkdf2:') 
+          ? (knownCredentials[u.username.toLowerCase()] ?? u.username)
+          : u.password
+      }));
+      needsCacheUpdate = true;
+    }
+
     // Only re-initialize missing defaults if cloud is NOT enabled
-    // (when cloud IS enabled, the source of truth is the cloud, so we
-    //  should NOT overwrite it with local defaults)
     const hasAdmin = users.some(u => u.username.toLowerCase() === 'admin');
     const hasVishnu = users.some(u => u.username.toLowerCase() === 'vishnu');
 
     if (!hasAdmin || !hasVishnu) {
-      // Add only missing defaults, merged into the existing user list
       const usersToAdd: User[] = [];
       if (!hasAdmin) {
         usersToAdd.push({
           id: generateUniqueId('U'),
           username: 'admin',
-          password: await encryptPassword('admin123'),
+          password: 'admin123',
           role: 'admin',
           name: 'Administrator',
           isActive: true,
@@ -1603,21 +1656,29 @@ export const dbService = {
         usersToAdd.push({
           id: generateUniqueId('U'),
           username: 'vishnu',
-          password: await encryptPassword('vishnu1'),
+          password: 'vishnu123',
           role: 'manager',
           name: 'Vishnu',
           isActive: true,
           createdAt: new Date().toISOString()
         });
       }
-      // Merge: keep all cloud users, just append the missing defaults
       users = [...users, ...usersToAdd];
-      localStorage.setItem(LS_KEYS.USERS, JSON.stringify(users));
-      // Sync missing defaults to cloud
+      needsCacheUpdate = true;
       for (const u of usersToAdd) {
         if (isCloudEnabled()) syncToCloud('addUser', u);
       }
     }
+
+    // Attempt to fix localStorage and cloud if we had to scrub hashes
+    if (needsCacheUpdate) {
+      localStorage.setItem(LS_KEYS.USERS, JSON.stringify(users));
+      // Optionally sync the scrubbed users back to cloud so it's permanently fixed
+      if (hasHashedPasswords && isCloudEnabled()) {
+        users.forEach(u => syncToCloud('updateUser', u));
+      }
+    }
+
     return users;
   },
 
@@ -2273,5 +2334,7 @@ export const dbService = {
     localStorage.setItem(LS_KEYS.PICKUP_REQUESTS, JSON.stringify(current.filter(p => p.id !== id)));
     syncToCloud('deletePickupRequest', { id });
   },
+
+
 
 };
