@@ -1559,7 +1559,7 @@ export const dbService = {
         ...u,
         // Restore known accounts to their default password;
         // for mechanics/employees without a known password, use their username.
-        password: knownCredentials[u.username.toLowerCase()] ?? u.username,
+        password: knownCredentials[u.username?.toLowerCase() || ''] ?? (u.username || ''),
       }));
       localStorage.setItem(LS_KEYS.USERS, JSON.stringify(existingUsers));
       console.log('[Auth] Passwords reset. Login with: admin/admin123 or vishnu/vishnu123');
@@ -1568,7 +1568,7 @@ export const dbService = {
     const usersToAdd: User[] = [];
 
     // Only add admin default if not already in any source
-    if (!existingUsers.some(u => u.username.toLowerCase() === 'admin')) {
+    if (!existingUsers.some(u => u.username?.toLowerCase() === 'admin')) {
       const defaultAdmin: User = {
         id: generateUniqueId('U'),
         username: 'admin',
@@ -1628,16 +1628,16 @@ export const dbService = {
     if (hasHashedPasswords) {
       users = users.map(u => ({
         ...u,
-        password: u.password.startsWith('pbkdf2:') 
-          ? (knownCredentials[u.username.toLowerCase()] ?? u.username)
+        password: (typeof u.password === 'string' && u.password.startsWith('pbkdf2:'))
+          ? (knownCredentials[u.username?.toLowerCase() || ''] ?? u.username)
           : u.password
       }));
       needsCacheUpdate = true;
     }
 
     // Only re-initialize missing defaults if cloud is NOT enabled
-    const hasAdmin = users.some(u => u.username.toLowerCase() === 'admin');
-    const hasVishnu = users.some(u => u.username.toLowerCase() === 'vishnu');
+    const hasAdmin = users.some(u => u.username?.toLowerCase() === 'admin');
+    const hasVishnu = users.some(u => u.username?.toLowerCase() === 'vishnu');
 
     if (!hasAdmin || !hasVishnu) {
       const usersToAdd: User[] = [];
