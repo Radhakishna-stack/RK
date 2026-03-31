@@ -1,5 +1,9 @@
 
-export type PickupStatus = 'Pending' | 'Assigned' | 'Accepted' | 'In Transit' | 'Picked Up' | 'Delivered' | 'Cancelled';
+export type PickupStatus =
+  | 'New' | 'Assigned' | 'Accepted' | 'En Route' | 'At Pickup' | 'Completed' | 'Cancelled'
+  | 'Pending' | 'In Transit' | 'Picked Up' | 'Delivered'; // legacy aliases
+
+export type PickupType = 'Breakdown' | 'Emergency' | 'Scheduled' | 'Delivery';
 
 export interface PickupRequest {
   id: string;
@@ -8,6 +12,7 @@ export interface PickupRequest {
   bikeNumber: string;
   issueDescription: string;
   locationLink: string;
+  pickupType?: PickupType;
   location?: { lat: number; lng: number };
   status: PickupStatus;
   assignedEmployeeId?: string;

@@ -40,6 +40,12 @@ function elapsedLabel(isoDate: string): string {
 // ─── Pickup status colors ─────────────────────────────────────────────────────
 
 const PICKUP_STATUS_COLORS: Record<PickupStatus, string> = {
+  // New 6-stage values
+  'New':        'bg-sky-100 text-sky-800',
+  'En Route':   'bg-orange-100 text-orange-800',
+  'At Pickup':  'bg-emerald-100 text-emerald-800',
+  'Completed':  'bg-slate-100 text-slate-700',
+  // Legacy kept for backward compat
   'Pending':    'bg-yellow-100 text-yellow-800',
   'Assigned':   'bg-blue-100 text-blue-800',
   'Accepted':   'bg-indigo-100 text-indigo-800',
@@ -48,6 +54,7 @@ const PICKUP_STATUS_COLORS: Record<PickupStatus, string> = {
   'Delivered':  'bg-emerald-100 text-emerald-800',
   'Cancelled':  'bg-red-100 text-red-800',
 };
+
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
