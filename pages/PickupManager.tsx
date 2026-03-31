@@ -1,4 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import {
   Plus, MapPin, User, Phone, Bike, Clock, CheckCircle2, Truck, X,
   ArrowLeft, Navigation, UserCheck, Search, Share2, ExternalLink,
@@ -167,80 +170,76 @@ const KanbanColumn: React.FC<{
 // ── Staff Map ─────────────────────────────────────────────────────────────
 const StaffMap: React.FC<{ staff: StaffMember[] }> = ({ staff }) => {
   const [sel, setSel] = useState<string|null>(null);
+  
+  // Rajahmundry center: [17.0005, 81.8040]
+  const centerLat = 17.0005;
+  const centerLng = 81.8040;
+
+  // Convert mapX, mapY mock percentages to Rajahmundry area lat/lng
+  const toLat = (mapY: number) => centerLat + ((50 - mapY) / 100) * 0.08;
+  const toLng = (mapX: number) => centerLng + ((mapX - 50) / 100) * 0.08;
+
   return (
-    <div className="relative h-[580px] rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50">
-      <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-            <path d="M50 0L0 0 0 50" fill="none" stroke="#cbd5e1" strokeWidth="0.5"/>
-          </pattern>
-          <pattern id="bigGrid" width="150" height="150" patternUnits="userSpaceOnUse">
-            <rect width="150" height="150" fill="url(#grid)"/>
-            <path d="M150 0L0 0 0 150" fill="none" stroke="#94a3b8" strokeWidth="1"/>
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#bigGrid)"/>
-        {/* Roads */}
-        <line x1="0" y1="35%" x2="100%" y2="35%" stroke="#93c5fd" strokeWidth="8" strokeOpacity="0.5"/>
-        <line x1="0" y1="65%" x2="100%" y2="65%" stroke="#93c5fd" strokeWidth="5" strokeOpacity="0.4"/>
-        <line x1="33%" y1="0" x2="33%" y2="100%" stroke="#93c5fd" strokeWidth="8" strokeOpacity="0.5"/>
-        <line x1="65%" y1="0" x2="65%" y2="100%" stroke="#93c5fd" strokeWidth="5" strokeOpacity="0.4"/>
-        {/* Park */}
-        <rect x="66%" y="15%" width="18%" height="22%" rx="12" fill="#86efac" opacity="0.5"/>
-        {/* Lake */}
-        <ellipse cx="82%" cy="78%" rx="10%" ry="7%" fill="#7dd3fc" opacity="0.4"/>
-        {/* Road labels */}
-        <text x="34%" y="33%" textAnchor="middle" fontSize="9" fill="#64748b" fontFamily="monospace">MAIN ROAD</text>
-        <text x="34%" y="63%" textAnchor="middle" fontSize="9" fill="#64748b" fontFamily="monospace">BYPASS ROAD</text>
-      </svg>
-
-      {/* Zone labels */}
-      <div className="absolute top-3 left-12 text-[10px] font-bold text-slate-400 uppercase tracking-widest">North Zone</div>
-      <div className="absolute bottom-12 left-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">South Zone</div>
-      <div className="absolute top-16 right-3 text-xs font-bold text-emerald-600">🌳 Park</div>
-      <div className="absolute bottom-8 right-12 text-xs text-blue-500">💧 Lake</div>
-
-      {/* Shop */}
-      <div className="absolute" style={{top:'48%',left:'48%',transform:'translate(-50%,-50%)'}}>
-        <div className="relative flex flex-col items-center">
-          <div className="w-11 h-11 bg-blue-600 rounded-full flex items-center justify-center shadow-xl border-3 border-white z-10">
-            <Truck size={18} color="white"/>
-          </div>
-          <div className="absolute -bottom-7 whitespace-nowrap text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold shadow">SRK Shop</div>
-        </div>
-      </div>
-
-      {/* Staff markers */}
-      {staff.map(m => {
-        const cfg = STAFF_CFG[m.status as keyof typeof STAFF_CFG] ?? STAFF_CFG['Offline'];
-        const isSel = sel === m.id;
-        return (
-          <button key={m.id} onClick={() => setSel(isSel ? null : m.id)}
-            className="absolute z-20" style={{top:`${m.mapY}%`, left:`${m.mapX}%`, transform:'translate(-50%,-50%)'}}>
-            {m.status === 'On Task' && <div className="absolute w-10 h-10 rounded-full border-2 border-orange-400 animate-ping opacity-40" style={{top:'50%',left:'50%',transform:'translate(-50%,-50%)'}}/>}
-            <div className="relative w-9 h-9 rounded-full flex items-center justify-center border-2 border-white shadow-md transition-transform hover:scale-110 active:scale-95"
-              style={{background: cfg.hex}}>
-              <User size={14} color="white"/>
-            </div>
-            <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] bg-white text-slate-700 px-1.5 py-0.5 rounded-full font-bold shadow border border-slate-100">
-              {m.name.split(' ')[0]}
-            </div>
-            {isSel && (
-              <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-40 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 w-44 text-left pointer-events-none">
-                <div className="font-bold text-sm text-slate-900">{m.name}</div>
-                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${cfg.badge}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot.split(' ')[0]}`}/>{m.status}
-                </span>
-                {m.currentTask && <p className="mt-2 text-xs text-slate-600 bg-slate-50 rounded-lg p-1.5 leading-snug">📍 {m.currentTask}</p>}
-                <p className="text-[10px] text-slate-400 mt-1">{m.targetArea}</p>
+    <div className="relative h-[580px] rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
+      <MapContainer center={[centerLat, centerLng]} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <ZoomControl position="topleft" />
+        
+        {/* Shop Marker */}
+        <Marker position={[centerLat, centerLng]} icon={L.divIcon({
+          className: 'custom-marker',
+          html: `
+            <div style="position:relative; display:flex; flex-direction:column; align-items:center; transform: translate(-10px, -20px);">
+              <div style="width:40px; height:40px; background-color:#2563eb; border-radius:9999px; display:flex; align-items:center; justify-content:center; border:3px solid white; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M20 17h2v-9h-4V5H14v12h3"/><path d="M7 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M17 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
               </div>
-            )}
-          </button>
-        );
-      })}
+              <div style="position:absolute; bottom:-20px; white-space:nowrap; font-size:10px; background-color:#2563eb; color:white; padding:2px 8px; border-radius:9999px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.1);">SRK Shop</div>
+            </div>
+          `,
+          iconSize: [20, 20],
+          iconAnchor: [0, 0]
+        })} />
+
+        {/* Staff markers */}
+        {staff.map(m => {
+          const cfg = STAFF_CFG[m.status as keyof typeof STAFF_CFG] ?? STAFF_CFG['Offline'];
+          return (
+            <Marker key={m.id} position={[toLat(m.mapY), toLng(m.mapX)]} 
+              eventHandlers={{ click: () => setSel(sel === m.id ? null : m.id) }}
+              icon={L.divIcon({
+                className: 'custom-marker',
+                html: `
+                  <div style="position:relative; display:flex; flex-direction:column; align-items:center; transform: translate(-10px, -20px);">
+                    ${m.status === 'On Task' ? `<div style="position:absolute; width:40px; height:40px; border-radius:9999px; border:2px solid #fb923c; animation:ping 1s cubic-bezier(0,0,0.2,1) infinite; opacity:0.4;"></div>` : ''}
+                    <div style="position:relative; width:36px; height:36px; border-radius:9999px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); background-color:${cfg.hex}; transition:transform 0.15s;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <div style="position:absolute; bottom:-16px; left:50%; transform:translateX(-50%); white-space:nowrap; font-size:10px; background-color:white; color:#334155; padding:2px 6px; border-radius:9999px; font-weight:bold; box-shadow:0 1px 3px rgba(0,0,0,0.1); border:1px solid #f1f5f9;">
+                      ${m.name.split(' ')[0]}
+                    </div>
+                  </div>
+                `,
+                iconSize: [20, 20],
+                iconAnchor: [0, 0]
+              })}>
+              <Popup className="custom-popup">
+                <div style="margin:-4px;">
+                  <div class="font-bold text-sm text-slate-900">${m.name}</div>
+                  <div class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${cfg.badge}"><span class="w-1.5 h-1.5 rounded-full ${cfg.dot.split(' ')[0]}"></span>${m.status}</div>
+                  ${m.currentTask ? `<p class="mt-2 text-xs text-slate-600 bg-slate-50 rounded-lg p-1.5 leading-snug">📍 ${m.currentTask}</p>` : ''}
+                  <p class="text-[10px] text-slate-400 mt-1">${m.targetArea}</p>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
+      </MapContainer>
 
       {/* Floating staff panel */}
-      <div className="absolute top-3 right-3 w-52 bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+      <div className="absolute top-3 right-3 w-52 bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-[400]">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2"><Users size={14} className="text-blue-600"/><span className="text-sm font-bold text-slate-800">Field Staff</span></div>
           <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">{staff.length}</span>
@@ -271,13 +270,7 @@ const StaffMap: React.FC<{ staff: StaffMember[] }> = ({ staff }) => {
         </div>
       </div>
 
-      {/* Zoom UI */}
-      <div className="absolute top-3 left-3 flex flex-col bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
-        <button className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-50 font-bold text-lg">+</button>
-        <div className="h-px bg-slate-100"/>
-        <button className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-50 font-bold text-lg">−</button>
-      </div>
-      <div className="absolute bottom-2 left-2 text-[10px] text-slate-400 bg-white/80 px-2 py-0.5 rounded">Chennai Metro · Live View</div>
+      <div className="absolute bottom-2 left-2 text-[10px] text-slate-600 bg-white/90 px-2 py-0.5 rounded shadow-sm font-semibold z-[400]">Rajahmundry · Live View</div>
     </div>
   );
 };
