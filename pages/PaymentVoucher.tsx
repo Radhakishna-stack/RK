@@ -295,7 +295,7 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate, ini
                         totalAmount: total,
                         date: date,
                         description: description + autoDescription
-                    });
+                    } as any);
                     alert('Receipt Updated!');
                 } else {
                     await dbService.addPaymentReceipt({
@@ -308,7 +308,7 @@ const PaymentReceiptPage: React.FC<PaymentReceiptPageProps> = ({ onNavigate, ini
                         totalAmount: total,
                         date: date,
                         description: description + autoDescription
-                    });
+                    } as any);
                     alert('Receipt Saved!');
                 }
                 const data = await dbService.getPaymentReceipts();

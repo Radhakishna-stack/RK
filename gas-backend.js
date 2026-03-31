@@ -4,48 +4,52 @@
  * Paste this ENTIRE file into Code.gs in your Google Apps Script Editor.
  * Then: Deploy → New Deployment → Web App → Execute as: Me → Who has access: Anyone
  * Copy the Web App URL and paste it into googleSheetsService.ts
+ *
+ * SHEET LAYOUT (13 sheets):
+ *   Customers, Invoices, Inventory (+WantedQty col), Transactions (+ReceiptNumber col),
+ *   BankAccounts, Complaints, Visitors, ServiceReminders,
+ *   Salesmen, Users, Config, RecycleBin, PickupRequests
+ *
+ * MERGED (no separate sheets needed):
+ *   Expenses       → Transactions  (type = 'expense')
+ *   PaymentReceipts→ Transactions  (type = 'receipt')
+ *   StockTransactions→Transactions (type = 'stock-in' | 'stock-out')
+ *   StockWanting   → Inventory     (WantedQty column)
  */
 // ============================================
 // 1. INITIALIZATION - RUN THIS ONCE
 // ============================================
+const _s = (str) => str.split(',');
 function initProject() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheets = {
-        'Customers': ['ID', 'Name', 'Phone', 'BikeNumber', 'City', 'Email', 'Address', 'GSTIN', 'LoyaltyPoints', 'CreatedAt'],
-        'Invoices': ['ID', 'ComplaintID', 'BikeNumber', 'CustomerName', 'CustomerPhone', 'Details', 'Items_JSON', 'EstimatedCost', 'FinalAmount', 'TaxAmount', 'SubTotal', 'PaymentStatus', 'AccountID', 'PaymentMode', 'Date', 'OdometerReading', 'DocType', 'ServiceReminderDate', 'PayCollCash', 'PayCollUPI', 'PayCollUPIAcctID'],
-        'Inventory': ['ID', 'Name', 'Category', 'Stock', 'UnitPrice', 'PurchasePrice', 'ItemCode', 'GSTRate', 'HSN', 'LastUpdated'],
-        'Transactions': ['ID', 'EntityID', 'AccountID', 'Type', 'Amount', 'PaymentMode', 'Date', 'Description', 'Category', 'Status', 'ChequeNumber', 'PartyName', 'BankName', 'Items_JSON'],
-        'Expenses': ['ID', 'Description', 'Amount', 'Category', 'Date', 'PaymentMode', 'TransactionID', 'AccountID'],
-        'BankAccounts': ['ID', 'Name', 'BankName', 'AccountNumber', 'Type', 'OpeningBalance', 'CreatedAt'],
-        'PaymentReceipts': ['ID', 'ReceiptNumber', 'CustomerID', 'CustomerName', 'CustomerPhone', 'BikeNumber', 'CashAmount', 'UPIAmount', 'TotalAmount', 'Date', 'Description', 'CreatedAt'],
-        'Complaints': ['ID', 'BikeNumber', 'CustomerName', 'CustomerPhone', 'Details', 'PhotoUrls', 'EstimatedCost', 'Status', 'CreatedAt', 'DueDate', 'OdometerReading'],
-        'StockWanting': ['ID', 'PartNumber', 'ItemName', 'Quantity', 'Rate', 'CreatedAt'],
-        'Visitors': ['ID', 'Name', 'BikeNumber', 'Phone', 'Remarks', 'Type', 'PhotoUrls', 'CreatedAt'],
-        'ServiceReminders': ['ID', 'BikeNumber', 'CustomerName', 'Phone', 'ReminderDate', 'ServiceType', 'Status', 'LastNotified', 'Message', 'ServiceDate'],
-        'StockTransactions': ['ID', 'ItemID', 'Type', 'Quantity', 'Date', 'Note'],
-        'Salesmen': ['ID', 'Name', 'Phone', 'Target', 'SalesCount', 'TotalSalesValue', 'JoinDate', 'Status'],
-        'Users': ['ID', 'Username', 'Password', 'Role', 'Name', 'Phone', 'CreatedAt', 'IsActive'],
-        'Config': ['Key', 'Value', 'UpdatedAt'],
-        'RecycleBin': ['BinID', 'OriginalID', 'Type', 'Data_JSON', 'DeletedAt'],
-        'PickupRequests': ['ID', 'CustomerName', 'CustomerPhone', 'BikeNumber', 'IssueDescription', 'LocationLink', 'Location_JSON', 'Status', 'AssignedEmployeeID', 'AssignedEmployeeName', 'EmployeeLocation_JSON', 'Notes', 'CreatedAt', 'UpdatedAt']
+        Customers:       _s('ID,Name,Phone,BikeNumber,City,Email,Address,GSTIN,LoyaltyPoints,CreatedAt'),
+        Invoices:        _s('ID,ComplaintID,BikeNumber,CustomerName,CustomerPhone,Details,Items_JSON,EstimatedCost,FinalAmount,TaxAmount,SubTotal,PaymentStatus,AccountID,PaymentMode,Date,OdometerReading,DocType,ServiceReminderDate,PayCollCash,PayCollUPI,PayCollUPIAcctID'),
+        Inventory:       _s('ID,Name,Category,Stock,UnitPrice,PurchasePrice,ItemCode,GSTRate,HSN,LastUpdated,WantedQty'),
+        Transactions:    _s('ID,EntityID,AccountID,Type,Amount,PaymentMode,Date,Description,Category,Status,ChequeNumber,PartyName,BankName,Items_JSON,ReceiptNumber'),
+        BankAccounts:    _s('ID,Name,BankName,AccountNumber,Type,OpeningBalance,CreatedAt'),
+        Complaints:      _s('ID,BikeNumber,CustomerName,CustomerPhone,Details,PhotoUrls,EstimatedCost,Status,CreatedAt,DueDate,OdometerReading'),
+        Visitors:        _s('ID,Name,BikeNumber,Phone,Remarks,Type,PhotoUrls,CreatedAt'),
+        ServiceReminders:_s('ID,BikeNumber,CustomerName,Phone,ReminderDate,ServiceType,Status,LastNotified,Message,ServiceDate'),
+        Salesmen:        _s('ID,Name,Phone,Target,SalesCount,TotalSalesValue,JoinDate,Status'),
+        Users:           _s('ID,Username,Password,Role,Name,Phone,CreatedAt,IsActive'),
+        Config:          _s('Key,Value,UpdatedAt'),
+        RecycleBin:      _s('BinID,OriginalID,Type,Data_JSON,DeletedAt'),
+        PickupRequests:  _s('ID,CustomerName,CustomerPhone,BikeNumber,IssueDescription,LocationLink,Location_JSON,Status,AssignedEmployeeID,AssignedEmployeeName,EmployeeLocation_JSON,Notes,CreatedAt,UpdatedAt')
     };
     for (const name in sheets) {
         let sheet = ss.getSheetByName(name);
-        if (!sheet) {
-            sheet = ss.insertSheet(name);
-        }
-        // Always set headers on row 1
+        if (!sheet) sheet = ss.insertSheet(name);
         const headers = sheets[name];
         sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#E8EAF6');
         sheet.setFrozenRows(1);
     }
-    // Add default Cash account if BankAccounts is empty
     const bankSheet = ss.getSheetByName('BankAccounts');
     if (bankSheet.getLastRow() <= 1) {
         bankSheet.appendRow(['CASH-01', 'CASH IN HAND', '', '', 'Cash', 0, new Date().toISOString()]);
     }
-    return 'Project initialized with ' + Object.keys(sheets).length + ' sheets!';
+    return 'Project initialized with ' + Object.keys(sheets).length + ' sheets (13 total, 4 merged)!';
 }
 // ============================================
 // 2. HTTP ENTRY POINTS
@@ -223,17 +227,18 @@ function updateInvoice(data) {
     return updateRow('Invoices', data.id, row);
 }
 function deleteInvoice(data) { return deleteRow('Invoices', data.id); }
-// --- INVENTORY ---
-const INVENTORY_FIELDS = ['id', 'name', 'category', 'stock', 'unitPrice', 'purchasePrice', 'itemCode', 'gstRate', 'hsn', 'lastUpdated'];
+// --- INVENTORY (now includes WantedQty col 11) ---
+// Columns: ID, Name, Category, Stock, UnitPrice, PurchasePrice, ItemCode, GSTRate, HSN, LastUpdated, WantedQty
+const INVENTORY_FIELDS = ['id', 'name', 'category', 'stock', 'unitPrice', 'purchasePrice', 'itemCode', 'gstRate', 'hsn', 'lastUpdated', 'wantedQty'];
 function getInventory() { return getSheetData('Inventory', INVENTORY_FIELDS); }
 function addInventoryItem(data) {
     const id = data.id || genId('SKU-');
-    const row = [id, data.name || '', data.category || '', data.stock || 0, data.unitPrice || 0, data.purchasePrice || 0, data.itemCode || '', data.gstRate || 0, data.hsn || '', data.lastUpdated || nowISO()];
+    const row = [id, data.name || '', data.category || '', data.stock || 0, data.unitPrice || 0, data.purchasePrice || 0, data.itemCode || '', data.gstRate || 0, data.hsn || '', data.lastUpdated || nowISO(), data.wantedQty || 0];
     getSheet('Inventory').appendRow(row);
     return { ...data, id, lastUpdated: data.lastUpdated || nowISO() };
 }
 function updateInventoryItem(data) {
-    const row = [data.id, data.name || '', data.category || '', data.stock || 0, data.unitPrice || 0, data.purchasePrice || 0, data.itemCode || '', data.gstRate || 0, data.hsn || '', nowISO()];
+    const row = [data.id, data.name || '', data.category || '', data.stock || 0, data.unitPrice || 0, data.purchasePrice || 0, data.itemCode || '', data.gstRate || 0, data.hsn || '', nowISO(), data.wantedQty || 0];
     return updateRow('Inventory', data.id, row);
 }
 function deleteInventoryItem(data) { return deleteRow('Inventory', data.id); }
@@ -244,6 +249,8 @@ function updateStock(data) {
         const currentStock = Number(sheet.getRange(row, 4).getValue()) || 0;
         sheet.getRange(row, 4).setValue(currentStock + (data.delta || 0));
         sheet.getRange(row, 10).setValue(nowISO());
+        // Also log as a stock transaction in Transactions sheet
+        addTransaction({ id: genId('ST-'), entityId: data.id, accountId: '', type: data.delta > 0 ? 'stock-in' : 'stock-out', amount: 0, paymentMode: '', date: nowISO(), description: data.note || '', category: 'stock', status: 'completed' });
         return true;
     }
     return false;
@@ -257,14 +264,10 @@ function bulkUpdateInventory(data) {
         for (let i = 1; i < allData.length; i++) {
             if (allData[i][1]?.toString().toLowerCase() === item.name?.toString().toLowerCase() ||
                 allData[i][6]?.toString().toLowerCase() === item.itemCode?.toString().toLowerCase()) {
-                // Update existing
                 const rowNum = i + 1;
-                if (item.stock !== undefined)
-                    sheet.getRange(rowNum, 4).setValue(item.stock);
-                if (item.unitPrice !== undefined)
-                    sheet.getRange(rowNum, 5).setValue(item.unitPrice);
-                if (item.purchasePrice !== undefined)
-                    sheet.getRange(rowNum, 6).setValue(item.purchasePrice);
+                if (item.stock !== undefined) sheet.getRange(rowNum, 4).setValue(item.stock);
+                if (item.unitPrice !== undefined) sheet.getRange(rowNum, 5).setValue(item.unitPrice);
+                if (item.purchasePrice !== undefined) sheet.getRange(rowNum, 6).setValue(item.purchasePrice);
                 sheet.getRange(rowNum, 10).setValue(nowISO());
                 updated++;
                 found = true;
@@ -273,44 +276,46 @@ function bulkUpdateInventory(data) {
         }
         if (!found) {
             const id = genId('SKU-');
-            sheet.appendRow([id, item.name || '', item.category || '', item.stock || 0, item.unitPrice || 0, item.purchasePrice || 0, item.itemCode || '', item.gstRate || 0, item.hsn || '', nowISO()]);
+            sheet.appendRow([id, item.name || '', item.category || '', item.stock || 0, item.unitPrice || 0, item.purchasePrice || 0, item.itemCode || '', item.gstRate || 0, item.hsn || '', nowISO(), 0]);
             created++;
         }
     }
     return { updated, created };
 }
-// --- TRANSACTIONS ---
-const TXN_FIELDS = ['id', 'entityId', 'accountId', 'type', 'amount', 'paymentMode', 'date', 'description', 'category', 'status', 'chequeNumber', 'partyName', 'bankName', 'items'];
-function getTransactions() {
-    return getSheetData('Transactions', TXN_FIELDS);
+// --- STOCK WANTING (delegated → Inventory.wantedQty, col 11) ---
+function getStockWanting() {
+    return getInventory().filter(i => (i.wantedQty || 0) > 0).map(i => ({
+        id: i.id, partNumber: i.itemCode || '', itemName: i.name, quantity: i.wantedQty, rate: i.unitPrice, createdAt: i.lastUpdated
+    }));
 }
+function setWantedQty(data) {
+    return updateCell('Inventory', data.id, 11, data.wantedQty || 0);
+}
+// --- TRANSACTIONS (now absorbs Expenses, PaymentReceipts, StockTransactions) ---
+// Columns: ID, EntityID, AccountID, Type, Amount, PaymentMode, Date, Description,
+//          Category, Status, ChequeNumber, PartyName, BankName, Items_JSON, ReceiptNumber
+const TXN_FIELDS = ['id', 'entityId', 'accountId', 'type', 'amount', 'paymentMode', 'date', 'description', 'category', 'status', 'chequeNumber', 'partyName', 'bankName', 'items', 'receiptNumber'];
+function getTransactions() { return getSheetData('Transactions', TXN_FIELDS); }
 function addTransaction(data) {
     const id = data.id || genId('TXN-');
     const itemsJson = JSON.stringify(data.items || []);
-    const row = [id, data.entityId || '', data.accountId || '', data.type || '', data.amount || 0, data.paymentMode || '', data.date || nowISO(), data.description || '', data.category || '', data.status || 'completed', data.chequeNumber || '', data.partyName || '', data.bankName || '', itemsJson];
+    const row = [id, data.entityId || '', data.accountId || '', data.type || '', data.amount || 0, data.paymentMode || '', data.date || nowISO(), data.description || '', data.category || '', data.status || 'completed', data.chequeNumber || '', data.partyName || '', data.bankName || '', itemsJson, data.receiptNumber || ''];
     getSheet('Transactions').appendRow(row);
     return { ...data, id };
 }
 function updateTransaction(data) {
     const itemsJson = JSON.stringify(data.items || []);
-    const row = [data.id, data.entityId || '', data.accountId || '', data.type || '', data.amount || 0, data.paymentMode || '', data.date || nowISO(), data.description || '', data.category || '', data.status || 'completed', data.chequeNumber || '', data.partyName || '', data.bankName || '', itemsJson];
+    const row = [data.id, data.entityId || '', data.accountId || '', data.type || '', data.amount || 0, data.paymentMode || '', data.date || nowISO(), data.description || '', data.category || '', data.status || 'completed', data.chequeNumber || '', data.partyName || '', data.bankName || '', itemsJson, data.receiptNumber || ''];
     return updateRow('Transactions', data.id, row);
 }
 function deleteTransaction(data) { return deleteRow('Transactions', data.id); }
-// --- EXPENSES ---
-const EXPENSE_FIELDS = ['id', 'description', 'amount', 'category', 'date', 'paymentMode', 'transactionId', 'accountId'];
-function getExpenses() { return getSheetData('Expenses', EXPENSE_FIELDS); }
+// --- EXPENSES (delegated → Transactions with type='expense') ---
+function getExpenses() { return getTransactions().filter(t => t.type === 'expense'); }
 function addExpense(data) {
-    const id = data.id || genId('EXP-');
-    const row = [id, data.description || data.title || '', data.amount || 0, data.category || '', data.date || nowISO(), data.paymentMode || '', data.transactionId || '', data.accountId || ''];
-    getSheet('Expenses').appendRow(row);
-    return { ...data, id, date: data.date || nowISO() };
+    return addTransaction({ ...data, id: data.id || genId('EXP-'), type: 'expense', status: data.status || 'completed' });
 }
-function updateExpense(data) {
-    const row = [data.id, data.description || data.title || '', data.amount || 0, data.category || '', data.date || '', data.paymentMode || '', data.transactionId || '', data.accountId || ''];
-    return updateRow('Expenses', data.id, row);
-}
-function deleteExpense(data) { return deleteRow('Expenses', data.id); }
+function updateExpense(data) { return updateTransaction({ ...data, type: 'expense' }); }
+function deleteExpense(data) { return deleteTransaction(data); }
 // --- BANK ACCOUNTS ---
 const BANK_FIELDS = ['id', 'name', 'bankName', 'accountNumber', 'type', 'openingBalance', 'createdAt'];
 function getBankAccounts() { return getSheetData('BankAccounts', BANK_FIELDS); }
@@ -321,24 +326,27 @@ function addBankAccount(data) {
     return { ...data, id, createdAt: data.createdAt || nowISO() };
 }
 function deleteBankAccount(data) { return deleteRow('BankAccounts', data.id); }
-// --- PAYMENT RECEIPTS ---
-const PR_FIELDS = ['id', 'receiptNumber', 'customerId', 'customerName', 'customerPhone', 'bikeNumber', 'cashAmount', 'upiAmount', 'totalAmount', 'date', 'description', 'createdAt'];
-function getPaymentReceipts() { return getSheetData('PaymentReceipts', PR_FIELDS); }
+// --- PAYMENT RECEIPTS (delegated → Transactions with type='receipt') ---
+// cash/upi split stored in Items_JSON; receiptNumber in ReceiptNumber col
+function getPaymentReceipts() {
+    return getTransactions()
+        .filter(t => t.type === 'receipt')
+        .map(t => {
+            const split = (() => { try { return Array.isArray(t.items) ? t.items[0] || {} : {}; } catch { return {}; } })();
+            return { id: t.id, receiptNumber: t.receiptNumber || '', customerId: t.entityId || '', customerName: t.partyName || '', customerPhone: t.chequeNumber || '', bikeNumber: t.bankName || '', cashAmount: split.cash || 0, upiAmount: split.upi || 0, totalAmount: t.amount || 0, date: t.date, description: t.description || '', createdAt: t.date };
+        });
+}
 function addPaymentReceipt(data) {
     const id = data.id || genId('PR-');
-    // Auto-generate receipt number
-    const sheet = getSheet('PaymentReceipts');
-    const count = Math.max(0, sheet.getLastRow() - 1) + 1;
-    const receiptNumber = data.receiptNumber || ('PR-' + count.toString().padStart(4, '0'));
-    const row = [id, receiptNumber, data.customerId || '', data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.cashAmount || 0, data.upiAmount || 0, data.totalAmount || 0, data.date || nowISO(), data.description || '', data.createdAt || nowISO()];
-    sheet.appendRow(row);
-    return { ...data, id, receiptNumber, createdAt: data.createdAt || nowISO() };
+    const txns = getTransactions().filter(t => t.type === 'receipt');
+    const receiptNumber = data.receiptNumber || ('PR-' + (txns.length + 1).toString().padStart(4, '0'));
+    const splitJson = JSON.stringify([{ cash: data.cashAmount || 0, upi: data.upiAmount || 0 }]);
+    return addTransaction({ id, entityId: data.customerId || '', accountId: '', type: 'receipt', amount: data.totalAmount || 0, paymentMode: '', date: data.date || nowISO(), description: data.description || '', category: 'receipt', status: 'completed', chequeNumber: data.customerPhone || '', partyName: data.customerName || '', bankName: data.bikeNumber || '', items: [{ cash: data.cashAmount || 0, upi: data.upiAmount || 0 }], receiptNumber });
 }
 function updatePaymentReceipt(data) {
-    const row = [data.id, data.receiptNumber || '', data.customerId || '', data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.cashAmount || 0, data.upiAmount || 0, data.totalAmount || 0, data.date || '', data.description || '', data.createdAt || ''];
-    return updateRow('PaymentReceipts', data.id, row);
+    return updateTransaction({ ...data, type: 'receipt', entityId: data.customerId || '', partyName: data.customerName || '', chequeNumber: data.customerPhone || '', bankName: data.bikeNumber || '', amount: data.totalAmount || 0, items: [{ cash: data.cashAmount || 0, upi: data.upiAmount || 0 }] });
 }
-function deletePaymentReceipt(data) { return deleteRow('PaymentReceipts', data.id); }
+function deletePaymentReceipt(data) { return deleteTransaction(data); }
 // --- COMPLAINTS (JOB CARDS) ---
 const COMPLAINT_FIELDS = ['id', 'bikeNumber', 'customerName', 'customerPhone', 'details', 'photoUrls', 'estimatedCost', 'status', 'createdAt', 'dueDate', 'odometerReading', 'assignedMechanicId', 'assignedMechanicName'];
 function getComplaints() { return getSheetData('Complaints', COMPLAINT_FIELDS); }
@@ -436,14 +444,14 @@ function updateReminderStatus(data) {
     return updateCell('ServiceReminders', data.id, 7, data.status);
 }
 function deleteReminder(data) { return deleteRow('ServiceReminders', data.id); }
-// --- STOCK TRANSACTIONS ---
-const ST_FIELDS = ['id', 'itemId', 'type', 'quantity', 'date', 'note'];
-function getStockTransactions() { return getSheetData('StockTransactions', ST_FIELDS); }
+// --- STOCK TRANSACTIONS (delegated → Transactions with type='stock-in'|'stock-out') ---
+function getStockTransactions() {
+    return getTransactions()
+        .filter(t => t.type === 'stock-in' || t.type === 'stock-out')
+        .map(t => ({ id: t.id, itemId: t.entityId, type: t.type === 'stock-in' ? 'IN' : 'OUT', quantity: t.amount, date: t.date, note: t.description }));
+}
 function addStockTransaction(data) {
-    const id = data.id || genId('ST-');
-    const row = [id, data.itemId || '', data.type || 'IN', data.quantity || 0, data.date || nowISO(), data.note || ''];
-    getSheet('StockTransactions').appendRow(row);
-    return { ...data, id };
+    return addTransaction({ id: data.id || genId('ST-'), entityId: data.itemId || '', accountId: '', type: data.type === 'IN' ? 'stock-in' : 'stock-out', amount: data.quantity || 0, paymentMode: '', date: data.date || nowISO(), description: data.note || '', category: 'stock', status: 'completed' });
 }
 // --- SALESMEN ---
 const SALESMAN_FIELDS = ['id', 'name', 'phone', 'target', 'salesCount', 'totalSalesValue', 'joinDate', 'status'];
@@ -621,104 +629,175 @@ function getDashboardStats() {
 // --- BULK DATA MIGRATION ---
 function bulkImport(data) {
     const sheetName = data.sheetName;
-    const rows = data.rows; // Array of arrays
+    const rows = data.rows;
     const sheet = getSheet(sheetName);
-    if (!sheet || !rows || !rows.length)
-        return { imported: 0 };
-    for (const row of rows) {
-        sheet.appendRow(row);
-    }
+    if (!sheet || !rows || !rows.length) return { imported: 0 };
+    for (const row of rows) { sheet.appendRow(row); }
     return { imported: rows.length };
+}
+// --- GET ALL DATA (single batch call) ---
+function getAllData() {
+    return {
+        customers:       getCustomers(),
+        invoices:        getInvoices(),
+        inventory:       getInventory(),       // includes wantedQty
+        transactions:    getTransactions(),    // includes expenses, receipts, stock txns
+        bankAccounts:    getBankAccounts(),
+        complaints:      getComplaints(),
+        visitors:        getVisitors(),
+        reminders:       getReminders(),
+        salesmen:        getSalesmen(),
+        users:           getUsers(),
+        pickupRequests:  getPickupRequests(),
+    };
+}
+// --- ONE-TIME MIGRATION HELPER (run once from GAS editor, then ignore) ---
+// Copies data from old separate sheets into the merged Transactions / Inventory sheets.
+function migrateToMerged() {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let log = [];
+    // 1. Migrate Expenses sheet → Transactions (type='expense')
+    const expSheet = ss.getSheetByName('Expenses');
+    if (expSheet && expSheet.getLastRow() > 1) {
+        const rows = expSheet.getDataRange().getValues().slice(1);
+        rows.forEach(r => {
+            if (!r[0]) return;
+            addTransaction({ id: r[0], entityId: '', accountId: r[7] || '', type: 'expense', amount: r[2] || 0, paymentMode: r[5] || '', date: r[4] ? new Date(r[4]).toISOString() : nowISO(), description: r[1] || '', category: r[3] || '', status: 'completed' });
+        });
+        log.push('Expenses: ' + rows.length + ' rows migrated');
+    }
+    // 2. Migrate PaymentReceipts sheet → Transactions (type='receipt')
+    const prSheet = ss.getSheetByName('PaymentReceipts');
+    if (prSheet && prSheet.getLastRow() > 1) {
+        const rows = prSheet.getDataRange().getValues().slice(1);
+        rows.forEach(r => {
+            if (!r[0]) return;
+            addTransaction({ id: r[0], entityId: r[2] || '', accountId: '', type: 'receipt', amount: r[8] || 0, paymentMode: '', date: r[9] ? new Date(r[9]).toISOString() : nowISO(), description: r[10] || '', category: 'receipt', status: 'completed', chequeNumber: r[4] || '', partyName: r[3] || '', bankName: r[5] || '', items: [{ cash: r[6] || 0, upi: r[7] || 0 }], receiptNumber: r[1] || '' });
+        });
+        log.push('PaymentReceipts: ' + rows.length + ' rows migrated');
+    }
+    // 3. Migrate StockTransactions sheet → Transactions (type='stock-in'|'stock-out')
+    const stSheet = ss.getSheetByName('StockTransactions');
+    if (stSheet && stSheet.getLastRow() > 1) {
+        const rows = stSheet.getDataRange().getValues().slice(1);
+        rows.forEach(r => {
+            if (!r[0]) return;
+            addTransaction({ id: r[0], entityId: r[1] || '', accountId: '', type: r[2] === 'IN' ? 'stock-in' : 'stock-out', amount: r[3] || 0, paymentMode: '', date: r[4] ? new Date(r[4]).toISOString() : nowISO(), description: r[5] || '', category: 'stock', status: 'completed' });
+        });
+        log.push('StockTransactions: ' + rows.length + ' rows migrated');
+    }
+    // 4. Migrate StockWanting → Inventory.WantedQty
+    const swSheet = ss.getSheetByName('StockWanting');
+    if (swSheet && swSheet.getLastRow() > 1) {
+        const rows = swSheet.getDataRange().getValues().slice(1);
+        const invSheet = ss.getSheetByName('Inventory');
+        const invData = invSheet.getDataRange().getValues();
+        rows.forEach(r => {
+            if (!r[0]) return;
+            const itemName = (r[2] || '').toString().toLowerCase();
+            for (let i = 1; i < invData.length; i++) {
+                if (invData[i][1]?.toString().toLowerCase() === itemName) {
+                    invSheet.getRange(i + 1, 11).setValue(r[3] || 0);
+                    break;
+                }
+            }
+        });
+        log.push('StockWanting: ' + rows.length + ' items mapped to Inventory.WantedQty');
+    }
+    return log.join('\n') || 'Nothing to migrate (old sheets not found or empty)';
 }
 // ============================================
 // 5. ACTION ROUTER MAP
 // ============================================
 const ACTIONS = {
     // Customers
-    getCustomers: () => getCustomers(),
-    addCustomer: (d) => addCustomer(d),
-    updateCustomer: (d) => updateCustomer(d),
-    deleteCustomer: (d) => deleteCustomer(d),
+    getCustomers:          () => getCustomers(),
+    addCustomer:           (d) => addCustomer(d),
+    updateCustomer:        (d) => updateCustomer(d),
+    deleteCustomer:        (d) => deleteCustomer(d),
     updateCustomerLoyalty: (d) => updateCustomerLoyalty(d),
     // Invoices
-    getInvoices: () => getInvoices(),
-    addInvoice: (d) => addInvoice(d),
-    updateInvoice: (d) => updateInvoice(d),
-    deleteInvoice: (d) => deleteInvoice(d),
-    // Inventory
-    getInventory: () => getInventory(),
-    addInventoryItem: (d) => addInventoryItem(d),
-    updateInventoryItem: (d) => updateInventoryItem(d),
-    deleteInventoryItem: (d) => deleteInventoryItem(d),
-    updateStock: (d) => updateStock(d),
-    bulkUpdateInventory: (d) => bulkUpdateInventory(d),
-    // Transactions
-    getTransactions: () => getTransactions(),
-    addTransaction: (d) => addTransaction(d),
-    updateTransaction: (d) => updateTransaction(d),
-    deleteTransaction: (d) => deleteTransaction(d),
-    // Expenses
-    getExpenses: () => getExpenses(),
-    addExpense: (d) => addExpense(d),
-    updateExpense: (d) => updateExpense(d),
-    deleteExpense: (d) => deleteExpense(d),
+    getInvoices:           () => getInvoices(),
+    addInvoice:            (d) => addInvoice(d),
+    updateInvoice:         (d) => updateInvoice(d),
+    deleteInvoice:         (d) => deleteInvoice(d),
+    // Inventory (+ WantedQty)
+    getInventory:          () => getInventory(),
+    addInventoryItem:      (d) => addInventoryItem(d),
+    updateInventoryItem:   (d) => updateInventoryItem(d),
+    deleteInventoryItem:   (d) => deleteInventoryItem(d),
+    updateStock:           (d) => updateStock(d),
+    bulkUpdateInventory:   (d) => bulkUpdateInventory(d),
+    setWantedQty:          (d) => setWantedQty(d),
+    // Transactions (absorbs Expenses, Receipts, StockTxns)
+    getTransactions:       () => getTransactions(),
+    addTransaction:        (d) => addTransaction(d),
+    updateTransaction:     (d) => updateTransaction(d),
+    deleteTransaction:     (d) => deleteTransaction(d),
+    // Expenses (delegated → Transactions)
+    getExpenses:           () => getExpenses(),
+    addExpense:            (d) => addExpense(d),
+    updateExpense:         (d) => updateExpense(d),
+    deleteExpense:         (d) => deleteExpense(d),
     // Bank Accounts
-    getBankAccounts: () => getBankAccounts(),
-    addBankAccount: (d) => addBankAccount(d),
-    deleteBankAccount: (d) => deleteBankAccount(d),
-    // Payment Receipts
-    getPaymentReceipts: () => getPaymentReceipts(),
-    addPaymentReceipt: (d) => addPaymentReceipt(d),
-    updatePaymentReceipt: (d) => updatePaymentReceipt(d),
-    deletePaymentReceipt: (d) => deletePaymentReceipt(d),
+    getBankAccounts:       () => getBankAccounts(),
+    addBankAccount:        (d) => addBankAccount(d),
+    deleteBankAccount:     (d) => deleteBankAccount(d),
+    // Payment Receipts (delegated → Transactions)
+    getPaymentReceipts:    () => getPaymentReceipts(),
+    addPaymentReceipt:     (d) => addPaymentReceipt(d),
+    updatePaymentReceipt:  (d) => updatePaymentReceipt(d),
+    deletePaymentReceipt:  (d) => deletePaymentReceipt(d),
     // Complaints
-    getComplaints: () => getComplaints(),
-    addComplaint: (d) => addComplaint(d),
-    updateComplaint: (d) => updateComplaint(d),
+    getComplaints:         () => getComplaints(),
+    addComplaint:          (d) => addComplaint(d),
+    updateComplaint:       (d) => updateComplaint(d),
     updateComplaintStatus: (d) => updateComplaintStatus(d),
-    deleteComplaint: (d) => deleteComplaint(d),
-    // Stock Wanting
-    getStockWanting: () => getStockWanting(),
-    addStockWanting: (d) => addStockWanting(d),
-    deleteStockWanting: (d) => deleteStockWanting(d),
+    deleteComplaint:       (d) => deleteComplaint(d),
+    // Stock Wanting (delegated → Inventory.wantedQty)
+    getStockWanting:       () => getStockWanting(),
     // Visitors
-    getVisitors: () => getVisitors(),
-    addVisitor: (d) => addVisitor(d),
-    deleteVisitor: (d) => deleteVisitor(d),
+    getVisitors:           () => getVisitors(),
+    addVisitor:            (d) => addVisitor(d),
+    deleteVisitor:         (d) => deleteVisitor(d),
     // Service Reminders
-    getReminders: () => getReminders(),
-    addReminder: (d) => addReminder(d),
-    updateReminder: (d) => updateReminder(d),
-    updateReminderStatus: (d) => updateReminderStatus(d),
-    deleteReminder: (d) => deleteReminder(d),
-    // Stock Transactions
-    getStockTransactions: () => getStockTransactions(),
-    addStockTransaction: (d) => addStockTransaction(d),
+    getReminders:          () => getReminders(),
+    addReminder:           (d) => addReminder(d),
+    updateReminder:        (d) => updateReminder(d),
+    updateReminderStatus:  (d) => updateReminderStatus(d),
+    deleteReminder:        (d) => deleteReminder(d),
+    // Stock Transactions (delegated → Transactions)
+    getStockTransactions:  () => getStockTransactions(),
+    addStockTransaction:   (d) => addStockTransaction(d),
     // Salesmen
-    getSalesmen: () => getSalesmen(),
-    addSalesman: (d) => addSalesman(d),
-    deleteSalesman: (d) => deleteSalesman(d),
+    getSalesmen:           () => getSalesmen(),
+    addSalesman:           (d) => addSalesman(d),
+    deleteSalesman:        (d) => deleteSalesman(d),
     // Users
-    getUsers: () => getUsers(),
-    addUser: (d) => addUser(d),
-    updateUser: (d) => updateUser(d),
-    deleteUser: (d) => deleteUser(d),
-    toggleUserStatus: (d) => toggleUserStatus(d),
+    getUsers:              () => getUsers(),
+    addUser:               (d) => addUser(d),
+    updateUser:            (d) => updateUser(d),
+    deleteUser:            (d) => deleteUser(d),
+    toggleUserStatus:      (d) => toggleUserStatus(d),
     // Config
-    getConfig: (d) => getConfig(d),
-    setConfig: (d) => setConfig(d),
+    getConfig:             (d) => getConfig(d),
+    setConfig:             (d) => setConfig(d),
     // Recycle Bin
-    getRecycleBin: () => getRecycleBin(),
-    addToRecycleBin: (d) => addToRecycleBin(d),
-    deleteFromRecycleBin: (d) => deleteFromRecycleBin(d),
-    emptyRecycleBin: () => emptyRecycleBin(),
+    getRecycleBin:         () => getRecycleBin(),
+    addToRecycleBin:       (d) => addToRecycleBin(d),
+    deleteFromRecycleBin:  (d) => deleteFromRecycleBin(d),
+    emptyRecycleBin:       () => emptyRecycleBin(),
     // Dashboard
-    getDashboardStats: () => getDashboardStats(),
-    // Bulk Migration
-    bulkImport: (d) => bulkImport(d),
+    getDashboardStats:     () => getDashboardStats(),
     // Pickup Requests
-    getPickupRequests: () => getPickupRequests(),
-    addPickupRequest: (d) => addPickupRequest(d),
-    updatePickupRequest: (d) => updatePickupRequest(d),
-    deletePickupRequest: (d) => deletePickupRequest(d),
+    getPickupRequests:     () => getPickupRequests(),
+    addPickupRequest:      (d) => addPickupRequest(d),
+    updatePickupRequest:   (d) => updatePickupRequest(d),
+    deletePickupRequest:   (d) => deletePickupRequest(d),
+    // Bulk Tools
+    bulkImport:            (d) => bulkImport(d),
+    // *** BATCH FETCH - single call for full sync ***
+    getAllData:             () => getAllData(),
+    // *** ONE-TIME DATA MIGRATION (run from GAS editor) ***
+    migrateToMerged:       () => migrateToMerged(),
 };

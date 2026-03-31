@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Plus, Clock, TrendingUp, Receipt, ArrowDownCircle, AlertCircle,
-  ClipboardCheck, Users, Package, Bike, Phone, Wallet, Wrench
+  ClipboardCheck, Users, Package, Bike, Phone, Wallet, Wrench, Truck
 } from 'lucide-react';
 import { dbService } from '../db';
 import { Invoice, Customer, DashboardStats, Complaint, ComplaintStatus } from '../types';
@@ -104,6 +104,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           <QuickAction icon={<Package />} label="Stock" accentColor="#10B981" onClick={() => onNavigate('items')} />
           <QuickAction icon={<TrendingUp />} label="Reports" accentColor="#6366F1" onClick={() => onNavigate('sale_report')} />
           <QuickAction icon={<ArrowDownCircle />} label="Payment In" accentColor="#0EA5E9" onClick={() => onNavigate('payment_receipt')} />
+          <QuickAction icon={<Truck />} label="Pick up" accentColor="#F97316" onClick={() => onNavigate('pickup_manager')} />
           <QuickAction icon={<Phone />} label="Contacts" accentColor="#EC4899" onClick={() => onNavigate('customers')} />
         </div>
       </div>

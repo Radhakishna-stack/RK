@@ -275,7 +275,7 @@ export interface Transaction {
   id: string;
   entityId: string; // Party ID or description
   accountId: string; // Reference to BankAccount.id
-  type: 'IN' | 'OUT' | 'cash-in' | 'cash-out' | 'cheque-received' | 'cheque-issued' | 'purchase' | 'expense';
+  type: 'IN' | 'OUT' | 'cash-in' | 'cash-out' | 'cheque-received' | 'cheque-issued' | 'purchase' | 'expense' | 'receipt' | 'stock-in' | 'stock-out';
   amount: number;
   paymentMode: string; // For legacy/display
   date: string;
@@ -286,6 +286,7 @@ export interface Transaction {
   partyName?: string;
   bankName?: string;
   items?: PurchaseItem[]; // Added for Purchase editing
+  receiptNumber?: string; // Used when type='receipt'
 }
 
 export interface StockTransaction {
@@ -309,21 +310,17 @@ export interface InventoryItem {
   hsn?: string;
   lowStockThreshold?: number;
   lastUpdated: string;
+  wantedQty?: number; // Merged from StockWanting sheet
 }
 
-export interface Expense {
-  id: string;
-  description: string; // Used in UI
-  amount: number;
-  category: string;
-  date: string;
-  paymentMode: string;
-  transactionId?: string; // Links to the ledger transaction
-  // Legacy or unused fields kept optional just in case
+// Expense is a Transaction with type='expense' — kept as alias for backward compat
+export type Expense = Transaction & {
+  description: string;
   title?: string;
   notes?: string;
-  accountId?: string;
-}
+  transactionId?: string;
+};
+
 
 export interface Salesman {
   id: string;
@@ -358,20 +355,19 @@ export interface ServiceReminder {
   serviceDate?: string;
 }
 
-export interface PaymentReceipt {
-  id: string;              // Auto-generated receipt ID (e.g., "PR-1737738000000")
-  receiptNumber: string;   // Display format (e.g., "PR-0001")
-  customerId: string;      // Reference to Customer.id
-  customerName: string;    // Cached for display
-  customerPhone: string;   // Cached for display
-  bikeNumber?: string;     // Optional: linked to customer's bike
-  cashAmount: number;      // Amount received in cash
-  upiAmount: number;       // Amount received via UPI
-  totalAmount: number;     // cashAmount + upiAmount
-  date: string;            // ISO format
-  description?: string;    // Optional notes
-  createdAt: string;       // Timestamp
-}
+// PaymentReceipt is a Transaction with type='receipt' — kept as alias for backward compat
+export type PaymentReceipt = Transaction & {
+  receiptNumber: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  bikeNumber?: string;
+  cashAmount: number;
+  upiAmount: number;
+  totalAmount: number;
+  createdAt: string;
+};
+
 
 export interface DashboardStats {
   totalCustomers: number;

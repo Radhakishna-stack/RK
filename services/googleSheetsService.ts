@@ -100,27 +100,26 @@ import {
     Customer, Visitor, Complaint, Invoice, InventoryItem, Expense,
     Transaction, BankAccount, PaymentReceipt, StockWantingItem,
     ServiceReminder, Salesman, StockTransaction, DashboardStats,
-    AppSettings, User, RecycleBinItem, ComplaintStatus, RolePermissions
+    AppSettings, User, RecycleBinItem, ComplaintStatus, RolePermissions,
+    PickupRequest
 } from '../types';
 
 const LS_KEYS = {
     CUSTOMERS: 'mg_customers',
     VISITORS: 'mg_visitors',
-    STOCK_WANTING: 'mg_stock_wanting',
     COMPLAINTS: 'mg_complaints',
     INVOICES: 'mg_invoices',
     INVENTORY: 'mg_inventory',
-    EXPENSES: 'mg_expenses',
     REMINDERS: 'mg_reminders',
-    TRANSACTIONS: 'mg_transactions',
+    TRANSACTIONS: 'mg_transactions', // also stores expenses, receipts, stock txns
     BANK_ACCOUNTS: 'mg_bank_accounts',
-    PAYMENT_RECEIPTS: 'mg_payment_receipts',
     SALESMEN: 'mg_salesmen',
     USERS: 'mg_users',
-    STOCK_TXNS: 'mg_stock_txns',
     SETTINGS: 'mg_settings',
     RECYCLE_BIN: 'mg_recycle_bin',
+    PICKUP_REQUESTS: 'mg_pickup_requests',
 };
+
 
 export const sheetsService = {
 
@@ -220,22 +219,24 @@ export const sheetsService = {
         await writeWithSync('deleteTransaction', LS_KEYS.TRANSACTIONS, { id }, 'getTransactions');
     },
 
-    // ---- Expenses ----
+    // ---- Expenses (delegated → Transactions with type='expense') ----
     async getExpenses(): Promise<Expense[]> {
-        return fetchWithFallback('getExpenses', LS_KEYS.EXPENSES);
+        const all: Transaction[] = await fetchWithFallback('getTransactions', LS_KEYS.TRANSACTIONS);
+        return all.filter(t => t.type === 'expense') as Expense[];
     },
 
     async addExpense(data: Partial<Expense>): Promise<Expense> {
-        return writeWithSync('addExpense', LS_KEYS.EXPENSES, data, 'getExpenses');
+        return writeWithSync('addExpense', LS_KEYS.TRANSACTIONS, data, 'getTransactions') as Promise<Expense>;
     },
 
     async updateExpense(id: string, updates: Partial<Expense>): Promise<void> {
-        await writeWithSync('updateExpense', LS_KEYS.EXPENSES, { ...updates, id }, 'getExpenses');
+        await writeWithSync('updateExpense', LS_KEYS.TRANSACTIONS, { ...updates, id }, 'getTransactions');
     },
 
     async deleteExpense(id: string): Promise<void> {
-        await writeWithSync('deleteExpense', LS_KEYS.EXPENSES, { id }, 'getExpenses');
+        await writeWithSync('deleteExpense', LS_KEYS.TRANSACTIONS, { id }, 'getTransactions');
     },
+
 
     // ---- Bank Accounts ----
     async getBankAccounts(): Promise<BankAccount[]> {
@@ -250,22 +251,24 @@ export const sheetsService = {
         await writeWithSync('deleteBankAccount', LS_KEYS.BANK_ACCOUNTS, { id }, 'getBankAccounts');
     },
 
-    // ---- Payment Receipts ----
+    // ---- Payment Receipts (delegated → Transactions with type='receipt') ----
     async getPaymentReceipts(): Promise<PaymentReceipt[]> {
-        return fetchWithFallback('getPaymentReceipts', LS_KEYS.PAYMENT_RECEIPTS);
+        const all: Transaction[] = await fetchWithFallback('getTransactions', LS_KEYS.TRANSACTIONS);
+        return all.filter(t => t.type === 'receipt') as PaymentReceipt[];
     },
 
     async addPaymentReceipt(data: Partial<PaymentReceipt>): Promise<PaymentReceipt> {
-        return writeWithSync('addPaymentReceipt', LS_KEYS.PAYMENT_RECEIPTS, data, 'getPaymentReceipts');
+        return writeWithSync('addPaymentReceipt', LS_KEYS.TRANSACTIONS, data, 'getTransactions') as Promise<PaymentReceipt>;
     },
 
     async updatePaymentReceipt(id: string, updates: Partial<PaymentReceipt>): Promise<void> {
-        await writeWithSync('updatePaymentReceipt', LS_KEYS.PAYMENT_RECEIPTS, { ...updates, id }, 'getPaymentReceipts');
+        await writeWithSync('updatePaymentReceipt', LS_KEYS.TRANSACTIONS, { ...updates, id }, 'getTransactions');
     },
 
     async deletePaymentReceipt(id: string): Promise<void> {
-        await writeWithSync('deletePaymentReceipt', LS_KEYS.PAYMENT_RECEIPTS, { id }, 'getPaymentReceipts');
+        await writeWithSync('deletePaymentReceipt', LS_KEYS.TRANSACTIONS, { id }, 'getTransactions');
     },
+
 
     // ---- Complaints ----
     async getComplaints(): Promise<Complaint[]> {
@@ -288,18 +291,24 @@ export const sheetsService = {
         await writeWithSync('deleteComplaint', LS_KEYS.COMPLAINTS, { id }, 'getComplaints');
     },
 
-    // ---- Stock Wanting ----
+    // ---- Stock Wanting (delegated → Inventory.wantedQty) ----
     async getStockWanting(): Promise<StockWantingItem[]> {
-        return fetchWithFallback('getStockWanting', LS_KEYS.STOCK_WANTING);
+        const inv: InventoryItem[] = await fetchWithFallback('getInventory', LS_KEYS.INVENTORY);
+        return inv
+            .filter(i => (i.wantedQty || 0) > 0)
+            .map(i => ({ id: i.id, partNumber: i.itemCode || '', itemName: i.name, quantity: i.wantedQty || 0, rate: i.unitPrice, createdAt: i.lastUpdated }));
     },
 
     async addStockWantingItem(data: Partial<StockWantingItem>): Promise<StockWantingItem> {
-        return writeWithSync('addStockWanting', LS_KEYS.STOCK_WANTING, data, 'getStockWanting');
+        // Set wantedQty on the matching inventory item by name/id
+        await callGAS('setWantedQty', { id: data.id, wantedQty: data.quantity || 0 });
+        return data as StockWantingItem;
     },
 
     async deleteStockWantingItem(id: string): Promise<void> {
-        await writeWithSync('deleteStockWanting', LS_KEYS.STOCK_WANTING, { id }, 'getStockWanting');
+        await callGAS('setWantedQty', { id, wantedQty: 0 });
     },
+
 
     // ---- Visitors ----
     async getVisitors(): Promise<Visitor[]> {
@@ -335,11 +344,14 @@ export const sheetsService = {
         await writeWithSync('deleteReminder', LS_KEYS.REMINDERS, { id }, 'getReminders');
     },
 
-    // ---- Stock Transactions ----
+    // ---- Stock Transactions (delegated → Transactions with type='stock-in'|'stock-out') ----
     async getStockTransactions(itemId: string): Promise<StockTransaction[]> {
-        const all: StockTransaction[] = await fetchWithFallback('getStockTransactions', LS_KEYS.STOCK_TXNS);
-        return all.filter(st => st.itemId === itemId);
+        const all: Transaction[] = await fetchWithFallback('getTransactions', LS_KEYS.TRANSACTIONS);
+        return all
+            .filter(t => (t.type === 'stock-in' || t.type === 'stock-out') && t.entityId === itemId)
+            .map(t => ({ id: t.id, itemId: t.entityId, type: t.type === 'stock-in' ? 'IN' : 'OUT', quantity: t.amount, date: t.date, note: t.description })) as StockTransaction[];
     },
+
 
     // ---- Salesmen ----
     async getSalesmen(): Promise<Salesman[]> {
@@ -447,10 +459,42 @@ export const sheetsService = {
         await callGAS('emptyRecycleBin');
     },
 
+    // ---- getAllData (single batch fetch for full sync) ----
+    async getAllData(): Promise<{
+        customers: Customer[];
+        invoices: Invoice[];
+        inventory: InventoryItem[];
+        transactions: Transaction[];
+        bankAccounts: BankAccount[];
+        complaints: Complaint[];
+        visitors: Visitor[];
+        reminders: ServiceReminder[];
+        salesmen: Salesman[];
+        users: User[];
+        pickupRequests: PickupRequest[];
+    }> {
+        const result = await fetchWithFallback('getAllData', 'mg_all_cache');
+        if (result) {
+            // Hydrate each individual LS key so per-entity fallbacks still work
+            if (result.customers)    localStorage.setItem(LS_KEYS.CUSTOMERS,    JSON.stringify(result.customers));
+            if (result.invoices)     localStorage.setItem(LS_KEYS.INVOICES,     JSON.stringify(result.invoices));
+            if (result.inventory)    localStorage.setItem(LS_KEYS.INVENTORY,    JSON.stringify(result.inventory));
+            if (result.transactions) localStorage.setItem(LS_KEYS.TRANSACTIONS, JSON.stringify(result.transactions));
+            if (result.bankAccounts) localStorage.setItem(LS_KEYS.BANK_ACCOUNTS,JSON.stringify(result.bankAccounts));
+            if (result.complaints)   localStorage.setItem(LS_KEYS.COMPLAINTS,   JSON.stringify(result.complaints));
+            if (result.visitors)     localStorage.setItem(LS_KEYS.VISITORS,     JSON.stringify(result.visitors));
+            if (result.reminders)    localStorage.setItem(LS_KEYS.REMINDERS,    JSON.stringify(result.reminders));
+            if (result.salesmen)     localStorage.setItem(LS_KEYS.SALESMEN,     JSON.stringify(result.salesmen));
+            if (result.users)        localStorage.setItem(LS_KEYS.USERS,        JSON.stringify(result.users));
+        }
+        return result;
+    },
+
     // ---- Dashboard ----
     async getDashboardStats(): Promise<DashboardStats> {
         return fetchWithFallback('getDashboardStats', 'mg_dashboard_cache');
     },
+
 
     // ---- Account Balance (computed) ----
     async getAccountBalance(accountId: string): Promise<number> {
@@ -477,17 +521,15 @@ export const sheetsService = {
         const entities = [
             { lsKey: 'mg_customers', sheet: 'Customers', fields: ['id', 'name', 'phone', 'bikeNumber', 'city', 'email', 'address', 'gstin', 'loyaltyPoints', 'createdAt'] },
             { lsKey: 'mg_invoices', sheet: 'Invoices', fields: ['id', 'complaintId', 'bikeNumber', 'customerName', 'customerPhone', 'details', 'items', 'estimatedCost', 'finalAmount', 'taxAmount', 'subTotal', 'paymentStatus', 'accountId', 'paymentMode', 'date', 'odometerReading', 'docType', 'serviceReminderDate'] },
-            { lsKey: 'mg_inventory', sheet: 'Inventory', fields: ['id', 'name', 'category', 'stock', 'unitPrice', 'purchasePrice', 'itemCode', 'gstRate', 'hsn', 'lastUpdated'] },
-            { lsKey: 'mg_transactions', sheet: 'Transactions', fields: ['id', 'entityId', 'accountId', 'type', 'amount', 'paymentMode', 'date', 'description', 'category', 'status', 'chequeNumber', 'partyName', 'bankName', 'items'] },
-            { lsKey: 'mg_expenses', sheet: 'Expenses', fields: ['id', 'description', 'amount', 'category', 'date', 'paymentMode', 'transactionId', 'accountId'] },
+            { lsKey: 'mg_inventory', sheet: 'Inventory', fields: ['id', 'name', 'category', 'stock', 'unitPrice', 'purchasePrice', 'itemCode', 'gstRate', 'hsn', 'lastUpdated', 'wantedQty'] },
+            { lsKey: 'mg_transactions', sheet: 'Transactions', fields: ['id', 'entityId', 'accountId', 'type', 'amount', 'paymentMode', 'date', 'description', 'category', 'status', 'chequeNumber', 'partyName', 'bankName', 'items', 'receiptNumber'] },
             { lsKey: 'mg_bank_accounts', sheet: 'BankAccounts', fields: ['id', 'name', 'bankName', 'accountNumber', 'type', 'openingBalance', 'createdAt'] },
-            { lsKey: 'mg_payment_receipts', sheet: 'PaymentReceipts', fields: ['id', 'receiptNumber', 'customerId', 'customerName', 'customerPhone', 'bikeNumber', 'cashAmount', 'upiAmount', 'totalAmount', 'date', 'description', 'createdAt'] },
             { lsKey: 'mg_complaints', sheet: 'Complaints', fields: ['id', 'bikeNumber', 'customerName', 'customerPhone', 'details', 'photoUrls', 'estimatedCost', 'status', 'createdAt', 'dueDate', 'odometerReading'] },
-            { lsKey: 'mg_stock_wanting', sheet: 'StockWanting', fields: ['id', 'partNumber', 'itemName', 'quantity', 'rate', 'createdAt'] },
             { lsKey: 'mg_visitors', sheet: 'Visitors', fields: ['id', 'name', 'bikeNumber', 'phone', 'remarks', 'type', 'photoUrls', 'createdAt'] },
             { lsKey: 'mg_reminders', sheet: 'ServiceReminders', fields: ['id', 'bikeNumber', 'customerName', 'phone', 'reminderDate', 'serviceType', 'status', 'lastNotified', 'message', 'serviceDate'] },
             { lsKey: 'mg_users', sheet: 'Users', fields: ['id', 'username', 'password', 'role', 'name', 'phone', 'createdAt', 'isActive'] },
         ];
+
 
         let totalMigrated = 0;
         const results: string[] = [];
