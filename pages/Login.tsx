@@ -14,7 +14,7 @@ import { User as UserType } from '../types';
 // ─────────────────────────────────────────────────────────────
 
 interface LoginPageProps {
-    onLogin: (user: UserType) => void;
+    onLogin: (credentials: { username: string; password: string }) => Promise<void> | void;
     error?: string;
 }
 
@@ -44,7 +44,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, error: propError }) => {
         }
         setIsLoading(true);
         try {
-            await onLogin({ username, password } as any);
+            await onLogin({ username, password });
         } catch (err: any) {
             setError(err.message || 'Login failed. Please try again.');
         } finally {

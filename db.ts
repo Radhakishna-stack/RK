@@ -1606,8 +1606,34 @@ export const dbService = {
   },
 
   getUsers: async (): Promise<User[]> => {
-    // Fetch from cloud (or fall back to localStorage cache)
-    let users: User[] = await cloudRead('getUsers', LS_KEYS.USERS, []);
+    // ─── BLOCKING cloud fetch for auth reliability ───────────
+    // Unlike cloudRead() which fires background fetch and returns
+    // stale localStorage, we MUST await cloud data here because
+    // login depends on having the latest user list.
+    // On fresh devices, localStorage is empty → cloudRead returns []
+    // → login fails. This fix waits for the cloud response.
+    let users: User[] = [];
+    const localStr = localStorage.getItem(LS_KEYS.USERS);
+    const localUsers: User[] = localStr ? JSON.parse(localStr) : [];
+
+    if (isCloudEnabled()) {
+      try {
+        const cloudUsers = await fetchFromCloud('getUsers');
+        if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+          users = cloudUsers;
+          // Cache to localStorage for offline use
+          localStorage.setItem(LS_KEYS.USERS, JSON.stringify(users));
+        } else {
+          // Cloud returned empty/null — use local cache
+          users = localUsers;
+        }
+      } catch {
+        // Network failure — fall back to local cache
+        users = localUsers;
+      }
+    } else {
+      users = localUsers;
+    }
 
     // ─────────────────────────────────────────────────────────
     // PROTECT AGAINST CLOUD SYNC INJECTING OLD HASHES

@@ -127,16 +127,22 @@ const App: React.FC = () => {
   const handleLogin = async (credentials: { username: string; password: string }) => {
     try {
       setLoginError('');
+      console.log(`[Auth] Attempting login for user: ${credentials.username}`);
       const users = await dbService.getUsers();
+      console.log(`[Auth] Found ${users.length} users in database.`);
+      
       const user = await validateCredentials(credentials.username, credentials.password, users);
 
       if (!user) {
+        console.warn(`[Auth] Login failed for user: ${credentials.username}`);
         throw new Error('Invalid username or password');
       }
 
+      console.log(`[Auth] Login successful for user: ${user.username} (${user.role})`);
       const session = login(user);
       setAuthSession(session);
     } catch (error: any) {
+      console.error(`[Auth] Login error:`, error);
       setLoginError(error.message);
       throw error;
     }
