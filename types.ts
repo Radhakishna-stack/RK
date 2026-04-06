@@ -339,14 +339,6 @@ export interface Salesman {
   targetArea?: string;
 }
 
-export interface StaffLocation {
-  staffId: string;
-  staffName: string;
-  lat: number;
-  lng: number;
-  lastUpdated: string;
-}
-
 export interface ServiceReminder {
   id: string;
   bikeNumber: string;

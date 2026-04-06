@@ -60,7 +60,7 @@ function queueOfflineSync(action: string, data?: any) {
   }
 }
 
-export function processOfflineSyncQueue() {
+export async function processOfflineSyncQueue() {
   const url = getGasUrl();
   if (!url || !navigator.onLine) return; // Don't try if still offline or no URL
 
@@ -73,8 +73,8 @@ export function processOfflineSyncQueue() {
 
     console.log(`[OfflineSync] Processing ${queue.length} queued actions...`);
 
-    // Process one by one to maintain order
-    queue.forEach(async (item) => {
+    // Process sequentially to maintain order (dependencies between items)
+    for (const item of queue) {
       try {
         const res = await fetch(url, {
           method: 'POST',
@@ -100,7 +100,7 @@ export function processOfflineSyncQueue() {
         console.error(`[OfflineSync] ❌ Action '${item.action}' from queue failed (network error):`, err.message);
         // Keep in queue for next time
       }
-    });
+    }
 
   } catch (err) {
     console.error('[OfflineSync] Error processing queue:', err);
@@ -593,7 +593,7 @@ export const dbService = {
 
   addBankAccount: async (data: Omit<BankAccount, 'id' | 'createdAt'>): Promise<BankAccount> => {
     const current = await dbService.getBankAccounts();
-    const newBank = { ...data, id: 'BANK-' + Date.now(), createdAt: new Date().toISOString() };
+    const newBank = { ...data, id: generateUniqueId('BANK-'), createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.BANK_ACCOUNTS, JSON.stringify([...current, newBank]));
     syncToCloud('addBankAccount', newBank);
     return newBank;
@@ -670,7 +670,7 @@ export const dbService = {
   getCustomers: async (): Promise<Customer[]> => cloudRead('getCustomers', LS_KEYS.CUSTOMERS, []),
   addCustomer: async (data: any): Promise<Customer> => {
     const current = await dbService.getCustomers();
-    const newUser = { ...data, id: 'C' + Date.now(), loyaltyPoints: data.loyaltyPoints || 0, createdAt: new Date().toISOString() };
+    const newUser = { ...data, id: generateUniqueId('C'), loyaltyPoints: data.loyaltyPoints || 0, createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.CUSTOMERS, JSON.stringify([...current, newUser]));
     syncToCloud('addCustomer', newUser);
     return newUser;
@@ -703,7 +703,7 @@ export const dbService = {
     const current = await dbService.getTransactions();
     const newTxn = {
       ...data,
-      id: prefix + Date.now(),
+      id: generateUniqueId(prefix),
       date: data.date || new Date().toISOString(),
       // Only assign CASH-01 if paymentMode is Cash AND no accountId was given
       // Credit transactions should NOT be linked to any account (they're on-book, not paid)
@@ -755,7 +755,7 @@ export const dbService = {
   getVisitors: async (): Promise<Visitor[]> => cloudRead('getVisitors', LS_KEYS.VISITORS, []),
   addVisitor: async (data: any): Promise<Visitor> => {
     const current = await dbService.getVisitors();
-    const newVisitor = { ...data, id: 'V' + Date.now(), createdAt: new Date().toISOString() };
+    const newVisitor = { ...data, id: generateUniqueId('V'), createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.VISITORS, JSON.stringify([newVisitor, ...current]));
     syncToCloud('addVisitor', newVisitor);
     return newVisitor;
@@ -773,7 +773,7 @@ export const dbService = {
   getStockWanting: async (): Promise<StockWantingItem[]> => cloudRead('getStockWanting', LS_KEYS.STOCK_WANTING, []),
   addStockWantingItem: async (data: Omit<StockWantingItem, 'id' | 'createdAt'>): Promise<StockWantingItem> => {
     const current = await dbService.getStockWanting();
-    const newItem = { ...data, id: 'W' + Date.now(), createdAt: new Date().toISOString() };
+    const newItem = { ...data, id: generateUniqueId('W'), createdAt: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.STOCK_WANTING, JSON.stringify([...current, newItem]));
     syncToCloud('addStockWanting', newItem);
     return newItem;
@@ -789,7 +789,7 @@ export const dbService = {
     const currentComplaints = await dbService.getComplaints();
     const newComplaint = {
       ...data,
-      id: 'B' + Date.now(),
+      id: generateUniqueId('B'),
       status: ComplaintStatus.NEW,
       createdAt: new Date().toISOString()
     };
@@ -865,7 +865,7 @@ export const dbService = {
     });
 
     // Handle Invoice creation
-    const newInv = { ...data, id: getTxnPrefix('sale') + Date.now(), date: data.date || new Date().toISOString() };
+    const newInv = { ...data, id: generateUniqueId(getTxnPrefix('sale')), date: data.date || new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...currentInvoices]));
     syncToCloud('addInvoice', newInv);
 
@@ -1103,7 +1103,7 @@ export const dbService = {
 
   addInventoryItem: async (data: any): Promise<InventoryItem> => {
     const current = await dbService.getInventory();
-    const newItem = { ...data, id: 'S' + Date.now(), lastUpdated: new Date().toISOString() };
+    const newItem = { ...data, id: generateUniqueId('S'), lastUpdated: new Date().toISOString() };
     localStorage.setItem(LS_KEYS.INVENTORY, JSON.stringify([...current, newItem]));
     syncToCloud('addInventoryItem', newItem);
     return newItem;
@@ -1220,7 +1220,7 @@ export const dbService = {
 
     const newExp = {
       ...data,
-      id: getTxnPrefix('expense') + Date.now(),
+      id: generateUniqueId(getTxnPrefix('expense')),
       date: data.date || new Date().toISOString(),
       transactionId: transactionId || '',
       accountId: accountId
@@ -1266,7 +1266,7 @@ export const dbService = {
   getReminders: async (): Promise<ServiceReminder[]> => cloudRead('getReminders', LS_KEYS.REMINDERS, []),
   addReminder: async (data: any): Promise<ServiceReminder> => {
     const current = await dbService.getReminders();
-    const newRem = { ...data, id: 'R' + Date.now(), status: 'Pending' };
+    const newRem = { ...data, id: generateUniqueId('R'), status: 'Pending' };
     localStorage.setItem(LS_KEYS.REMINDERS, JSON.stringify([...current, newRem]));
     syncToCloud('addReminder', newRem);
     return newRem;
@@ -1414,7 +1414,7 @@ export const dbService = {
     const current = await dbService.getSalesmen();
     const newStaff = {
       ...data,
-      id: 'ST' + Date.now(),
+      id: generateUniqueId('ST'),
       salesCount: 0,
       totalSalesValue: 0,
       joinDate: new Date().toISOString(),
@@ -1479,7 +1479,7 @@ export const dbService = {
   moveToRecycleBin: async (type: RecycleBinCategory, data: any): Promise<void> => {
     const bin = await dbService.getRecycleBin();
     const newItem: RecycleBinItem = {
-      binId: 'BIN-' + Date.now(),
+      binId: generateUniqueId('BIN-'),
       originalId: data.id,
       type,
       data,
@@ -1787,10 +1787,13 @@ export const dbService = {
   addPaymentReceipt: async (data: Omit<PaymentReceipt, 'id' | 'receiptNumber' | 'createdAt'>): Promise<PaymentReceipt> => {
     const current = await dbService.getPaymentReceipts();
 
-    // Generate receipt number with zero-padded counter
-    const nextNumber = current.length + 1;
-    const receiptNumber = `PR-${String(nextNumber).padStart(4, '0')}`;
-    const id = `PR-${Date.now()}`;
+    // Generate receipt number using max existing counter to prevent gaps after deletions
+    const maxNum = current.reduce((max, r) => {
+      const match = r.receiptNumber?.match(/PR-(\d+)/);
+      return match ? Math.max(max, parseInt(match[1], 10)) : max;
+    }, 0);
+    const receiptNumber = `PR-${String(maxNum + 1).padStart(4, '0')}`;
+    const id = generateUniqueId('PR-');
 
     const newReceipt: PaymentReceipt = {
       ...data,
@@ -2283,7 +2286,7 @@ export const dbService = {
     const current = await dbService.getPickupRequests();
     const newPickup: PickupRequest = {
       ...data,
-      id: 'PKP-' + Date.now(),
+      id: generateUniqueId('PKP-'),
       status: 'Pending',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

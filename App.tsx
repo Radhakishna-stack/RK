@@ -24,6 +24,7 @@ import { getSession, login, logout, validateCredentials } from './auth';
 import { canAccessRoute } from './permissions';
 import { dbService } from './db';
 import { NotificationSystem } from './components/NotificationSystem';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // ── Lazy-load all page components (web-perf + mobile-design skill) ──
 // Each page loads only when navigated to, dramatically reducing initial bundle.
@@ -315,6 +316,7 @@ const App: React.FC = () => {
       <main className={`flex-1 overflow-y-auto relative no-scrollbar ${location.pathname.includes('billing') || location.pathname.includes('estimate/new') || location.pathname.includes('sales') || location.pathname.includes('complaints') || location.pathname.includes('field-service-manager') || location.pathname.includes('field-jobs') ? 'pb-0' : ''}`}>
         <div className={location.pathname === '/business' ? '' : `max-w-screen-xl mx-auto px-4 pt-4`}>
           <Suspense fallback={<PageLoader />}>
+          <ErrorBoundary>
             <Routes>
               {/* Core Tabs */}
               <Route path="/" element={(userRole === 'employee' || userRole === 'mechanic') ? <Navigate to="/employee-panel" /> : <DashboardPage onNavigate={handleNavigate} />} />
@@ -367,6 +369,7 @@ const App: React.FC = () => {
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
+          </ErrorBoundary>
           </Suspense>
         </div>
       </main>

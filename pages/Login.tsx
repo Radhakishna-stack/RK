@@ -449,34 +449,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, error: propError }) => {
                         </button>
                     </form>
 
-                    {/* Default credentials hint */}
-                    <div style={{
+                    {/* Footer */}
+                    <p style={{
                         marginTop: '2rem',
-                        padding: '0.875rem 1rem',
-                        background: '#F1F5F9',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: 8,
-                        borderLeft: '3px solid #F59E0B',
+                        textAlign: 'center',
+                        fontFamily: "'Fira Code', monospace",
+                        fontSize: '0.65rem',
+                        color: '#94A3B8',
+                        letterSpacing: '0.1em',
                     }}>
-                        <p style={{
-                            fontFamily: "'Fira Code', monospace",
-                            fontSize: '0.65rem',
-                            fontWeight: 700,
-                            color: '#94A3B8',
-                            letterSpacing: '0.12em',
-                            textTransform: 'uppercase',
-                            marginBottom: '0.35rem',
-                        }}>
-                            Default Credentials
-                        </p>
-                        <p style={{
-                            fontFamily: "'Fira Code', monospace",
-                            fontSize: '0.78rem',
-                            color: '#475569',
-                        }}>
-                            admin / admin123
-                        </p>
-                    </div>
+                        Authorized personnel only
+                    </p>
                 </div>
             </div>
 

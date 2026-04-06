@@ -42,3 +42,20 @@ Thumbs.db
 desktop.ini
 
 /generated/prisma
+
+# Debug & diagnostic artifacts
+*.log
+debug_*.txt
+debug_*.png
+dump_*.log
+diag_*.py
+diag_*.json
+*_verification.json
+verify_*.py
+test_*.py
+*_success.png
+rice_analysis.txt
+features.csv
+
+# Database files
+*.db

@@ -4,6 +4,7 @@ const SESSION_KEY = 'mg_auth_session';
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 
+
 /**
  * Verify a password — plain text comparison only.
  * Passwords are stored as-is in Google Sheets for easy management.

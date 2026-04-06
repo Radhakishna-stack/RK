@@ -59,7 +59,18 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
-      chunkSizeWarningLimit: 3000,
+      chunkSizeWarningLimit: 500,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+            charts: ['recharts'],
+            maps: ['leaflet', 'react-leaflet'],
+            pdf: ['jspdf', 'jspdf-autotable'],
+            icons: ['lucide-react'],
+          }
+        }
+      }
     }
   };
 });
