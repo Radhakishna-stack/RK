@@ -11,6 +11,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
+import { JobTimeline } from '../components/JobTimeline';
 
 interface ComplaintsPageProps {
   onNavigate: (tab: string) => void;
@@ -291,6 +292,7 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
     accepted: complaints.filter(c => c.status === ComplaintStatus.ACCEPTED).length,
     inProgress: complaints.filter(c => c.status === ComplaintStatus.IN_PROGRESS).length,
     ready: complaints.filter(c => c.status === ComplaintStatus.READY).length,
+    qcApproved: complaints.filter(c => c.status === ComplaintStatus.QC_APPROVED).length,
     delivered: complaints.filter(c => c.status === ComplaintStatus.DELIVERED || c.status === ComplaintStatus.COMPLETED).length,
   };
 
@@ -344,6 +346,7 @@ const ComplaintsPage: React.FC<ComplaintsPageProps> = ({ onNavigate }) => {
         <PipelineTab label="✅ Accepted" count={statusCounts.accepted} active={filterStatus === ComplaintStatus.ACCEPTED} onClick={() => setFilterStatus(ComplaintStatus.ACCEPTED)} color="indigo" />
         <PipelineTab label="⚙️ Working" count={statusCounts.inProgress} active={filterStatus === ComplaintStatus.IN_PROGRESS} onClick={() => setFilterStatus(ComplaintStatus.IN_PROGRESS)} color="amber" />
         <PipelineTab label="🔍 Ready" count={statusCounts.ready} active={filterStatus === ComplaintStatus.READY} onClick={() => setFilterStatus(ComplaintStatus.READY)} color="green" />
+        <PipelineTab label="✓ QC Pass" count={statusCounts.qcApproved} active={filterStatus === ComplaintStatus.QC_APPROVED} onClick={() => setFilterStatus(ComplaintStatus.QC_APPROVED)} color="emerald" />
         <PipelineTab label="🏁 Done" count={statusCounts.delivered} active={filterStatus === ComplaintStatus.DELIVERED} onClick={() => setFilterStatus(ComplaintStatus.DELIVERED)} color="emerald" />
       </div>
 
@@ -716,6 +719,8 @@ const JobCard: React.FC<{
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200">⚙️ Working</span>;
       case ComplaintStatus.READY:
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-700 border border-green-200">🔍 Ready for QC</span>;
+      case ComplaintStatus.QC_APPROVED:
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-100 text-teal-700 border border-teal-200">✓ QC Approved</span>;
       case ComplaintStatus.DELIVERED:
       case ComplaintStatus.COMPLETED:
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">🏁 Delivered</span>;
@@ -832,8 +837,11 @@ const JobCard: React.FC<{
           )}
         </div>
 
+        {/* Timeline visualization */}
+        <JobTimeline job={job} />
+
         {/* Pipeline Actions - role-based CTAs */}
-        <div className="pt-2 border-t border-slate-100 flex gap-2 flex-wrap">
+        <div className="pt-2 flex gap-2 flex-wrap">
           {/* Admin: assign mechanic prompt for NEW jobs */}
           {(job.status === ComplaintStatus.NEW || job.status === ComplaintStatus.PENDING) && !job.assignedMechanicId && (
             <span className="flex-1 text-xs text-amber-600 font-semibold flex items-center gap-1">
@@ -846,11 +854,18 @@ const JobCard: React.FC<{
               <Clock className="w-3.5 h-3.5" /> Waiting for mechanic to accept…
             </span>
           )}
-          {/* Admin: QC Pass button when mechanic marks ready */}
+          {/* Admin/Manager: QC Pass button when mechanic marks ready */}
           {job.status === ComplaintStatus.READY && (
+            <Button size="sm" onClick={() => onStatusChange(job.id, ComplaintStatus.QC_APPROVED)}
+              className="flex-1 bg-teal-600 hover:bg-teal-700 text-white">
+              <CheckCircle className="w-4 h-4 mr-1" /> Pass QC ✓
+            </Button>
+          )}
+          {/* Admin/Manager: Mark delivered after QC approval */}
+          {job.status === ComplaintStatus.QC_APPROVED && (
             <Button size="sm" onClick={() => onStatusChange(job.id, ComplaintStatus.DELIVERED)}
               className="flex-1 bg-green-600 hover:bg-green-700 text-white">
-              <CheckCircle className="w-4 h-4 mr-1" /> Pass QC → Deliver
+              <CheckCircle className="w-4 h-4 mr-1" /> Mark Delivered
             </Button>
           )}
           {/* Done state */}

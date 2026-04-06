@@ -5,7 +5,7 @@ import {
   ClipboardCheck, Users, Package, Bike, Phone, Wallet, Wrench, Truck
 } from 'lucide-react';
 import { dbService } from '../db';
-import { Invoice, Customer, DashboardStats, Complaint, ComplaintStatus } from '../types';
+import { Invoice, Customer, DashboardStats, Complaint, ComplaintStatus, PickupRequest } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -17,6 +17,7 @@ interface DashboardPageProps {
 const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [pickups, setPickups] = useState<PickupRequest[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,14 +31,16 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [statData, compData, invData] = await Promise.all([
+      const [statData, compData, invData, pickupData] = await Promise.all([
         dbService.getDashboardStats(),
         dbService.getComplaints(),
-        dbService.getInvoices()
+        dbService.getInvoices(),
+        dbService.getPickupRequests()
       ]);
       setStats(statData);
       setComplaints(compData);
       setRecentInvoices(invData.slice(0, 5)); // Only show 5 most recent
+      setPickups(pickupData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -55,7 +58,12 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     c.status === ComplaintStatus.ACCEPTED ||
     c.status === ComplaintStatus.IN_PROGRESS
   ).length;
-  const readyJobs = complaints.filter(c => c.status === ComplaintStatus.READY).length;
+  const readyJobs = complaints.filter(c => c.status === ComplaintStatus.READY || c.status === ComplaintStatus.QC_APPROVED).length;
+
+  // Pickup fleet counts
+  const activePickups = pickups.filter(p => p.status !== 'Delivered' && p.status !== 'Cancelled');
+  const unassignedPickups = activePickups.filter(p => !p.assignedEmployeeId && (p.status === 'Pending' || p.status === 'New')).length;
+  const activeFleet = activePickups.filter(p => p.status === 'En Route' || p.status === 'Accepted' || p.status === 'At Pickup' || p.status === 'In Transit' || p.status === 'Picked Up').length;
 
   // Get today's date
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -137,6 +145,34 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             <div className="mt-4 pt-4 border-t border-slate-100 bg-slate-50/50">
               <Button variant="ghost" className="w-full justify-center text-xs font-bold uppercase tracking-widest">
                 Access Workshop Terminal →
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Pickup Fleet Status */}
+      <div>
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Pickup Fleet</h2>
+        <div onClick={() => onNavigate('pickup_manager')}>
+          <Card className="hover:shadow-md transition-all cursor-pointer overflow-hidden border-t-2 border-t-[#F97316]">
+            <div className="grid grid-cols-2 gap-4">
+              <StatusCard
+                label="Unassigned"
+                value={unassignedPickups}
+                variant="warning"
+                icon={<AlertCircle className="w-5 h-5 text-amber-500" />}
+              />
+              <StatusCard
+                label="Active En Route"
+                value={activeFleet}
+                variant="info"
+                icon={<Truck className="w-5 h-5 text-blue-500" />}
+              />
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-100 bg-slate-50/50">
+              <Button variant="ghost" className="w-full justify-center text-xs font-bold uppercase tracking-widest">
+                Manage Fleet Terminal →
               </Button>
             </div>
           </Card>

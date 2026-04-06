@@ -1526,6 +1526,7 @@ export const dbService = {
     const knownCredentials: Record<string, string> = {
       admin: 'admin123',
       vishnu: 'vishnu123',
+      pickup: 'pickup123',
     };
 
     // Load both cloud users (if available) and local users, merge them
@@ -1595,6 +1596,21 @@ export const dbService = {
       };
       usersToAdd.push(defaultVishnu);
       if (isCloudEnabled()) syncToCloud('addUser', defaultVishnu);
+    }
+
+    // Add a default pickup boy for testing
+    if (!existingUsers.some(u => u.username.toLowerCase() === 'pickup')) {
+      const defaultPickupBoy: User = {
+        id: generateUniqueId('U'),
+        username: 'pickup',
+        password: knownCredentials.pickup,
+        role: 'pickup_boy',
+        name: 'Pickup Boy 1',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+      usersToAdd.push(defaultPickupBoy);
+      if (isCloudEnabled()) syncToCloud('addUser', defaultPickupBoy);
     }
 
     if (usersToAdd.length > 0) {

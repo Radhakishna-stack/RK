@@ -22,17 +22,19 @@ const PERMISSION_LABELS: Record<keyof RolePermissions, { label: string, category
 
     canViewComplaints: { label: 'View Job Cards', category: 'Service' },
     canEditComplaints: { label: 'Edit Job Cards (Status/Update)', category: 'Service' },
+    canApproveQC: { label: 'Approve QC Check', category: 'Service' },
 
     canViewReports: { label: 'View Reports', category: 'Analytics' },
     canAccessAnalytics: { label: 'Access Dashboard Analytics', category: 'Analytics' },
 
     canManageStaff: { label: 'Manage Staff', category: 'Admin' },
     canManageUsers: { label: 'Manage Users', category: 'Admin' },
+    canManagePickups: { label: 'Manage Pickups', category: 'Admin' },
     canViewSettings: { label: 'View Settings', category: 'Admin' },
     canManageSettings: { label: 'Change Settings', category: 'Admin' },
 };
 
-const ROLES: UserRole[] = ['manager', 'employee', 'mechanic']; // Exclude admin as they should have all access
+const ROLES: UserRole[] = ['manager', 'employee', 'mechanic', 'pickup_boy']; // Exclude admin as they should have all access
 
 const RolePermissionsEditor: React.FC = () => {
     const [loading, setLoading] = useState(true);

@@ -5,7 +5,7 @@ import {
   Package, RefreshCw, ChevronRight, Wrench, Star
 } from 'lucide-react';
 import { dbService } from '../db';
-import { Complaint, ComplaintStatus, PickupRequest, PickupStatus } from '../types';
+import { Complaint, ComplaintStatus, PickupRequest, PickupStatus, WorkNote } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { getCurrentUser } from '../auth';
@@ -24,6 +24,7 @@ const STAGE_CONFIG: Record<string, { label: string; bg: string; text: string; }>
   [ComplaintStatus.ACCEPTED]:   { label: '✅ Accepted',    bg: 'bg-indigo-100',  text: 'text-indigo-700' },
   [ComplaintStatus.IN_PROGRESS]:{ label: '⚙️ Working',     bg: 'bg-amber-100',   text: 'text-amber-700' },
   [ComplaintStatus.READY]:      { label: '🔍 Ready for QC', bg: 'bg-green-100',  text: 'text-green-700' },
+  [ComplaintStatus.QC_APPROVED]:{ label: '✓ QC Approved',  bg: 'bg-teal-100',   text: 'text-teal-700' },
   [ComplaintStatus.DELIVERED]:  { label: '🏁 Delivered',   bg: 'bg-emerald-100', text: 'text-emerald-700' },
   [ComplaintStatus.COMPLETED]:  { label: '🏁 Delivered',   bg: 'bg-emerald-100', text: 'text-emerald-700' },
   [ComplaintStatus.CANCELLED]:  { label: '✕ Cancelled',    bg: 'bg-red-100',     text: 'text-red-600' },
@@ -67,6 +68,7 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
   const [trackingPickupId, setTrackingPickupId] = useState<string | null>(null);
   const gpsWatchRef = useRef<number | null>(null);
   const gpsPollRef = useRef<NodeJS.Timeout | null>(null);
+  const [noteText, setNoteText] = useState<Record<string, string>>({});
 
   const currentUser = getCurrentUser();
 
@@ -139,6 +141,26 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
     loadData();
   };
 
+  const addWorkNote = async (jobId: string) => {
+    const text = noteText[jobId]?.trim();
+    if (!text || !currentUser) return;
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    const newNote: WorkNote = {
+      text,
+      timestamp: new Date().toISOString(),
+      userId: currentUser.id,
+      userName: currentUser.name
+    };
+    const existingNotes = job.workNotes || [];
+    await dbService.updateComplaint(jobId, {
+      ...job,
+      workNotes: [...existingNotes, newNote]
+    } as any);
+    setNoteText(prev => ({ ...prev, [jobId]: '' }));
+    loadData();
+  };
+
   // ── Pickup Actions ────────────────────────────────────────────────────────
 
   const handlePickupAction = async (pickup: PickupRequest, action: PickupStatus) => {
@@ -204,18 +226,20 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — hide pickups for mechanics (they have their own panel) */}
       <div className="flex gap-2">
         <button onClick={() => setActiveTab('jobs')}
           className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === 'jobs' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-700'}`}>
           <Hammer className="w-4 h-4" /> Service Jobs
           {jobs.length > 0 && <span className={`px-1.5 py-0.5 rounded-full text-xs font-black ${activeTab === 'jobs' ? 'bg-white/30' : 'bg-blue-100 text-blue-700'}`}>{jobs.length}</span>}
         </button>
-        <button onClick={() => setActiveTab('pickups')}
-          className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === 'pickups' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 text-slate-700'}`}>
-          <Truck className="w-4 h-4" /> Pickups
-          {pickups.length > 0 && <span className={`px-1.5 py-0.5 rounded-full text-xs font-black ${activeTab === 'pickups' ? 'bg-white/30' : 'bg-purple-100 text-purple-700'}`}>{pickups.length}</span>}
-        </button>
+        {userRole !== 'mechanic' && (
+          <button onClick={() => setActiveTab('pickups')}
+            className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === 'pickups' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 text-slate-700'}`}>
+            <Truck className="w-4 h-4" /> Pickups
+            {pickups.length > 0 && <span className={`px-1.5 py-0.5 rounded-full text-xs font-black ${activeTab === 'pickups' ? 'bg-white/30' : 'bg-purple-100 text-purple-700'}`}>{pickups.length}</span>}
+          </button>
+        )}
       </div>
 
       {/* ─── SERVICE JOBS TAB ─────────────────────────────────────────────── */}
@@ -326,17 +350,50 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
                         </Button>
                       )}
                       {job.status === ComplaintStatus.IN_PROGRESS && (
-                        <Button
-                          className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-3 rounded-xl shadow-md shadow-green-200"
-                          onClick={() => updateJobStatus(job.id, ComplaintStatus.READY)}>
-                          <CheckCircle2 className="w-5 h-5 mr-2" /> Mark Ready for Delivery
-                        </Button>
+                        <>
+                          {/* Work notes input */}
+                          <div className="mb-2">
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Add a work note..."
+                                value={noteText[job.id] || ''}
+                                onChange={e => setNoteText(prev => ({ ...prev, [job.id]: e.target.value }))}
+                                onKeyDown={e => e.key === 'Enter' && addWorkNote(job.id)}
+                                className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none"
+                              />
+                              <Button size="sm" onClick={() => addWorkNote(job.id)}
+                                className="bg-slate-700 hover:bg-slate-800 text-white px-3 rounded-xl">
+                                Add
+                              </Button>
+                            </div>
+                            {/* Show existing notes */}
+                            {(job.workNotes || []).length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {(job.workNotes || []).slice(-3).map((note, idx) => (
+                                  <div key={idx} className="text-xs text-slate-500 bg-slate-50 px-2.5 py-1.5 rounded-lg">
+                                    <span className="font-semibold text-slate-700">{note.userName}:</span> {note.text}
+                                    <span className="text-slate-400 ml-1">· {new Date(note.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-3 rounded-xl shadow-md shadow-green-200"
+                            onClick={() => updateJobStatus(job.id, ComplaintStatus.READY)}>
+                            <CheckCircle2 className="w-5 h-5 mr-2" /> Mark Ready for QC
+                          </Button>
+                        </>
                       )}
                       {(job.status === ComplaintStatus.NEW || job.status === ComplaintStatus.PENDING) && (
                         <p className="text-center text-xs text-slate-400 py-1">⏳ Awaiting admin to assign you to this job</p>
                       )}
                       {job.status === ComplaintStatus.READY && (
                         <p className="text-center text-xs text-green-600 font-semibold py-1">✅ Waiting for manager QC check</p>
+                      )}
+                      {job.status === ComplaintStatus.QC_APPROVED && (
+                        <p className="text-center text-xs text-teal-600 font-semibold py-1">✓ QC Approved — awaiting delivery</p>
                       )}
                     </div>
                   </div>

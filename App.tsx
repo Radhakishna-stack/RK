@@ -17,7 +17,8 @@ import {
   LogOut,
   User as UserIcon,
   Wrench,
-  Plus
+  Plus,
+  Truck
 } from 'lucide-react';
 import { AuthSession, User } from './types';
 import { getSession, login, logout, validateCredentials } from './auth';
@@ -60,6 +61,7 @@ const PaymentVoucherPage = React.lazy(() => import('./pages/PaymentVoucher'));
 const CloudSyncPage = React.lazy(() => import('./pages/CloudSync'));
 const CustomerBooking = React.lazy(() => import('./pages/CustomerBooking'));
 const PickupManagerPage = React.lazy(() => import('./pages/PickupManager'));
+const PickupBoyPanel = React.lazy(() => import('./pages/PickupBoyPanel'));
 const AuditLogsPage = React.lazy(() => import('./pages/AuditLogs'));
 
 // ── Suspense fallback spinner (skill: always show loading state) ──
@@ -319,7 +321,11 @@ const App: React.FC = () => {
           <ErrorBoundary>
             <Routes>
               {/* Core Tabs */}
-              <Route path="/" element={(userRole === 'employee' || userRole === 'mechanic') ? <Navigate to="/employee-panel" /> : <DashboardPage onNavigate={handleNavigate} />} />
+              <Route path="/" element={
+                userRole === 'pickup_boy' ? <Navigate to="/pickup-panel" /> :
+                (userRole === 'employee' || userRole === 'mechanic') ? <Navigate to="/employee-panel" /> :
+                <DashboardPage onNavigate={handleNavigate} />
+              } />
               <Route path="/dashboard" element={<Navigate to="/" />} />
               <Route path="/business" element={<DashboardV2 onNavigate={handleNavigate} />} />
               <Route path="/money" element={<BankAccountsPage onNavigate={handleNavigate} />} />
@@ -327,6 +333,7 @@ const App: React.FC = () => {
 
               {/* Features */}
               <Route path="/employee-panel" element={<EmployeePanel onNavigate={handleNavigate} userRole={userRole} />} />
+              <Route path="/pickup-panel" element={<PickupBoyPanel onNavigate={handleNavigate} />} />
               <Route path="/staff-control" element={<ProtectedRoute feature="staff_control"><StaffControlCenter onNavigate={handleNavigate} /></ProtectedRoute>} />
               <Route path="/inventory" element={<InventoryPage onNavigate={(tab, query) => {
                 if (tab === 'market_explorer') navigate(`/market-explorer${query ? `?q=${query}` : ''}`); // Simplified query handling or just pass state
@@ -395,18 +402,35 @@ const App: React.FC = () => {
               boxShadow: '0 -4px 20px rgba(0,0,0,0.03)'
             }}
           >
-            <div className="flex justify-around w-full max-w-[45%]">
-              <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
-              <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
-            </div>
-            
-            {/* Empty space for the FAB */}
-            <div className="w-[10%] min-w-[60px]" aria-hidden="true" />
-            
-            <div className="flex justify-around w-full max-w-[45%]">
-              <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money'} onClick={() => navigate('/money')} />
-              <BottomNavItem icon={<LayoutGrid />} label="More" active={activeTab === 'more'} onClick={() => navigate('/more')} />
-            </div>
+            {userRole === 'pickup_boy' ? (
+              /* Pickup Boy: simplified nav */
+              <div className="flex justify-around w-full">
+                <BottomNavItem icon={<Truck />} label="Pickups" active={activeTab === 'pickup-panel'} onClick={() => navigate('/pickup-panel')} />
+                <BottomNavItem icon={<Settings />} label="Profile" active={activeTab === 'settings'} onClick={() => navigate('/settings')} />
+              </div>
+            ) : userRole === 'mechanic' ? (
+              /* Mechanic: focused nav */
+              <div className="flex justify-around w-full">
+                <BottomNavItem icon={<Home />} label="My Jobs" active={activeTab === 'employee-panel'} onClick={() => navigate('/employee-panel')} />
+                <BottomNavItem icon={<Settings />} label="Profile" active={activeTab === 'settings'} onClick={() => navigate('/settings')} />
+              </div>
+            ) : (
+              /* Admin / Manager / Employee: full nav */
+              <>
+                <div className="flex justify-around w-full max-w-[45%]">
+                  <BottomNavItem icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => navigate('/')} />
+                  <BottomNavItem icon={<BarChart3 />} label="Business" active={activeTab === 'business'} onClick={() => navigate('/business')} />
+                </div>
+                
+                {/* Empty space for the FAB */}
+                <div className="w-[10%] min-w-[60px]" aria-hidden="true" />
+                
+                <div className="flex justify-around w-full max-w-[45%]">
+                  <BottomNavItem icon={<DollarSign />} label="Money" active={activeTab === 'money'} onClick={() => navigate('/money')} />
+                  <BottomNavItem icon={<LayoutGrid />} label="More" active={activeTab === 'more'} onClick={() => navigate('/more')} />
+                </div>
+              </>
+            )}
           </nav>
         </div>
       )}

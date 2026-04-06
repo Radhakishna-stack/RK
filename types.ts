@@ -64,14 +64,22 @@ export enum ComplaintStatus {
   PENDING = 'Pending',       // maps → NEW (unassigned) or ASSIGNED
   COMPLETED = 'Completed',   // maps → DELIVERED
 
-  // New 6-stage pipeline
+  // New 7-stage pipeline
   NEW = 'New',
   ASSIGNED = 'Assigned',
   ACCEPTED = 'Accepted',
   IN_PROGRESS = 'In Progress',
   READY = 'Ready',
+  QC_APPROVED = 'QC Approved',
   DELIVERED = 'Delivered',
   CANCELLED = 'Cancelled'
+}
+
+export interface WorkNote {
+  text: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
 }
 
 export interface Complaint {
@@ -93,7 +101,11 @@ export interface Complaint {
   acceptedAt?: string;
   startedAt?: string;
   readyAt?: string;
+  qcApprovedAt?: string;
+  qcApprovedBy?: string;
   deliveredAt?: string;
+  // Work notes from mechanic during job
+  workNotes?: WorkNote[];
 }
 
 
@@ -568,7 +580,7 @@ export interface AppSettings {
 }
 
 // Authentication & Authorization Types
-export type UserRole = 'admin' | 'employee' | 'manager' | 'mechanic';
+export type UserRole = 'admin' | 'employee' | 'manager' | 'mechanic' | 'pickup_boy';
 
 export interface User {
   id: string;
@@ -604,6 +616,8 @@ export interface RolePermissions {
   canAccessBilling: boolean;
   canAccessPurchase: boolean;
   canAccessAnalytics: boolean;
+  canApproveQC: boolean;
+  canManagePickups: boolean;
 }
 
 export interface AuditLog {

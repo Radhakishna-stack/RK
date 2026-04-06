@@ -21,6 +21,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
         canAccessBilling: true,
         canAccessPurchase: true,
         canAccessAnalytics: true,
+        canApproveQC: true,
+        canManagePickups: true,
     },
     employee: {
         canViewSales: true,
@@ -40,6 +42,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
         canAccessBilling: false,
         canAccessPurchase: false,
         canAccessAnalytics: false,
+        canApproveQC: false,
+        canManagePickups: false,
     },
     manager: {
         canViewSales: true,
@@ -59,6 +63,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
         canAccessBilling: true,
         canAccessPurchase: true,
         canAccessAnalytics: true,
+        canApproveQC: true,
+        canManagePickups: true,
     },
     mechanic: {
         canViewSales: false,
@@ -78,6 +84,29 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
         canAccessBilling: false,
         canAccessPurchase: false,
         canAccessAnalytics: false,
+        canApproveQC: false,
+        canManagePickups: false,
+    },
+    pickup_boy: {
+        canViewSales: false,
+        canCreateSales: false,
+        canEditSales: false,
+        canDeleteSales: false,
+        canViewReports: false,
+        canManageInventory: false,
+        canManageCustomers: false,
+        canManageExpenses: false,
+        canViewSettings: false,
+        canManageSettings: false,
+        canManageStaff: false,
+        canManageUsers: false,
+        canViewComplaints: false,
+        canEditComplaints: false,
+        canAccessBilling: false,
+        canAccessPurchase: false,
+        canAccessAnalytics: false,
+        canApproveQC: false,
+        canManagePickups: true,
     },
 };
 
@@ -160,10 +189,13 @@ export function canAccessRoute(role: UserRole, route: string): boolean {
         'staff_control_center': 'canManageStaff',
         'salesmen': 'canManageStaff',
         'salesman_tracking': 'canManageStaff',
-        'employee_panel': 'canManageStaff',
-        'pickup_manager': 'canManageStaff',
-        'field_jobs': 'canManageStaff',
+        'employee_panel': 'canViewComplaints',
+        'field_jobs': 'canViewComplaints',
         'field_service_manager': 'canManageStaff',
+
+        // Pickups
+        'pickup_manager': 'canManagePickups',
+        'pickup_panel': 'canManagePickups',
 
         // Admin-only
         'recycle_bin': 'canManageSettings',
@@ -179,3 +211,4 @@ export function canAccessRoute(role: UserRole, route: string): boolean {
 
     return permissions[requiredPermission];
 }
+
