@@ -28,7 +28,7 @@ function initProject() {
     'Expenses': ['ID', 'Description', 'Amount', 'Category', 'Date', 'PaymentMode', 'TransactionID', 'AccountID'],
     'BankAccounts': ['ID', 'Name', 'BankName', 'AccountNumber', 'Type', 'OpeningBalance', 'CreatedAt'],
     'PaymentReceipts': ['ID', 'ReceiptNumber', 'CustomerID', 'CustomerName', 'CustomerPhone', 'BikeNumber', 'CashAmount', 'UPIAmount', 'TotalAmount', 'Date', 'Description', 'CreatedAt'],
-    'Complaints': ['ID', 'BikeNumber', 'CustomerName', 'CustomerPhone', 'Details', 'PhotoUrls', 'EstimatedCost', 'Status', 'CreatedAt', 'DueDate', 'OdometerReading', 'AssignedMechanicId', 'AssignedMechanicName', 'AcceptedAt', 'StartedAt', 'ReadyAt', 'DeliveredAt'],
+    'Complaints': ['ID', 'BikeNumber', 'CustomerName', 'CustomerPhone', 'Details', 'PhotoUrls', 'EstimatedCost', 'Status', 'CreatedAt', 'DueDate', 'OdometerReading', 'AssignedMechanicId', 'AssignedMechanicName', 'AcceptedAt', 'StartedAt', 'ReadyAt', 'QCApprovedAt', 'QCApprovedBy', 'DeliveredAt', 'WorkNotes_JSON', 'City'],
     'StockWanting': ['ID', 'PartNumber', 'ItemName', 'Quantity', 'Rate', 'CreatedAt'],
     'Visitors': ['ID', 'Name', 'BikeNumber', 'Phone', 'Remarks', 'Type', 'PhotoUrls', 'CreatedAt'],
     'ServiceReminders': ['ID', 'BikeNumber', 'CustomerName', 'Phone', 'ReminderDate', 'ServiceType', 'Status', 'LastNotified', 'Message', 'ServiceDate'],
@@ -404,21 +404,32 @@ function updatePaymentReceipt(data: any) {
 function deletePaymentReceipt(data: any) { return deleteRow('PaymentReceipts', data.id); }
 
 // --- COMPLAINTS (JOB CARDS) ---
-const COMPLAINT_FIELDS = ['id', 'bikeNumber', 'customerName', 'customerPhone', 'details', 'photoUrls', 'estimatedCost', 'status', 'createdAt', 'dueDate', 'odometerReading', 'assignedMechanicId', 'assignedMechanicName', 'acceptedAt', 'startedAt', 'readyAt', 'deliveredAt'];
+const COMPLAINT_FIELDS = ['id', 'bikeNumber', 'customerName', 'customerPhone', 'details', 'photoUrls', 'estimatedCost', 'status', 'createdAt', 'dueDate', 'odometerReading', 'assignedMechanicId', 'assignedMechanicName', 'acceptedAt', 'startedAt', 'readyAt', 'qcApprovedAt', 'qcApprovedBy', 'deliveredAt', 'workNotes_JSON', 'city'];
 
-function getComplaints() { return getSheetData('Complaints', COMPLAINT_FIELDS); }
+function getComplaints() {
+  const data = getSheetData('Complaints', COMPLAINT_FIELDS);
+  return data.map((c: any) => {
+    if (c.workNotes_JSON) {
+        c.workNotes = c.workNotes_JSON;
+        delete c.workNotes_JSON;
+    }
+    return c;
+  });
+}
 
 function addComplaint(data: any) {
   const id = data.id || genId('CMP-');
   const photos = Array.isArray(data.photoUrls) ? data.photoUrls.join(',') : (data.photoUrls || '');
-  const row = [id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'New', data.createdAt || nowISO(), data.dueDate || '', data.odometerReading || '', data.assignedMechanicId || '', data.assignedMechanicName || '', data.acceptedAt || '', data.startedAt || '', data.readyAt || '', data.deliveredAt || ''];
+  const workNotes = JSON.stringify(data.workNotes || []);
+  const row = [id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'New', data.createdAt || nowISO(), data.dueDate || '', data.odometerReading || '', data.assignedMechanicId || '', data.assignedMechanicName || '', data.acceptedAt || '', data.startedAt || '', data.readyAt || '', data.qcApprovedAt || '', data.qcApprovedBy || '', data.deliveredAt || '', workNotes, data.city || ''];
   getSheet('Complaints').appendRow(row);
   return { ...data, id, status: data.status || 'New', createdAt: data.createdAt || nowISO() };
 }
 
 function updateComplaint(data: any) {
   const photos = Array.isArray(data.photoUrls) ? data.photoUrls.join(',') : (data.photoUrls || '');
-  const row = [data.id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'New', data.createdAt || '', data.dueDate || '', data.odometerReading || '', data.assignedMechanicId || '', data.assignedMechanicName || '', data.acceptedAt || '', data.startedAt || '', data.readyAt || '', data.deliveredAt || ''];
+  const workNotes = JSON.stringify(data.workNotes || []);
+  const row = [data.id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'New', data.createdAt || '', data.dueDate || '', data.odometerReading || '', data.assignedMechanicId || '', data.assignedMechanicName || '', data.acceptedAt || '', data.startedAt || '', data.readyAt || '', data.qcApprovedAt || '', data.qcApprovedBy || '', data.deliveredAt || '', workNotes, data.city || ''];
   return updateRow('Complaints', data.id, row);
 }
 

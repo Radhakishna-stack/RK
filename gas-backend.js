@@ -28,7 +28,7 @@ function initProject() {
         Inventory:       _s('ID,Name,Category,Stock,UnitPrice,PurchasePrice,ItemCode,GSTRate,HSN,LastUpdated,WantedQty'),
         Transactions:    _s('ID,EntityID,AccountID,Type,Amount,PaymentMode,Date,Description,Category,Status,ChequeNumber,PartyName,BankName,Items_JSON,ReceiptNumber'),
         BankAccounts:    _s('ID,Name,BankName,AccountNumber,Type,OpeningBalance,CreatedAt'),
-        Complaints:      _s('ID,BikeNumber,CustomerName,CustomerPhone,Details,PhotoUrls,EstimatedCost,Status,CreatedAt,DueDate,OdometerReading'),
+        Complaints:      _s('ID,BikeNumber,CustomerName,CustomerPhone,Details,PhotoUrls,EstimatedCost,Status,CreatedAt,DueDate,OdometerReading,AssignedMechanicId,AssignedMechanicName,AcceptedAt,StartedAt,ReadyAt,QCApprovedAt,QCApprovedBy,DeliveredAt,WorkNotes_JSON,City'),
         Visitors:        _s('ID,Name,BikeNumber,Phone,Remarks,Type,PhotoUrls,CreatedAt'),
         ServiceReminders:_s('ID,BikeNumber,CustomerName,Phone,ReminderDate,ServiceType,Status,LastNotified,Message,ServiceDate'),
         Salesmen:        _s('ID,Name,Phone,Target,SalesCount,TotalSalesValue,JoinDate,Status'),
@@ -348,18 +348,29 @@ function updatePaymentReceipt(data) {
 }
 function deletePaymentReceipt(data) { return deleteTransaction(data); }
 // --- COMPLAINTS (JOB CARDS) ---
-const COMPLAINT_FIELDS = ['id', 'bikeNumber', 'customerName', 'customerPhone', 'details', 'photoUrls', 'estimatedCost', 'status', 'createdAt', 'dueDate', 'odometerReading', 'assignedMechanicId', 'assignedMechanicName'];
-function getComplaints() { return getSheetData('Complaints', COMPLAINT_FIELDS); }
+const COMPLAINT_FIELDS = ['id', 'bikeNumber', 'customerName', 'customerPhone', 'details', 'photoUrls', 'estimatedCost', 'status', 'createdAt', 'dueDate', 'odometerReading', 'assignedMechanicId', 'assignedMechanicName', 'acceptedAt', 'startedAt', 'readyAt', 'qcApprovedAt', 'qcApprovedBy', 'deliveredAt', 'workNotes_JSON', 'city'];
+function getComplaints() {
+    const data = getSheetData('Complaints', COMPLAINT_FIELDS);
+    return data.map(c => {
+        if (c.workNotes_JSON) {
+            c.workNotes = c.workNotes_JSON;
+            delete c.workNotes_JSON;
+        }
+        return c;
+    });
+}
 function addComplaint(data) {
     const id = data.id || genId('CMP-');
     const photos = Array.isArray(data.photoUrls) ? data.photoUrls.join(',') : (data.photoUrls || '');
-    const row = [id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'Pending', data.createdAt || nowISO(), data.dueDate || '', data.odometerReading || '', data.assignedMechanicId || '', data.assignedMechanicName || ''];
+    const workNotes = JSON.stringify(data.workNotes || []);
+    const row = [id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'Pending', data.createdAt || nowISO(), data.dueDate || '', data.odometerReading || '', data.assignedMechanicId || '', data.assignedMechanicName || '', data.acceptedAt || '', data.startedAt || '', data.readyAt || '', data.qcApprovedAt || '', data.qcApprovedBy || '', data.deliveredAt || '', workNotes, data.city || ''];
     getSheet('Complaints').appendRow(row);
     return { ...data, id, status: data.status || 'Pending', createdAt: data.createdAt || nowISO() };
 }
 function updateComplaint(data) {
     const photos = Array.isArray(data.photoUrls) ? data.photoUrls.join(',') : (data.photoUrls || '');
-    const row = [data.id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'Pending', data.createdAt || '', data.dueDate || '', data.odometerReading || '', data.assignedMechanicId || '', data.assignedMechanicName || ''];
+    const workNotes = JSON.stringify(data.workNotes || []);
+    const row = [data.id, data.bikeNumber || '', data.customerName || '', data.customerPhone || '', data.details || '', photos, data.estimatedCost || 0, data.status || 'Pending', data.createdAt || '', data.dueDate || '', data.odometerReading || '', data.assignedMechanicId || '', data.assignedMechanicName || '', data.acceptedAt || '', data.startedAt || '', data.readyAt || '', data.qcApprovedAt || '', data.qcApprovedBy || '', data.deliveredAt || '', workNotes, data.city || ''];
     return updateRow('Complaints', data.id, row);
 }
 function updateComplaintStatus(data) {
