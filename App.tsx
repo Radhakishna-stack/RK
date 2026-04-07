@@ -95,6 +95,37 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // ── Auto-Polling for Real-Time Sync 🔥 ──
+  // Continuously fetches live updates for active jobs & pickups
+  useEffect(() => {
+    if (!authSession || isOffline) return;
+    let isPolling = true;
+
+    const pollData = async () => {
+      // Small pause before starting to let the app naturally load first
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      while (isPolling) {
+        try {
+          // Triggers cloudRead(), which inherently drops local updates if there are cloud diffs
+          await Promise.all([
+            dbService.getComplaints(),
+            dbService.getPickupRequests()
+          ]);
+        } catch (e) {
+          console.warn('[AutoSync] Poll error:', e);
+        }
+        // Wait 2-3 seconds before starting the NEXT check. 
+        // A sequential loop is used instead of setInterval to prevent overlapping network requests
+        await new Promise(resolve => setTimeout(resolve, 2500));
+      }
+    };
+
+    pollData();
+
+    return () => { isPolling = false; };
+  }, [authSession, isOffline]);
+
   // Determine active tab for UI highlighting based on current path
   const getActiveTab = (path: string) => {
     if (path === '/' || path === '/dashboard') return 'home';
