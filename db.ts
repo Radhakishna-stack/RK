@@ -236,8 +236,8 @@ async function migrateToCloud(): Promise<string> {
     { lsKey: 'mg_visitors', sheet: 'Visitors', fields: (item: any) => [item.id, item.name || '', item.bikeNumber || '', item.phone || '', item.remarks || '', item.type || '', (item.photoUrls || []).join(','), item.createdAt || ''] },
     { lsKey: 'mg_reminders', sheet: 'ServiceReminders', fields: ['id', 'bikeNumber', 'customerName', 'phone', 'reminderDate', 'serviceType', 'status', 'lastNotified', 'message', 'serviceDate'] },
     { lsKey: 'mg_users', sheet: 'Users', fields: ['id', 'username', 'password', 'role', 'name', 'phone', 'createdAt', 'isActive'] },
-    { lsKey: 'mg_salesmen', sheet: 'Salesmen', fields: ['id', 'name', 'phone', 'target', 'salesCount', 'totalSalesValue', 'joinDate', 'status'] },
-    { lsKey: 'mg_pickup_requests', sheet: 'PickupRequests', fields: (item: any) => [item.id, item.customerName || '', item.customerPhone || '', item.bikeNumber || '', item.issueDescription || '', item.locationLink || '', JSON.stringify(item.location || null), item.status || 'Pending', item.assignedEmployeeId || '', item.assignedEmployeeName || '', JSON.stringify(item.employeeLocation || null), item.notes || '', item.createdAt || '', item.updatedAt || ''] },
+    { lsKey: 'mg_salesmen', sheet: 'Salesmen', fields: ['id', 'name', 'phone', 'target', 'salesCount', 'totalSalesValue', 'joinDate', 'status', 'targetArea'] },
+    { lsKey: 'mg_pickup_requests', sheet: 'PickupRequests', fields: (item: any) => [item.id, item.customerName || '', item.customerPhone || '', item.bikeNumber || '', item.issueDescription || '', item.locationLink || '', JSON.stringify(item.location || null), item.status || 'Pending', item.assignedEmployeeId || '', item.assignedEmployeeName || '', JSON.stringify(item.employeeLocation || null), item.notes || '', item.createdAt || '', item.updatedAt || '', item.pickupType || ''] },
   ];
 
   const results: string[] = [];

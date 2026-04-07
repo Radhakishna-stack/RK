@@ -31,11 +31,11 @@ function initProject() {
         Complaints:      _s('ID,BikeNumber,CustomerName,CustomerPhone,Details,PhotoUrls,EstimatedCost,Status,CreatedAt,DueDate,OdometerReading,AssignedMechanicId,AssignedMechanicName,AcceptedAt,StartedAt,ReadyAt,QCApprovedAt,QCApprovedBy,DeliveredAt,WorkNotes_JSON,City'),
         Visitors:        _s('ID,Name,BikeNumber,Phone,Remarks,Type,PhotoUrls,CreatedAt'),
         ServiceReminders:_s('ID,BikeNumber,CustomerName,Phone,ReminderDate,ServiceType,Status,LastNotified,Message,ServiceDate'),
-        Salesmen:        _s('ID,Name,Phone,Target,SalesCount,TotalSalesValue,JoinDate,Status'),
+        Salesmen:        _s('ID,Name,Phone,Target,SalesCount,TotalSalesValue,JoinDate,Status,TargetArea'),
         Users:           _s('ID,Username,Password,Role,Name,Phone,CreatedAt,IsActive'),
         Config:          _s('Key,Value,UpdatedAt'),
         RecycleBin:      _s('BinID,OriginalID,Type,Data_JSON,DeletedAt'),
-        PickupRequests:  _s('ID,CustomerName,CustomerPhone,BikeNumber,IssueDescription,LocationLink,Location_JSON,Status,AssignedEmployeeID,AssignedEmployeeName,EmployeeLocation_JSON,Notes,CreatedAt,UpdatedAt')
+        PickupRequests:  _s('ID,CustomerName,CustomerPhone,BikeNumber,IssueDescription,LocationLink,Location_JSON,Status,AssignedEmployeeID,AssignedEmployeeName,EmployeeLocation_JSON,Notes,CreatedAt,UpdatedAt,PickupType')
     };
     for (const name in sheets) {
         let sheet = ss.getSheetByName(name);
@@ -378,42 +378,27 @@ function updateComplaintStatus(data) {
 }
 function deleteComplaint(data) { return deleteRow('Complaints', data.id); }
 // --- PICKUP REQUESTS ---
-const PICKUP_FIELDS = ['id', 'customerName', 'customerPhone', 'bikeNumber', 'issueDescription', 'locationLink', 'location', 'status', 'assignedEmployeeId', 'assignedEmployeeName', 'employeeLocation', 'notes', 'createdAt', 'updatedAt'];
+const PICKUP_FIELDS = ['id', 'customerName', 'customerPhone', 'bikeNumber', 'issueDescription', 'locationLink', 'location', 'status', 'assignedEmployeeId', 'assignedEmployeeName', 'employeeLocation', 'notes', 'createdAt', 'updatedAt', 'pickupType'];
 function getPickupRequests() {
     const raw = getSheetData('PickupRequests', PICKUP_FIELDS);
-    return raw.map((r) => {
-        // Parse location JSON fields stored as plain strings (not _JSON suffix)
-        if (r.location && typeof r.location === 'string') {
-            try {
-                r.location = JSON.parse(r.location);
-            }
-            catch {
-                r.location = null;
-            }
-        }
-        if (r.employeeLocation && typeof r.employeeLocation === 'string') {
-            try {
-                r.employeeLocation = JSON.parse(r.employeeLocation);
-            }
-            catch {
-                r.employeeLocation = null;
-            }
-        }
+    return raw.map(r => {
+        if (typeof r.location === 'string') { try { r.location = JSON.parse(r.location); } catch { r.location = null; } }
+        if (typeof r.employeeLocation === 'string') { try { r.employeeLocation = JSON.parse(r.employeeLocation); } catch { r.employeeLocation = null; } }
         return r;
     });
 }
 function addPickupRequest(data) {
-    const id = data.id || genId('PKP-');
-    const locationJson = data.location ? JSON.stringify(data.location) : '';
-    const empLocJson = data.employeeLocation ? JSON.stringify(data.employeeLocation) : '';
-    const row = [id, data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', data.locationLink || '', locationJson, data.status || 'Pending', data.assignedEmployeeId || '', data.assignedEmployeeName || '', empLocJson, data.notes || '', data.createdAt || nowISO(), data.updatedAt || nowISO()];
+    const id = data.id || genId('PU-');
+    const loc = data.location ? JSON.stringify(data.location) : '';
+    const empLoc = data.employeeLocation ? JSON.stringify(data.employeeLocation) : '';
+    const row = [id, data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', data.locationLink || '', loc, data.status || 'Pending', data.assignedEmployeeId || '', data.assignedEmployeeName || '', empLoc, data.notes || '', data.createdAt || nowISO(), data.updatedAt || nowISO(), data.pickupType || ''];
     getSheet('PickupRequests').appendRow(row);
     return { ...data, id, status: data.status || 'Pending', createdAt: data.createdAt || nowISO(), updatedAt: data.updatedAt || nowISO() };
 }
 function updatePickupRequest(data) {
-    const locationJson = data.location ? JSON.stringify(data.location) : '';
-    const empLocJson = data.employeeLocation ? JSON.stringify(data.employeeLocation) : '';
-    const row = [data.id, data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', data.locationLink || '', locationJson, data.status || 'Pending', data.assignedEmployeeId || '', data.assignedEmployeeName || '', empLocJson, data.notes || '', data.createdAt || nowISO(), nowISO()];
+    const loc = data.location ? (typeof data.location === 'object' ? JSON.stringify(data.location) : data.location) : '';
+    const empLoc = data.employeeLocation ? (typeof data.employeeLocation === 'object' ? JSON.stringify(data.employeeLocation) : data.employeeLocation) : '';
+    const row = [data.id, data.customerName || '', data.customerPhone || '', data.bikeNumber || '', data.issueDescription || '', data.locationLink || '', loc, data.status || 'Pending', data.assignedEmployeeId || '', data.assignedEmployeeName || '', empLoc, data.notes || '', data.createdAt || '', data.updatedAt || nowISO(), data.pickupType || ''];
     return updateRow('PickupRequests', data.id, row);
 }
 function deletePickupRequest(data) { return deleteRow('PickupRequests', data.id); }
@@ -465,13 +450,17 @@ function addStockTransaction(data) {
     return addTransaction({ id: data.id || genId('ST-'), entityId: data.itemId || '', accountId: '', type: data.type === 'IN' ? 'stock-in' : 'stock-out', amount: data.quantity || 0, paymentMode: '', date: data.date || nowISO(), description: data.note || '', category: 'stock', status: 'completed' });
 }
 // --- SALESMEN ---
-const SALESMAN_FIELDS = ['id', 'name', 'phone', 'target', 'salesCount', 'totalSalesValue', 'joinDate', 'status'];
+const SALESMAN_FIELDS = ['id', 'name', 'phone', 'target', 'salesCount', 'totalSalesValue', 'joinDate', 'status', 'targetArea'];
 function getSalesmen() { return getSheetData('Salesmen', SALESMAN_FIELDS); }
 function addSalesman(data) {
-    const id = data.id || genId('SM-');
-    const row = [id, data.name || '', data.phone || '', data.target || 0, data.salesCount || 0, data.totalSalesValue || 0, data.joinDate || nowISO(), data.status || 'Available'];
+    const id = data.id || genId('ST');
+    const row = [id, data.name || '', data.phone || '', data.target || 0, data.salesCount || 0, data.totalSalesValue || 0, data.joinDate || nowISO(), data.status || 'Available', data.targetArea || ''];
     getSheet('Salesmen').appendRow(row);
-    return { ...data, id, salesCount: data.salesCount || 0, totalSalesValue: data.totalSalesValue || 0 };
+    return { ...data, id, joinDate: data.joinDate || nowISO(), status: data.status || 'Available' };
+}
+function updateSalesman(data) {
+    const row = [data.id, data.name || '', data.phone || '', data.target || 0, data.salesCount || 0, data.totalSalesValue || 0, data.joinDate || '', data.status || 'Available', data.targetArea || ''];
+    return updateRow('Salesmen', data.id, row);
 }
 function deleteSalesman(data) { return deleteRow('Salesmen', data.id); }
 // --- USERS ---
