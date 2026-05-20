@@ -2324,6 +2324,27 @@ export const dbService = {
     return false;
   },
 
+  completePickupAndDraftJob: async (pickupId: string): Promise<void> => {
+    const pickups = await dbService.getPickupRequests();
+    const pickup = pickups.find(p => p.id === pickupId);
+    if (!pickup) return;
+
+    // 1. Mark pickup as Delivered (Completed at shop)
+    await dbService.updatePickupRequest({ ...pickup, status: 'Delivered' });
+
+    // 2. Draft a new Service Job (Complaint) automatically
+    await dbService.addComplaint({
+      customerName: pickup.customerName,
+      customerPhone: pickup.customerPhone,
+      bikeNumber: pickup.bikeNumber,
+      details: pickup.issueDescription,
+      city: '',
+      estimatedCost: 0,
+      odometerReading: 0,
+      photoUrls: []
+    });
+  },
+
   // ============================================
   // Audit Logs
   // ============================================

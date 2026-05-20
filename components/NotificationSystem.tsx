@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Truck, Bell, X } from 'lucide-react';
 import { dbService } from '../db';
-import { PickupRequest, PickupStatus } from '../types';
+import { PickupRequest, PickupStatus, Complaint, ComplaintStatus } from '../types';
 import { getCurrentUser } from '../auth';
 import { canAccessRoute } from '../permissions';
 
@@ -15,6 +15,7 @@ interface Toast {
 export const NotificationSystem: React.FC = () => {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const lastPickupsRef = useRef<Map<string, PickupStatus>>(new Map());
+    const lastComplaintsRef = useRef<Map<string, ComplaintStatus>>(new Map());
     const isFirstLoadRef = useRef(true);
 
     const addToast = (title: string, message: string, type: 'info' | 'success' | 'warning' = 'info') => {
@@ -35,23 +36,33 @@ export const NotificationSystem: React.FC = () => {
             if (!user) return;
 
             try {
-                const pickups = await dbService.getPickupRequests();
-                const currentMap = new Map<string, PickupStatus>();
-                pickups.forEach(p => currentMap.set(p.id, p.status));
+                const [pickups, complaints] = await Promise.all([
+                    dbService.getPickupRequests(),
+                    dbService.getComplaints()
+                ]);
+                const currentPickupMap = new Map<string, PickupStatus>();
+                pickups.forEach(p => currentPickupMap.set(p.id, p.status));
+
+                const currentComplaintMap = new Map<string, ComplaintStatus>();
+                complaints.forEach(c => currentComplaintMap.set(c.id, c.status));
 
                 if (isFirstLoadRef.current) {
                     // Just initialize the baseline state
-                    lastPickupsRef.current = currentMap;
+                    lastPickupsRef.current = currentPickupMap;
+                    lastComplaintsRef.current = currentComplaintMap;
                     isFirstLoadRef.current = false;
                     return;
                 }
 
-                const prevMap = lastPickupsRef.current;
+                const prevPickupMap = lastPickupsRef.current;
+                const prevComplaintMap = lastComplaintsRef.current;
                 const isManager = canAccessRoute(user.role, 'pickup_manager');
+                const isMechanic = user.role === 'mechanic' || user.role === 'employee';
                 const isMyPickup = (p: PickupRequest) => p.assignedEmployeeId === user.id;
+                const isMyComplaint = (c: Complaint) => c.assignedMechanicId === user.id;
 
                 pickups.forEach(pickup => {
-                    const prevStatus = prevMap.get(pickup.id);
+                    const prevStatus = prevPickupMap.get(pickup.id);
                     const currentStatus = pickup.status;
 
                     if (prevStatus !== currentStatus) {
@@ -77,7 +88,31 @@ export const NotificationSystem: React.FC = () => {
                     }
                 });
 
-                lastPickupsRef.current = currentMap;
+                complaints.forEach(complaint => {
+                    const prevStatus = prevComplaintMap.get(complaint.id);
+                    const currentStatus = complaint.status;
+
+                    if (prevStatus !== currentStatus) {
+                        // ─── ADMIN / MANAGER NOTIFICATIONS ───
+                        if (isManager) {
+                            if (!prevStatus && currentStatus === ComplaintStatus.NEW) {
+                                addToast('New Service Job', `Vehicle ${complaint.bikeNumber} is at shop. Assign a mechanic!`, 'info');
+                            } else if (currentStatus === ComplaintStatus.READY && prevStatus !== ComplaintStatus.READY) {
+                                addToast('Job Ready for QC', `${complaint.assignedMechanicName} marked ${complaint.bikeNumber} as ready`, 'success');
+                            }
+                        }
+
+                        // ─── MECHANIC NOTIFICATIONS ───
+                        if (isMyComplaint(complaint)) {
+                            if (currentStatus === ComplaintStatus.ASSIGNED && prevStatus !== ComplaintStatus.ASSIGNED) {
+                                addToast('New Job Assigned', `You have been assigned to work on ${complaint.bikeNumber}`, 'warning');
+                            }
+                        }
+                    }
+                });
+
+                lastPickupsRef.current = currentPickupMap;
+                lastComplaintsRef.current = currentComplaintMap;
             } catch (err) {
                 console.error("Notification polling failed", err);
             }

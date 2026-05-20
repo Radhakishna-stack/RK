@@ -170,6 +170,9 @@ const EmployeePanel: React.FC<EmployeePanelProps> = ({ userRole, onNavigate }) =
     } else if (action === 'Picked Up') {
       stopGpsTracking();
       await dbService.updatePickupRequest({ ...pickup, status: 'Picked Up' });
+    } else if (action === 'Delivered') {
+      stopGpsTracking();
+      await dbService.completePickupAndDraftJob(pickup.id);
     } else {
       await dbService.updatePickupRequest({ ...pickup, status: action });
     }

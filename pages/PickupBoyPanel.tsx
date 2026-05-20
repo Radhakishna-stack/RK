@@ -109,7 +109,12 @@ const PickupBoyPanel: React.FC<PickupBoyPanelProps> = ({ onNavigate }) => {
     if (nextStatus === 'Picked Up' || nextStatus === 'Delivered') {
       stopGpsTracking();
     }
-    await dbService.updatePickupRequest({ ...pickup, status: nextStatus });
+    
+    if (nextStatus === 'Delivered') {
+      await dbService.completePickupAndDraftJob(pickup.id);
+    } else {
+      await dbService.updatePickupRequest({ ...pickup, status: nextStatus });
+    }
     await loadData();
   };
 
